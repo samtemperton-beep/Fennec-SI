@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Syne:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #090c11;
+  --surface: #10141c;
+  --surface2: #171d28;
+  --border: #232d3f;
+  --text: #e2e8f0;
+  --text2: #7a8899;
+  --green: #1fcc6e;
+  --red: #f05454;
+  --amber: #f0a940;
+  --accent: #5b6aff;
+  --accent2: #7c88ff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 { font-family: 'Syne', sans-serif; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+.glass {
+  background: rgba(16, 20, 28, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.signal-buy {
+  color: var(--green);
+  background: rgba(31, 204, 110, 0.1);
+  border: 1px solid rgba(31, 204, 110, 0.3);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.signal-sell {
+  color: var(--red);
+  background: rgba(240, 84, 84, 0.1);
+  border: 1px solid rgba(240, 84, 84, 0.3);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.signal-hold {
+  color: var(--amber);
+  background: rgba(240, 169, 64, 0.1);
+  border: 1px solid rgba(240, 169, 64, 0.3);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.positive { color: var(--green); }
+.negative { color: var(--red); }
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--text2);
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.nav-link:hover { background: var(--surface2); color: var(--text); }
+.nav-link.active {
+  background: rgba(91, 106, 255, 0.15);
+  color: var(--accent2);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 6px;
+}
