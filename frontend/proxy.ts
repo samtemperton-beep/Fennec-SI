@@ -21,21 +21,8 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Protect /app/* and /settings routes
-  if (!user && (
-    request.nextUrl.pathname.startsWith('/app') ||
-    request.nextUrl.pathname.startsWith('/settings') ||
-    request.nextUrl.pathname.startsWith('/onboarding')
-  )) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  // Redirect logged-in users away from login
-  if (user && request.nextUrl.pathname === '/login') {
-    return NextResponse.redirect(new URL('/app/portfolio', request.url))
-  }
+  // AUTH BYPASS — re-enable before launch
+  // const { data: { user } } = await supabase.auth.getUser()
 
   return supabaseResponse
 }
