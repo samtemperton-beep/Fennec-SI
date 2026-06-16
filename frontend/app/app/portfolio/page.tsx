@@ -26,8 +26,11 @@ export default function PortfolioPage() {
   const supabase = createClient()
 
   useEffect(() => {
+    const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) { setUserId(data.user.id); loadHoldings(data.user.id) }
+      const uid = data.user?.id ?? DEV_USER_ID
+      setUserId(uid)
+      loadHoldings(uid)
     })
   }, [])
 
