@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "Fennec SI — AI-powered portfolio tracker",
+  title: "Fennec SI — AI-Powered Portfolio Tracker",
   description: "AI-powered Stock Intelligence for NZ, ASX & US markets",
 };
 
