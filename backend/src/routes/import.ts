@@ -12,12 +12,13 @@ interface Holding {
 }
 
 function parseHatch(rows: string[][]): Holding[] {
-  return rows.slice(1).map(r => ({
+  // Hatch columns: Ticker,Name,Portion,Shares,Average cost (USD),Average cost (NZD),...
+  return rows.slice(1).filter(r => r.length > 5 && r[0] && !r[0].startsWith('"An FX')).map(r => ({
     ticker: (r[0] || '').trim().toUpperCase(),
-    shares: parseFloat(r[2] || '0'),
-    buyPrice: parseFloat(r[3] || '0'),
+    shares: parseFloat(r[3] || '0'),
+    buyPrice: parseFloat(r[4] || '0'),
     market: 'US',
-  })).filter(h => h.ticker && h.shares > 0);
+  })).filter(h => h.ticker && h.shares > 0 && !isNaN(h.buyPrice));
 }
 
 function parseSharesies(rows: string[][]): Holding[] {
@@ -40,7 +41,7 @@ function parseIBKR(rows: string[][]): Holding[] {
 
 function detectFormat(rows: string[][]): string {
   const header = (rows[0] || []).join(',').toLowerCase();
-  if (header.includes('hatch')) return 'hatch';
+  if (header.includes('average cost (usd)') || header.includes('average cost (nzd)')) return 'hatch';
   if (header.includes('sharesies') || header.includes('portfolio name')) return 'sharesies';
   if (rows.some(r => r[0] === 'Data' && r[1] === 'Trades')) return 'ibkr';
   return 'generic';
@@ -59,9 +60,17 @@ router.post('/csv', requireAuth, async (req, res) => {
   const { csv } = req.body;
   if (!csv) return res.status(400).json({ error: 'No CSV data' });
 
-  const rows = csv.split('\n').map((line: string) =>
-    line.split(',').map((cell: string) => cell.trim().replace(/^"|"$/g, ''))
-  ).filter((r: string[]) => r.some(c => c));
+  const rows = csv.split('\n').map((line: string) => {
+    const cells: string[] = [];
+    let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cells.push(cur.trim());
+    return cells;
+  }).filter((r: string[]) => r.some(c => c));
 
   const format = detectFormat(rows);
   let holdings: Holding[];
