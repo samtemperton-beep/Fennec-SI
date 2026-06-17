@@ -23,14 +23,21 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(9,12,17,0.85)' }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16, background: 'rgba(9,12,17,0.85)',
+      }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
         ref={ref}
-        className={`card relative max-h-[90vh] overflow-y-auto ${wide ? 'w-full max-w-3xl' : 'w-full max-w-lg'}`}
-        style={{ background: 'var(--surface)' }}
+        style={{
+          background: 'var(--surface)', borderRadius: 12, padding: 24,
+          width: '100%', maxWidth: wide ? 768 : 512,
+          maxHeight: '90vh', overflowY: 'auto', position: 'relative',
+          border: '1px solid var(--border)',
+        }}
       >
         {title && (
           <div className="flex items-center justify-between mb-4">
