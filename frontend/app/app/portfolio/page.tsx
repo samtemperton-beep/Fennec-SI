@@ -220,19 +220,35 @@ export default function PortfolioPage() {
 
       {/* Import Modal */}
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import Portfolio" wide>
-        <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 12 }}>Paste CSV from Hatch, Sharesies, or IBKR — we auto-detect the format.</p>
-        <textarea
-          value={csvText}
-          onChange={e => setCsvText(e.target.value)}
-          rows={10}
-          placeholder="Paste CSV content here..."
-          style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 12, resize: 'vertical' }}
-        />
-        <div className="flex gap-3 mt-4">
-          <button onClick={importCSV} style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+        <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>Upload a CSV from Hatch, Sharesies, or IBKR — we auto-detect the format.</p>
+        <label
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: '32px 16px', borderRadius: 8, cursor: 'pointer',
+            border: '2px dashed var(--border)', background: 'var(--surface2)',
+            color: 'var(--text2)', fontSize: 13,
+          }}
+        >
+          <IconUpload size={24} style={{ color: 'var(--accent)' }} />
+          {csvText ? <span style={{ color: 'var(--text)' }}>File loaded — ready to import</span> : <span>Click to choose a CSV file</span>}
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = ev => setCsvText(ev.target?.result as string)
+              reader.readAsText(file)
+            }}
+          />
+        </label>
+        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+          <button onClick={importCSV} disabled={!csvText} style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: csvText ? 1 : 0.5 }}>
             Import
           </button>
-          <button onClick={() => setImportOpen(false)} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+          <button onClick={() => { setImportOpen(false); setCsvText('') }} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
             Cancel
           </button>
         </div>
