@@ -7,7 +7,7 @@ import { SignalBadge } from '@/components/shared/SignalBadge'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
 import { fmtCurrency, fmtPct, fmtLarge, fmt } from '@/lib/utils'
-import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight } from '@tabler/icons-react'
+import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 interface WItem {
@@ -24,11 +24,16 @@ export default function WatchlistPage() {
   const [ticker, setTicker] = useState('')
   const [market, setMarket] = useState('US')
   const [analyzingSet, setAnalyzingSet] = useState(new Set<number>())
+  const [screenshotOpen, setScreenshotOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
+    const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) { setUserId(data.user.id); load(data.user.id) }
+      const uid = data.user?.id ?? DEV_USER_ID
+      setUserId(uid)
+      load(uid)
     })
   }, [])
 
@@ -80,6 +85,31 @@ export default function WatchlistPage() {
     setAnalyzingSet(s => { const n = new Set(s); n.delete(item.id); return n })
   }
 
+  async function importScreenshot(file: File) {
+    if (!userId) return
+    setImporting(true)
+    try {
+      const reader = new FileReader()
+      reader.onload = async ev => {
+        const base64 = (ev.target?.result as string).split(',')[1]
+        const mediaType = file.type as any
+        const { holdings } = await api.importScreenshot(base64, mediaType)
+        let added = 0
+        for (const h of holdings) {
+          const { data } = await supabase.from('watchlist').insert({ user_id: userId, ticker: h.ticker.toUpperCase(), market: 'US' }).select().single()
+          if (data) { setItems(prev => [data, ...prev]); added++ }
+        }
+        toast.success(`Added ${added} tickers to watchlist`)
+        setScreenshotOpen(false)
+      }
+      reader.readAsDataURL(file)
+    } catch (e: any) {
+      toast.error('Import failed: ' + e.message)
+    } finally {
+      setImporting(false)
+    }
+  }
+
   async function addToPortfolio(item: WItem) {
     if (!userId) return
     const buyPrice = item.current_price || 0
@@ -97,6 +127,9 @@ export default function WatchlistPage() {
           </button>
           <button onClick={() => items.forEach(i => analyzeItem(i))} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'rgba(91,106,255,0.15)', border: '1px solid rgba(91,106,255,0.3)', color: 'var(--accent2)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
             <IconBrain size={14} /> Analyze All
+          </button>
+          <button onClick={() => setScreenshotOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+            <IconCamera size={14} /> Import Screenshot
           </button>
           <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
             <IconPlus size={14} /> Add
@@ -160,6 +193,17 @@ export default function WatchlistPage() {
           </table>
         </div>
       )}
+
+      <Modal open={screenshotOpen} onClose={() => setScreenshotOpen(false)} title="Import from Screenshot">
+        <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>Upload a screenshot of any watchlist or stock list — AI will extract the tickers.</p>
+        <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '32px 16px', borderRadius: 8, cursor: importing ? 'not-allowed' : 'pointer', border: '2px dashed var(--border)', background: 'var(--surface2)', color: 'var(--text2)', fontSize: 13 }}>
+          <IconCamera size={24} style={{ color: 'var(--accent)' }} />
+          {importing ? <span>Analysing image...</span> : <span>Click to choose a screenshot (PNG, JPG)</span>}
+          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={importing}
+            onChange={e => { const f = e.target.files?.[0]; if (f) importScreenshot(f) }}
+          />
+        </label>
+      </Modal>
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add to Watchlist">
         <form onSubmit={add} className="space-y-4">
