@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
-import * as gemini from '../services/gemini';
 import * as claude from '../services/claude';
 import { getCached, setCached } from '../services/cache';
 
@@ -13,8 +12,9 @@ router.post('/analyze', requireAuth, async (req, res) => {
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
+  const user = (req as any).user;
   try {
-    const result = await gemini.analyzeStock(ticker, data);
+    const result = await claude.analyzeStock(ticker, data, user.user_metadata?.anthropic_key);
     await setCached(cacheKey, result, 6);
     res.json(result);
   } catch (e: any) {
@@ -49,8 +49,9 @@ router.post('/top10', requireAuth, async (req, res) => {
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
+  const user = (req as any).user;
   try {
-    const data = await gemini.generateTop10(market, timeframe);
+    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key);
     await setCached(cacheKey, data, 6);
     res.json({ data, cached: false });
   } catch (e: any) {
@@ -67,7 +68,7 @@ router.post('/opportunities', requireAuth, async (req, res) => {
   if (cached) return res.json({ data: cached, cached: true });
 
   try {
-    const data = await gemini.generateOpportunities(riskLevel, holdings);
+    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key);
     await setCached(cacheKey, data, 4);
     res.json({ data, cached: false });
   } catch (e: any) {
@@ -83,8 +84,9 @@ router.post('/news-digest', requireAuth, async (req, res) => {
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
+  const user = (req as any).user;
   try {
-    const data = await gemini.analyzeNews(headlines, portfolio || []);
+    const data = await claude.analyzeNews(headlines, portfolio || [], user.user_metadata?.anthropic_key);
     await setCached(cacheKey, data, 2);
     res.json(data);
   } catch (e: any) {
@@ -99,8 +101,9 @@ router.post('/ipo-analysis', requireAuth, async (req, res) => {
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
+  const user = (req as any).user;
   try {
-    const data = await gemini.analyzeIPO(ipo);
+    const data = await claude.analyzeIPO(ipo, user.user_metadata?.anthropic_key);
     await setCached(cacheKey, data, 24);
     res.json({ data, cached: false });
   } catch (e: any) {
@@ -115,8 +118,9 @@ router.post('/deep-dive', requireAuth, async (req, res) => {
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
+  const user = (req as any).user;
   try {
-    const data = await gemini.deepDive(ticker, context);
+    const data = await claude.deepDive(ticker, context, user.user_metadata?.anthropic_key);
     await setCached(cacheKey, data, 6);
     res.json(data);
   } catch (e: any) {
@@ -127,8 +131,9 @@ router.post('/deep-dive', requireAuth, async (req, res) => {
 // No cache: draft post is personal and instant
 router.post('/draft-post', requireAuth, async (req, res) => {
   const { ticker, signal, context } = req.body;
+  const user = (req as any).user;
   try {
-    const text = await gemini.draftPost(ticker, signal, context);
+    const text = await claude.draftPost(ticker, signal, context, user.user_metadata?.anthropic_key);
     res.json({ text });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
