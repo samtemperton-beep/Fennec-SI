@@ -17,8 +17,10 @@ async function generate(prompt: string, maxTokens = 1024): Promise<string> {
 }
 
 function parseJSON<T>(text: string, fallback: T): T {
-  const objMatch = text.match(/\{[\s\S]*\}/);
-  const arrMatch = text.match(/\[[\s\S]*\]/);
+  // Strip markdown code fences Gemini sometimes wraps around JSON
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  const objMatch = stripped.match(/\{[\s\S]*\}/);
+  const arrMatch = stripped.match(/\[[\s\S]*\]/);
   const match = objMatch || arrMatch;
   try { return match ? JSON.parse(match[0]) : fallback; } catch { return fallback; }
 }
