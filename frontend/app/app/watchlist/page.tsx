@@ -47,11 +47,15 @@ export default function WatchlistPage() {
   async function add(e: React.FormEvent) {
     e.preventDefault()
     if (!userId || !ticker) return
-    const { data, error } = await supabase.from('watchlist').insert({ user_id: userId, ticker: ticker.toUpperCase(), market }).select().single()
+    const t = ticker.toUpperCase()
+    if (items.some(i => i.ticker === t)) return toast.error(`${t} is already in your watchlist`)
+    const { data: portfolioData } = await supabase.from('holdings').select('ticker').eq('user_id', userId).eq('ticker', t)
+    if (portfolioData && portfolioData.length > 0) return toast.error(`${t} is already in your portfolio`)
+    const { data, error } = await supabase.from('watchlist').insert({ user_id: userId, ticker: t, market }).select().single()
     if (error) return toast.error(error.message)
     setItems(prev => [data, ...prev])
     setAddOpen(false); setTicker('')
-    toast.success(`${ticker.toUpperCase()} added to watchlist`)
+    toast.success(`${t} added to watchlist`)
   }
 
   async function remove(id: number) {
@@ -94,12 +98,25 @@ export default function WatchlistPage() {
         const base64 = (ev.target?.result as string).split(',')[1]
         const mediaType = file.type as any
         const { holdings } = await api.importScreenshot(base64, mediaType)
-        let added = 0
+
+        // Get existing watchlist tickers and portfolio tickers
+        const existingTickers = new Set(items.map(i => i.ticker.toUpperCase()))
+        const { data: portfolioData } = await supabase.from('holdings').select('ticker').eq('user_id', userId)
+        const portfolioTickers = new Set((portfolioData || []).map((h: any) => h.ticker.toUpperCase()))
+
+        let added = 0, skippedDupe = 0, skippedPortfolio = 0
         for (const h of holdings) {
-          const { data } = await supabase.from('watchlist').insert({ user_id: userId, ticker: h.ticker.toUpperCase(), market: 'US' }).select().single()
-          if (data) { setItems(prev => [data, ...prev]); added++ }
+          const t = h.ticker.toUpperCase()
+          if (existingTickers.has(t)) { skippedDupe++; continue }
+          if (portfolioTickers.has(t)) { skippedPortfolio++; continue }
+          const { data } = await supabase.from('watchlist').insert({ user_id: userId, ticker: t, market: 'US' }).select().single()
+          if (data) { setItems(prev => [data, ...prev]); existingTickers.add(t); added++ }
         }
-        toast.success(`Added ${added} tickers to watchlist`)
+
+        const parts = [`Added ${added} tickers`]
+        if (skippedDupe > 0) parts.push(`${skippedDupe} already in watchlist`)
+        if (skippedPortfolio > 0) parts.push(`${skippedPortfolio} already in portfolio`)
+        toast.success(parts.join(' · '))
         setScreenshotOpen(false)
       }
       reader.readAsDataURL(file)

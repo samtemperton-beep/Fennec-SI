@@ -63,7 +63,10 @@ export default function NewsPage() {
     try {
       const d = await api.deepDive(item.ticker || 'market', `${item.headline}. ${item.summary || ''}`)
       setDeepDive(d)
-    } catch {}
+    } catch (e: any) {
+      console.error('Deep dive failed:', e)
+      setDeepDive({ what_happened: 'Analysis unavailable — please try again shortly.', why_it_matters: e?.message || '' })
+    }
     setDiving(false)
   }
 

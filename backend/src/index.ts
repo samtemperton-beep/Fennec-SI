@@ -16,6 +16,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Railway (and most cloud hosts) sit behind a proxy — trust it so
+// express-rate-limit can read the real client IP from X-Forwarded-For
+app.set('trust proxy', 1);
+
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
 
 app.use(helmet());
