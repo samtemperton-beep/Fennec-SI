@@ -4,7 +4,7 @@ function getClient() {
   return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 }
 
-const MODEL = 'gemini-2.0-flash-lite';
+const MODEL = 'gemini-1.5-flash';
 
 async function generate(prompt: string, maxTokens = 1024, attempt = 0): Promise<string> {
   const ai = getClient();
