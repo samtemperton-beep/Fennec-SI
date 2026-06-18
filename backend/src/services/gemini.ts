@@ -4,16 +4,24 @@ function getClient() {
   return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 }
 
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-2.0-flash-lite';
 
-async function generate(prompt: string, maxTokens = 1024): Promise<string> {
+async function generate(prompt: string, maxTokens = 1024, attempt = 0): Promise<string> {
   const ai = getClient();
-  const response = await ai.models.generateContent({
-    model: MODEL,
-    contents: prompt,
-    config: { maxOutputTokens: maxTokens },
-  });
-  return response.text ?? '';
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: { maxOutputTokens: maxTokens },
+    });
+    return response.text ?? '';
+  } catch (e: any) {
+    if (attempt < 2 && (e?.status === 503 || e?.status === 429)) {
+      await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+      return generate(prompt, maxTokens, attempt + 1);
+    }
+    throw e;
+  }
 }
 
 function parseJSON<T>(text: string, fallback: T): T {
