@@ -7,12 +7,18 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconMail, IconToggleLeft, IconToggleRight } from '@tabler/icons-react'
 
 const SOURCES = [
-  { id: 'robinhood', name: 'Robinhood Snacks', color: '#00c805' },
-  { id: 'motley', name: 'Motley Fool', color: '#e91e63' },
-  { id: 'seekingalpha', name: 'Seeking Alpha', color: '#f57c00' },
-  { id: 'marketwatch', name: 'MarketWatch', color: '#0077b5' },
-  { id: 'morningbrew', name: 'Morning Brew', color: '#ffd700' },
-  { id: 'hatch', name: 'Hatch Weekly', color: '#00bcd4' },
+  { id: 'robinhood',    name: 'Robinhood Snacks',          color: '#00c805' },
+  { id: 'motley-fool', name: 'Motley Fool',                color: '#8b1a1a' },
+  { id: 'seeking-alpha',name: 'Seeking Alpha',             color: '#f5a623' },
+  { id: 'marketwatch', name: 'MarketWatch Daily',          color: '#1a1a2e' },
+  { id: 'morning-brew',name: 'Morning Brew',               color: '#ffdd00' },
+  { id: 'hatch',       name: 'Hatch Weekly',               color: '#ff6b35' },
+  { id: 'asx',         name: 'ASX Market Update',          color: '#003087' },
+  { id: 'sharesies',   name: 'Sharesies Weekly',           color: '#00b14f' },
+  { id: 'interest-nz', name: 'Interest.co.nz',             color: '#cc0000' },
+  { id: 'daily-upside',name: 'The Daily Upside',           color: '#0066cc' },
+  { id: 'finimize',    name: 'Finimize',                   color: '#7b2d8b' },
+  { id: 'investopedia',name: 'Investopedia',               color: '#003153' },
 ]
 
 const CATEGORIES = ['All', 'Picks', 'Macro', 'Earnings']
@@ -41,7 +47,8 @@ export default function NewslettersPage() {
       setWatchlist(w?.map((x: any) => x.ticker) || [])
     }
 
-    const { data } = await supabase.from('newsletter_digests').select('*').order('received_at', { ascending: false }).limit(100)
+    const { data, error } = await supabase.from('newsletter_digests').select('*').order('received_at', { ascending: false }).limit(100)
+    console.log('newsletters fetch:', { data, error, count: data?.length })
     setDigests(data || [])
     setLoading(false)
   }
