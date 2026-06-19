@@ -133,29 +133,27 @@ export default function NewslettersPage() {
                       )}
                     </div>
 
-                    {/* Bottom row */}
-                    {(d.actionable || d.tickers?.length > 0 || d.key_points?.length > 0) && (
-                      <div className="flex items-start gap-4 mt-3 flex-wrap">
-                        {d.actionable && (
-                          <div style={{ flex: '1 1 200px', padding: '6px 10px', background: 'rgba(91,106,255,0.08)', border: '1px solid rgba(91,106,255,0.2)', borderRadius: 6, fontSize: 12 }}>
-                            💡 {d.actionable}
+                    {/* Tickers */}
+                    {d.tickers?.length > 0 && (
+                      <div className="flex gap-2 flex-wrap mt-3">
+                        {d.tickers.map((t: string) => (
+                          <div key={t} className="flex items-center gap-1">
+                            <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: holdings.includes(t) ? 'var(--green)' : 'var(--accent2)' }}>{t}</span>
+                            <WatchlistButton
+                              ticker={t} userId={userId}
+                              inWatchlist={watchlist.includes(t)}
+                              inPortfolio={holdings.includes(t)}
+                              onAdded={tk => setWatchlist(prev => [...prev, tk])}
+                            />
                           </div>
-                        )}
-                        {d.tickers?.length > 0 && (
-                          <div className="flex gap-2 flex-wrap" style={{ alignSelf: 'center' }}>
-                            {d.tickers.map((t: string) => (
-                              <div key={t} className="flex items-center gap-1">
-                                <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: holdings.includes(t) ? 'var(--green)' : 'var(--accent2)' }}>{t}</span>
-                                <WatchlistButton
-                                  ticker={t} userId={userId}
-                                  inWatchlist={watchlist.includes(t)}
-                                  inPortfolio={holdings.includes(t)}
-                                  onAdded={tk => setWatchlist(prev => [...prev, tk])}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Actionable tip — full width below everything */}
+                    {d.actionable && (
+                      <div style={{ marginTop: 10, padding: '7px 12px', background: 'rgba(91,106,255,0.08)', border: '1px solid rgba(91,106,255,0.2)', borderRadius: 6, fontSize: 12 }}>
+                        💡 {d.actionable}
                       </div>
                     )}
                   </div>
