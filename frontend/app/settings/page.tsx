@@ -6,20 +6,30 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconSettings, IconTrash } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
+const AVATAR_COLORS = [
+  '#5b6aff', '#10b981', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
+]
+
+const PROFESSIONS = [
+  'Retail Investor', 'Day Trader', 'Financial Advisor', 'Fund Manager',
+  'Student', 'Software Engineer', 'Accountant', 'Business Owner', 'Other',
+]
+
 export default function SettingsPage() {
-  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [username, setUsername] = useState('')
+  const [avatarColor, setAvatarColor] = useState(AVATAR_COLORS[0])
+  const [location, setLocation] = useState('')
+  const [profession, setProfession] = useState('')
   const [riskLevel, setRiskLevel] = useState(7)
   const [anthropicKey, setAnthropicKey] = useState('')
   const [finnhubKey, setFinnhubKey] = useState('')
   const [user, setUser] = useState<any>(null)
   const supabase = createClient()
 
-  useEffect(() => {
-    init()
-  }, [])
+  useEffect(() => { init() }, [])
 
   async function init() {
     const { data: { user: u } } = await supabase.auth.getUser()
@@ -27,8 +37,10 @@ export default function SettingsPage() {
     if (u) {
       const { data } = await supabase.from('profiles').select('*').eq('id', u.id).single()
       if (data) {
-        setProfile(data)
         setUsername(data.username || '')
+        setAvatarColor(data.avatar_color || AVATAR_COLORS[0])
+        setLocation(data.location || '')
+        setProfession(data.profession || '')
         setRiskLevel(data.risk_level || 7)
       }
     }
@@ -40,7 +52,14 @@ export default function SettingsPage() {
     if (!user) return
     setSaving(true)
     try {
-      await supabase.from('profiles').upsert({ id: user.id, username, risk_level: riskLevel })
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        username,
+        avatar_color: avatarColor,
+        location: location || null,
+        profession: profession || null,
+        risk_level: riskLevel,
+      })
       if (anthropicKey || finnhubKey) {
         await supabase.auth.updateUser({ data: { anthropic_key: anthropicKey || user.user_metadata?.anthropic_key, finnhub_key: finnhubKey || user.user_metadata?.finnhub_key } })
       }
@@ -74,13 +93,63 @@ export default function SettingsPage() {
         {/* Profile */}
         <div className="card">
           <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Profile</h2>
+
+          {/* Avatar preview + color picker */}
+          <div className="flex items-center gap-4 mb-6 p-4 rounded-xl" style={{ background: 'var(--surface2)' }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%', background: avatarColor, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 24, fontWeight: 700, color: 'white', fontFamily: 'Syne, sans-serif',
+            }}>
+              {username ? username[0].toUpperCase() : '?'}
+            </div>
+            <div>
+              <p style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 8 }}>Avatar colour</p>
+              <div className="flex gap-2 flex-wrap">
+                {AVATAR_COLORS.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setAvatarColor(c)}
+                    style={{
+                      width: 26, height: 26, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
+                      outline: avatarColor === c ? `3px solid white` : 'none',
+                      outlineOffset: 2,
+                      boxShadow: avatarColor === c ? `0 0 0 5px ${c}55` : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-4">
             <div>
               <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Username</label>
-              <input value={username} onChange={e => setUsername(e.target.value)}
+              <input value={username} onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                 style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', outline: 'none' }}
               />
             </div>
+
+            <div className="flex gap-3">
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Location</label>
+                <input value={location} onChange={e => setLocation(e.target.value)}
+                  placeholder="Auckland, NZ"
+                  style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Profession</label>
+                <select value={profession} onChange={e => setProfession(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: profession ? 'var(--text)' : 'var(--text2)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }}
+                >
+                  <option value="">Select...</option>
+                  {PROFESSIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+
             <div>
               <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 8 }}>
                 Risk Level — {RISK_LABELS[riskLevel]}

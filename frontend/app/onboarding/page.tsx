@@ -5,11 +5,24 @@ import { useRouter } from 'next/navigation'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconChartBar, IconArrowRight } from '@tabler/icons-react'
 
-const STEPS = ['Username', 'Risk Level', 'Import Portfolio', 'AI Key', 'Done']
+const STEPS = ['Profile', 'Risk Level', 'Import Portfolio', 'AI Key', 'Done']
+
+const AVATAR_COLORS = [
+  '#5b6aff', '#10b981', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
+]
+
+const PROFESSIONS = [
+  'Retail Investor', 'Day Trader', 'Financial Advisor', 'Fund Manager',
+  'Student', 'Software Engineer', 'Accountant', 'Business Owner', 'Other',
+]
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(0)
   const [username, setUsername] = useState('')
+  const [avatarColor, setAvatarColor] = useState(AVATAR_COLORS[0])
+  const [location, setLocation] = useState('')
+  const [profession, setProfession] = useState('')
   const [riskLevel, setRiskLevel] = useState(7)
   const [anthropicKey, setAnthropicKey] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,7 +33,14 @@ export default function OnboardingPage() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      await supabase.from('profiles').upsert({ id: user.id, username, risk_level: riskLevel })
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        username,
+        avatar_color: avatarColor,
+        location: location || null,
+        profession: profession || null,
+        risk_level: riskLevel,
+      })
       if (anthropicKey) {
         await supabase.auth.updateUser({ data: { anthropic_key: anthropicKey } })
       }
@@ -62,14 +82,70 @@ export default function OnboardingPage() {
         <div className="card">
           {step === 0 && (
             <div>
-              <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 8 }}>Choose a username</h2>
-              <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 20 }}>This is how you'll appear in the community feed</p>
-              <input
-                value={username}
-                onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                placeholder="kiwi_trader"
-                style={{ width: '100%', padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 16, outline: 'none', marginBottom: 20 }}
-              />
+              <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 8 }}>Set up your profile</h2>
+              <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 24 }}>This is how you'll appear in the community</p>
+
+              {/* Avatar preview + color picker */}
+              <div className="flex flex-col items-center mb-6">
+                <div style={{
+                  width: 72, height: 72, borderRadius: '50%', background: avatarColor,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 28, fontWeight: 700, color: 'white', fontFamily: 'Syne, sans-serif', marginBottom: 12,
+                }}>
+                  {username ? username[0].toUpperCase() : '?'}
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>Pick an avatar colour</p>
+                <div className="flex gap-2">
+                  {AVATAR_COLORS.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setAvatarColor(c)}
+                      style={{
+                        width: 28, height: 28, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
+                        outline: avatarColor === c ? `3px solid white` : 'none',
+                        outlineOffset: 2,
+                        boxShadow: avatarColor === c ? `0 0 0 5px ${c}55` : 'none',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Username */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Username *</label>
+                <input
+                  value={username}
+                  onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                  placeholder="kiwi_trader"
+                  style={{ width: '100%', padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 16, outline: 'none' }}
+                />
+              </div>
+
+              {/* Location */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Location <span style={{ opacity: 0.5 }}>(optional)</span></label>
+                <input
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  placeholder="Auckland, NZ"
+                  style={{ width: '100%', padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* Profession */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Profession <span style={{ opacity: 0.5 }}>(optional)</span></label>
+                <select
+                  value={profession}
+                  onChange={e => setProfession(e.target.value)}
+                  style={{ width: '100%', padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: profession ? 'var(--text)' : 'var(--text2)', fontFamily: 'DM Mono, monospace', fontSize: 14, outline: 'none' }}
+                >
+                  <option value="">Select your profession...</option>
+                  {PROFESSIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+
               <button onClick={() => setStep(1)} disabled={!username || username.length < 3}
                 className="flex items-center justify-center gap-2 w-full py-3 rounded-lg"
                 style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: !username || username.length < 3 ? 0.5 : 1 }}
@@ -142,7 +218,14 @@ export default function OnboardingPage() {
 
           {step === 4 && (
             <div className="text-center">
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
+              <div style={{
+                width: 80, height: 80, borderRadius: '50%', background: avatarColor,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 32, fontWeight: 700, color: 'white', fontFamily: 'Syne, sans-serif',
+                margin: '0 auto 16px',
+              }}>
+                {username[0]?.toUpperCase()}
+              </div>
               <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24, marginBottom: 8 }}>You're all set, {username}!</h2>
               <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 24 }}>Start tracking your portfolio and getting AI insights</p>
               <button onClick={finish} disabled={loading} className="flex items-center justify-center gap-2 w-full py-3 rounded-lg"

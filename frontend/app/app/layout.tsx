@@ -27,10 +27,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    supabase.auth.getUser().then(async ({ data }) => {
+      setUser(data.user)
+      if (data.user) {
+        const { data: p } = await supabase.from('profiles').select('username, avatar_color, location, profession').eq('id', data.user.id).single()
+        setProfile(p)
+      }
+    })
   }, [])
 
   async function signOut() {
@@ -80,12 +87,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </button>
         {user && (
           <div className="flex items-center gap-2 mt-3 px-2">
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'white', fontWeight: 700, fontFamily: 'Syne, sans-serif', flexShrink: 0 }}>
-              {(user.email || 'U')[0].toUpperCase()}
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: profile?.avatar_color || 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'white', fontWeight: 700, fontFamily: 'Syne, sans-serif', flexShrink: 0 }}>
+              {(profile?.username || user.email || 'U')[0].toUpperCase()}
             </div>
-            <span style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user.email}
-            </span>
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, fontFamily: 'Syne, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {profile?.username || user.email}
+              </div>
+              {profile?.profession && (
+                <div style={{ fontSize: 10, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {profile.profession}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
