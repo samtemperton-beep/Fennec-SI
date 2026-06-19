@@ -40,8 +40,12 @@ export default function WatchlistPage() {
   async function load(uid: string) {
     setLoading(true)
     const { data } = await supabase.from('watchlist').select('*').eq('user_id', uid)
-    setItems(data || [])
+    const loaded = data || []
+    setItems(loaded)
     setLoading(false)
+    // Auto-enrich any items missing price data
+    const stale = loaded.filter((i: WItem) => !i.current_price)
+    if (stale.length > 0) enrichItems(stale)
   }
 
   async function add(e: React.FormEvent) {
@@ -63,20 +67,47 @@ export default function WatchlistPage() {
     setItems(prev => prev.filter(i => i.id !== id))
   }
 
+  async function enrichItems(itemsToEnrich: WItem[]) {
+    if (!itemsToEnrich.length) return
+    // Fetch full quotes in parallel (batches of 5 to avoid rate limits)
+    const enriched = [...itemsToEnrich]
+    for (let i = 0; i < enriched.length; i += 5) {
+      const batch = enriched.slice(i, i + 5)
+      await Promise.all(batch.map(async item => {
+        try {
+          const q = await api.getQuote(item.ticker)
+          const updates = {
+            current_price: q.price ?? item.current_price,
+            change_pct: q.changePct ?? item.change_pct,
+            sector: q.sector ?? item.sector,
+            mkt_cap: q.marketCap ? formatMarketCap(q.marketCap) : item.mkt_cap,
+            pe: q.pe ?? item.pe,
+            div_yld: q.divYield ?? item.div_yld,
+            w52_lo: q.w52Lo ?? item.w52_lo,
+            w52_hi: q.w52Hi ?? item.w52_hi,
+          }
+          Object.assign(item, updates)
+          await supabase.from('watchlist').update(updates).eq('id', item.id)
+        } catch {}
+      }))
+      setItems([...enriched]) // update UI after each batch
+    }
+  }
+
+  function formatMarketCap(cap: number): string {
+    if (cap >= 1e12) return `$${(cap / 1e12).toFixed(1)}T`
+    if (cap >= 1e9) return `$${(cap / 1e9).toFixed(1)}B`
+    if (cap >= 1e6) return `$${(cap / 1e6).toFixed(0)}M`
+    return `$${cap}`
+  }
+
   async function refreshPrices() {
     if (!items.length) return
-    try {
-      const tickers = items.map(i => i.ticker)
-      const prices = await api.getPrices(tickers)
-      const updated = items.map(i => ({ ...i, current_price: prices[i.ticker] ?? i.current_price }))
-      setItems(updated)
-      for (const item of updated) {
-        await supabase.from('watchlist').update({ current_price: item.current_price }).eq('id', item.id)
-      }
-      toast.success('Prices refreshed')
-    } catch (e: any) {
-      toast.error(e.message)
-    }
+    toast.promise(enrichItems(items), {
+      loading: `Fetching data for ${items.length} stocks…`,
+      success: 'Watchlist updated',
+      error: 'Some quotes failed to load',
+    })
   }
 
   async function analyzeItem(item: WItem) {
@@ -105,12 +136,13 @@ export default function WatchlistPage() {
         const portfolioTickers = new Set((portfolioData || []).map((h: any) => h.ticker.toUpperCase()))
 
         let added = 0, skippedDupe = 0, skippedPortfolio = 0
+        const newlyAddedItems: WItem[] = []
         for (const h of holdings) {
           const t = h.ticker.toUpperCase()
           if (existingTickers.has(t)) { skippedDupe++; continue }
           if (portfolioTickers.has(t)) { skippedPortfolio++; continue }
           const { data } = await supabase.from('watchlist').insert({ user_id: userId, ticker: t, market: 'US' }).select().single()
-          if (data) { setItems(prev => [data, ...prev]); existingTickers.add(t); added++ }
+          if (data) { setItems(prev => [data, ...prev]); existingTickers.add(t); added++; newlyAddedItems.push(data) }
         }
 
         const parts = [`Added ${added} tickers`]
@@ -118,6 +150,11 @@ export default function WatchlistPage() {
         if (skippedPortfolio > 0) parts.push(`${skippedPortfolio} already in portfolio`)
         toast.success(parts.join(' · '))
         setScreenshotOpen(false)
+        // Auto-fetch full quote data for newly added stocks
+        if (newlyAddedItems.length > 0) {
+          toast.info('Fetching market data…')
+          enrichItems(newlyAddedItems)
+        }
       }
       reader.readAsDataURL(file)
     } catch (e: any) {
