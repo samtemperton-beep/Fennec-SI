@@ -47,8 +47,7 @@ export default function NewslettersPage() {
       setWatchlist(w?.map((x: any) => x.ticker) || [])
     }
 
-    const { data, error } = await supabase.from('newsletter_digests').select('*').order('received_at', { ascending: false }).limit(100)
-    console.log('newsletters fetch:', { data, error, count: data?.length })
+    const { data } = await supabase.from('newsletter_digests').select('*').order('received_at', { ascending: false }).limit(100)
     setDigests(data || [])
     setLoading(false)
   }
