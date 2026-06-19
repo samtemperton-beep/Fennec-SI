@@ -69,28 +69,29 @@ export default function WatchlistPage() {
 
   async function enrichItems(itemsToEnrich: WItem[]) {
     if (!itemsToEnrich.length) return
-    // Fetch full quotes in parallel (batches of 5 to avoid rate limits)
-    const enriched = [...itemsToEnrich]
-    for (let i = 0; i < enriched.length; i += 5) {
-      const batch = enriched.slice(i, i + 5)
+    // Process in batches of 3 to avoid Finnhub rate limits (3 calls per ticker)
+    for (let i = 0; i < itemsToEnrich.length; i += 3) {
+      const batch = itemsToEnrich.slice(i, i + 3)
       await Promise.all(batch.map(async item => {
         try {
           const q = await api.getQuote(item.ticker)
-          const updates = {
-            current_price: q.price ?? item.current_price,
+          const updates: Partial<WItem> = {
+            current_price: q.price || item.current_price,
             change_pct: q.changePct ?? item.change_pct,
-            sector: q.sector ?? item.sector,
+            sector: q.sector || item.sector,
             mkt_cap: q.marketCap ? formatMarketCap(q.marketCap) : item.mkt_cap,
-            pe: q.pe ?? item.pe,
-            div_yld: q.divYield ?? item.div_yld,
-            w52_lo: q.w52Lo ?? item.w52_lo,
-            w52_hi: q.w52Hi ?? item.w52_hi,
+            pe: q.pe || item.pe,
+            div_yld: q.divYield || item.div_yld,
+            w52_lo: q.w52Lo || item.w52_lo,
+            w52_hi: q.w52Hi || item.w52_hi,
           }
-          Object.assign(item, updates)
+          // Update this item in the full list using functional state update
+          setItems(prev => prev.map(p => p.id === item.id ? { ...p, ...updates } : p))
           await supabase.from('watchlist').update(updates).eq('id', item.id)
-        } catch {}
+        } catch (e) {
+          console.warn(`Failed to enrich ${item.ticker}:`, e)
+        }
       }))
-      setItems([...enriched]) // update UI after each batch
     }
   }
 
