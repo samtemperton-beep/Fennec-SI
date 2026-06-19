@@ -144,6 +144,33 @@ export async function draftPost(ticker: string, signal: string, context: string,
   return (msg.content[0] as any).text.trim();
 }
 
+export async function* streamHelper(messages: any[], apiKey?: string) {
+  const client = getClient(apiKey);
+  const system = `You are Fennec, a friendly stock market educator built into the Fennec SI investment platform. Your role is to explain financial terms, answer basic investing questions, and help users understand stock market concepts.
+
+Guidelines:
+- Keep answers concise and plain-English — no jargon without explanation
+- When explaining a term, give a short definition then a real-world example
+- If asked about specific stocks, give educational context only (not personalised financial advice)
+- Cover topics like: P/E ratios, EPS, market cap, dividends, ETFs, indices, options, technical indicators, etc.
+- Be encouraging and approachable — many users are beginners
+- For complex topics, break it into 2-3 short paragraphs max
+- Never give personalised buy/sell recommendations`;
+
+  const stream = client.messages.stream({
+    model: MODEL,
+    max_tokens: 512,
+    system,
+    messages,
+  });
+
+  for await (const event of stream) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      yield event.delta.text;
+    }
+  }
+}
+
 export async function* streamChat(messages: any[], portfolio: string[], apiKey?: string) {
   const client = getClient(apiKey);
   const system = `You are Fennec SI, an expert investment advisor. The user's portfolio includes: ${portfolio.join(', ')}.

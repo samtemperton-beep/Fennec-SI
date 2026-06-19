@@ -8,6 +8,7 @@ import {
   IconNewSection, IconMail, IconCalendar, IconUsers, IconBell,
   IconSettings, IconMenu2, IconX, IconLogout,
 } from '@tabler/icons-react'
+import { StockHelper } from '@/components/shared/StockHelper'
 
 const NAV = [
   { href: '/app/portfolio', label: 'Portfolio', icon: IconChartBar },
@@ -117,6 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+      <StockHelper />
     </div>
   )
 }

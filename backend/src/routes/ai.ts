@@ -22,6 +22,25 @@ router.post('/analyze', requireAuth, async (req, res) => {
   }
 });
 
+router.post('/helper', requireAuth, async (req, res) => {
+  const { messages } = req.body;
+  const user = (req as any).user;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  try {
+    for await (const chunk of claude.streamHelper(messages, user.user_metadata?.anthropic_key)) {
+      res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+    }
+    res.write('data: [DONE]\n\n');
+  } catch (e: any) {
+    res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`);
+  }
+  res.end();
+});
+
 router.post('/chat', requireAuth, async (req, res) => {
   const { messages, portfolio } = req.body;
   const user = (req as any).user;
