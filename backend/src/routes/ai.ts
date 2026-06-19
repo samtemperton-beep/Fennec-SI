@@ -58,16 +58,16 @@ router.post('/top10', requireAuth, async (req, res) => {
   }
 });
 
-// Per-user cache: opportunities depend on individual holdings
+// Per-user cache: keyed by user + filters so different filter combos are cached separately
 router.post('/opportunities', requireAuth, async (req, res) => {
-  const { riskLevel = 7, holdings = [] } = req.body;
+  const { riskLevel = 7, holdings = [], sector = 'All', market = 'US' } = req.body;
   const user = (req as any).user;
-  const cacheKey = `opportunities:${user.id}`;
+  const cacheKey = `opportunities:${user.id}:${sector}:${market}:${riskLevel}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
   try {
-    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key);
+    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key, sector, market);
     await setCached(cacheKey, data, 4);
     res.json({ data, cached: false });
   } catch (e: any) {

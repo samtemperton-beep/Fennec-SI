@@ -41,15 +41,43 @@ Focus on real, well-known stocks. Be specific and actionable.`;
   return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 }
 
-export async function generateOpportunities(riskLevel: number, holdings: string[], apiKey?: string) {
+export async function generateOpportunities(
+  riskLevel: number,
+  holdings: string[],
+  apiKey?: string,
+  sector = 'All',
+  market = 'US',
+) {
   const client = getClient(apiKey);
-  const prompt = `You are an investment advisor. Generate 6 fresh stock opportunities for an investor with risk level ${riskLevel}/10.
-Exclude these stocks already in their portfolio: ${holdings.join(', ')}.
-Return a JSON array of 6 objects with: ticker, name, theme, reason (2 sentences), risk_level (1-10), upside_min_pct, upside_max_pct.`;
+  const sectorFilter = sector !== 'All' ? `Focus specifically on the ${sector} sector.` : 'Spread across different sectors.';
+  const marketFilter = market === 'Global'
+    ? 'Include stocks from any major global market (US, ASX, LSE, TSX, etc). Include the exchange in the ticker field, e.g. CBA.AX for ASX.'
+    : market === 'ASX'
+    ? 'Only include stocks listed on the Australian Securities Exchange (ASX). Use .AX suffix on tickers.'
+    : market === 'NZX'
+    ? 'Only include stocks listed on the New Zealand Exchange (NZX).'
+    : 'Only include stocks listed on US exchanges (NYSE, NASDAQ).';
+
+  const prompt = `You are a specialist stock researcher focused on finding under-the-radar investment opportunities.
+Generate 6 hidden gem stock picks for an investor with risk level ${riskLevel}/10.
+${sectorFilter} ${marketFilter}
+Exclude these stocks already in their portfolio: ${holdings.join(', ') || 'none'}.
+
+IMPORTANT RULES:
+- Prefer small-cap and mid-cap stocks (under $10B market cap) that are NOT commonly discussed
+- Each pick must have a specific upcoming catalyst (earnings, product launch, regulatory approval, etc.)
+- Do NOT pick the same stocks as typical "top 10" lists (no AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA)
+- Focus on genuine research depth — obscure but real, publicly traded companies
+
+Return a JSON array of 6 objects with these exact fields:
+ticker, name, market (US/ASX/NZX/LSE/etc), sector, market_cap_category (Small/Mid/Large),
+theme (3-5 word investment thesis), why_under_radar (1 sentence — why most investors miss this),
+catalyst (1 sentence — specific upcoming trigger), time_horizon (Short/Medium/Long),
+reason (2 sentences of analysis), risk_level (1-10), upside_min_pct, upside_max_pct`;
 
   const msg = await client.messages.create({
     model: MODEL,
-    max_tokens: 1536,
+    max_tokens: 2048,
     messages: [{ role: 'user', content: prompt }],
   });
   const text = (msg.content[0] as any).text;

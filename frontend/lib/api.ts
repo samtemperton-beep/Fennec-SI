@@ -46,8 +46,8 @@ export const api = {
   getTop10: (market: string, timeframe: string) =>
     apiFetch('/api/ai/top10', { method: 'POST', body: JSON.stringify({ market, timeframe }) }),
 
-  getOpportunities: (riskLevel: number, holdings: string[]) =>
-    apiFetch('/api/ai/opportunities', { method: 'POST', body: JSON.stringify({ riskLevel, holdings }) }),
+  getOpportunities: (riskLevel: number, holdings: string[], sector = 'All', market = 'US') =>
+    apiFetch('/api/ai/opportunities', { method: 'POST', body: JSON.stringify({ riskLevel, holdings, sector, market }) }),
 
   getNewsDigest: (headlines: string[], portfolio: string[]) =>
     apiFetch('/api/ai/news-digest', { method: 'POST', body: JSON.stringify({ headlines, portfolio }) }),
