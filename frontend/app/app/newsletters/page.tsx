@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { timeAgo } from '@/lib/utils'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconMail, IconToggleLeft, IconToggleRight } from '@tabler/icons-react'
+import { WatchlistButton } from '@/components/shared/WatchlistButton'
 
 const SOURCES = [
   { id: 'robinhood',    name: 'Robinhood Snacks',  color: '#00c805' },
@@ -39,20 +40,22 @@ export default function NewslettersPage() {
   const [enabled, setEnabled] = useState(new Set(SOURCES.map(s => s.id)))
   const [holdings, setHoldings] = useState<string[]>([])
   const [watchlist, setWatchlist] = useState<string[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClient()
+  const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
 
   useEffect(() => { init() }, [])
 
   async function init() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const [{ data: h }, { data: w }] = await Promise.all([
-        supabase.from('holdings').select('ticker').eq('user_id', user.id),
-        supabase.from('watchlist').select('ticker').eq('user_id', user.id),
-      ])
-      setHoldings(h?.map((x: any) => x.ticker) || [])
-      setWatchlist(w?.map((x: any) => x.ticker) || [])
-    }
+    const uid = user?.id ?? DEV_USER_ID
+    setUserId(uid)
+    const [{ data: h }, { data: w }] = await Promise.all([
+      supabase.from('holdings').select('ticker').eq('user_id', uid),
+      supabase.from('watchlist').select('ticker').eq('user_id', uid),
+    ])
+    setHoldings(h?.map((x: any) => x.ticker) || [])
+    setWatchlist(w?.map((x: any) => x.ticker) || [])
     const { data } = await supabase.from('newsletter_digests').select('*').order('received_at', { ascending: false }).limit(100)
     setDigests(data || [])
     setLoading(false)
@@ -139,9 +142,17 @@ export default function NewslettersPage() {
                           </div>
                         )}
                         {d.tickers?.length > 0 && (
-                          <div className="flex gap-1 flex-wrap" style={{ alignSelf: 'center' }}>
+                          <div className="flex gap-2 flex-wrap" style={{ alignSelf: 'center' }}>
                             {d.tickers.map((t: string) => (
-                              <span key={t} style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', padding: '2px 7px', background: 'var(--surface2)', borderRadius: 4, color: holdings.includes(t) ? 'var(--green)' : 'var(--text2)' }}>{t}</span>
+                              <div key={t} className="flex items-center gap-1">
+                                <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: holdings.includes(t) ? 'var(--green)' : 'var(--accent2)' }}>{t}</span>
+                                <WatchlistButton
+                                  ticker={t} userId={userId}
+                                  inWatchlist={watchlist.includes(t)}
+                                  inPortfolio={holdings.includes(t)}
+                                  onAdded={tk => setWatchlist(prev => [...prev, tk])}
+                                />
+                              </div>
                             ))}
                           </div>
                         )}

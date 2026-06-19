@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
+import { WatchlistButton } from '@/components/shared/WatchlistButton'
 import { timeAgo } from '@/lib/utils'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { IconExternalLink } from '@tabler/icons-react'
@@ -16,38 +17,45 @@ interface NewsItem {
 }
 
 const SENT_COLORS = { positive: 'var(--green)', negative: 'var(--red)', neutral: 'var(--amber)' }
-const FILTERS = ['All', 'Positive', 'Negative']
+const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
 
 export default function NewsPage() {
   const [news, setNews] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('All')
+  const [sentFilter, setSentFilter] = useState('All')
+  const [listFilter, setListFilter] = useState('All') // All | Portfolio | Watchlist
   const [selected, setSelected] = useState<NewsItem | null>(null)
   const [deepDive, setDeepDive] = useState<any>(null)
   const [diving, setDiving] = useState(false)
   const [digest, setDigest] = useState<any>(null)
   const [portfolio, setPortfolio] = useState<string[]>([])
+  const [watchlist, setWatchlist] = useState<string[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
   const supabase = createClient()
 
-  useEffect(() => {
-    init()
-  }, [])
+  useEffect(() => { init() }, [])
 
   async function init() {
     const { data: { user } } = await supabase.auth.getUser()
-    let tickers: string[] = []
-    if (user) {
-      const { data: h } = await supabase.from('holdings').select('ticker').eq('user_id', user.id)
-      tickers = h?.map((x: any) => x.ticker) || []
-      setPortfolio(tickers)
-    }
+    const uid = user?.id ?? DEV_USER_ID
+    setUserId(uid)
+
+    const [{ data: h }, { data: w }] = await Promise.all([
+      supabase.from('holdings').select('ticker').eq('user_id', uid),
+      supabase.from('watchlist').select('ticker').eq('user_id', uid),
+    ])
+    const portfolioTickers = h?.map((x: any) => x.ticker) || []
+    const watchlistTickers = w?.map((x: any) => x.ticker) || []
+    setPortfolio(portfolioTickers)
+    setWatchlist(watchlistTickers)
+
     setLoading(true)
     try {
-      const data = await api.getNews(tickers.slice(0, 5))
+      const data = await api.getNews(portfolioTickers.slice(0, 5))
       setNews(data)
       if (data.length > 0) {
         const headlines = data.map((n: NewsItem) => n.headline)
-        const d = await api.getNewsDigest(headlines, tickers)
+        const d = await api.getNewsDigest(headlines, portfolioTickers)
         setDigest(d)
       }
     } catch (e: any) {
@@ -70,8 +78,21 @@ export default function NewsPage() {
     setDiving(false)
   }
 
-  const filtered = filter === 'All' ? news : news.filter(n => n.sentiment === filter.toLowerCase())
-  const sentCounts = { positive: news.filter(n => n.sentiment === 'positive').length, negative: news.filter(n => n.sentiment === 'negative').length, neutral: news.filter(n => n.sentiment === 'neutral').length }
+  const portfolioSet = new Set(portfolio)
+  const watchlistSet = new Set(watchlist)
+
+  const filtered = news.filter(n => {
+    if (sentFilter !== 'All' && n.sentiment !== sentFilter.toLowerCase()) return false
+    if (listFilter === 'Portfolio') return n.ticker && portfolioSet.has(n.ticker)
+    if (listFilter === 'Watchlist') return n.ticker && watchlistSet.has(n.ticker)
+    return true
+  })
+
+  const sentCounts = {
+    positive: news.filter(n => n.sentiment === 'positive').length,
+    negative: news.filter(n => n.sentiment === 'negative').length,
+    neutral: news.filter(n => n.sentiment === 'neutral').length,
+  }
   const pieData = [
     { name: 'Positive', value: sentCounts.positive, color: 'var(--green)' },
     { name: 'Negative', value: sentCounts.negative, color: 'var(--red)' },
@@ -81,37 +102,70 @@ export default function NewsPage() {
   return (
     <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20 }} className="grid-cols-1 xl:grid-cols-[1fr_280px]">
       <div>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24, marginBottom: 20 }}>Market News</h1>
+        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24, marginBottom: 16 }}>Market News</h1>
 
-        <div className="flex gap-2 mb-4">
-          {FILTERS.map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: filter === f ? 'var(--accent)' : 'var(--surface)', color: filter === f ? 'white' : 'var(--text2)', border: filter === f ? 'none' : '1px solid var(--border)' }}
+        {/* Filters */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {/* Sentiment */}
+          {['All', 'Positive', 'Negative'].map(f => (
+            <button key={f} onClick={() => setSentFilter(f)}
+              style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: sentFilter === f ? 'var(--accent)' : 'var(--surface)', color: sentFilter === f ? 'white' : 'var(--text2)', border: sentFilter === f ? 'none' : '1px solid var(--border)' }}
             >{f}</button>
+          ))}
+          <div style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
+          {/* List filter */}
+          {['All', 'Portfolio', 'Watchlist'].map(f => (
+            <button key={f} onClick={() => setListFilter(f)}
+              style={{
+                padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer',
+                background: listFilter === f ? (f === 'Portfolio' ? 'rgba(16,185,129,0.2)' : f === 'Watchlist' ? 'rgba(91,106,255,0.2)' : 'var(--accent)') : 'var(--surface)',
+                color: listFilter === f ? (f === 'Portfolio' ? 'var(--green)' : f === 'Watchlist' ? 'var(--accent2)' : 'white') : 'var(--text2)',
+                border: listFilter === f ? 'none' : '1px solid var(--border)',
+              }}
+            >{f === 'All' ? 'All News' : `My ${f}`}</button>
           ))}
         </div>
 
         {loading ? (
           <div className="flex justify-center py-12"><LoadingSpinner size={32} /></div>
+        ) : filtered.length === 0 ? (
+          <div className="card text-center py-12">
+            <p style={{ color: 'var(--text2)', fontSize: 14 }}>No news matching your filters.</p>
+          </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((n, i) => (
-              <div key={i} className="card hover:border-accent transition-colors cursor-pointer" onClick={() => openDeepDive(n)} style={{ transition: 'border-color 0.2s' }}>
-                <div className="flex items-start gap-3">
-                  <div style={{ width: 3, flexShrink: 0, alignSelf: 'stretch', borderRadius: 2, background: SENT_COLORS[n.sentiment] }} />
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{n.headline}</p>
-                    {n.summary && <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 6 }}>{n.summary.slice(0, 150)}{n.summary.length > 150 ? '…' : ''}</p>}
-                    <div className="flex items-center gap-3">
-                      <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>{n.source}</span>
-                      {n.ticker && <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--accent2)' }}>{n.ticker}</span>}
-                      <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 10, background: `${SENT_COLORS[n.sentiment]}18`, color: SENT_COLORS[n.sentiment], fontFamily: 'Syne, sans-serif', fontWeight: 600, textTransform: 'capitalize' }}>{n.sentiment}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>{timeAgo(n.datetime)}</span>
+            {filtered.map((n, i) => {
+              const inPortfolio = !!(n.ticker && portfolioSet.has(n.ticker))
+              const inWatchlist = !!(n.ticker && watchlistSet.has(n.ticker))
+              return (
+                <div key={i} className="card hover:border-accent transition-colors cursor-pointer" onClick={() => openDeepDive(n)} style={{ transition: 'border-color 0.2s' }}>
+                  <div className="flex items-start gap-3">
+                    <div style={{ width: 3, flexShrink: 0, alignSelf: 'stretch', borderRadius: 2, background: SENT_COLORS[n.sentiment] }} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{n.headline}</p>
+                      {n.summary && <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 6 }}>{n.summary.slice(0, 150)}{n.summary.length > 150 ? '…' : ''}</p>}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>{n.source}</span>
+                        <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 10, background: `${SENT_COLORS[n.sentiment]}18`, color: SENT_COLORS[n.sentiment], fontFamily: 'Syne, sans-serif', fontWeight: 600, textTransform: 'capitalize' }}>{n.sentiment}</span>
+                        {n.ticker && (
+                          <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--accent2)', fontWeight: 700 }}>{n.ticker}</span>
+                        )}
+                        {n.ticker && (
+                          <span onClick={e => e.stopPropagation()}>
+                            <WatchlistButton
+                              ticker={n.ticker} userId={userId}
+                              inWatchlist={inWatchlist} inPortfolio={inPortfolio}
+                              onAdded={t => setWatchlist(prev => [...prev, t])}
+                            />
+                          </span>
+                        )}
+                        <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>{timeAgo(n.datetime)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -153,10 +207,23 @@ export default function NewsPage() {
         )}
       </div>
 
+      {/* Deep Dive Modal */}
       <Modal open={!!selected} onClose={() => setSelected(null)} title="News Deep Dive" wide>
         {selected && (
           <div>
-            <h4 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 12, lineHeight: 1.4 }}>{selected.headline}</h4>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <h4 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, lineHeight: 1.4 }}>{selected.headline}</h4>
+              {selected.ticker && (
+                <div style={{ flexShrink: 0 }}>
+                  <WatchlistButton
+                    ticker={selected.ticker} userId={userId} size="md"
+                    inWatchlist={watchlistSet.has(selected.ticker)}
+                    inPortfolio={portfolioSet.has(selected.ticker)}
+                    onAdded={t => setWatchlist(prev => [...prev, t])}
+                  />
+                </div>
+              )}
+            </div>
             <a href={selected.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 mb-6" style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'Syne, sans-serif' }}>
               <IconExternalLink size={13} /> View original article
             </a>

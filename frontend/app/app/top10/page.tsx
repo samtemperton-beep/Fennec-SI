@@ -1,15 +1,18 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
+import { createClient } from '@/lib/supabase'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { WatchlistButton } from '@/components/shared/WatchlistButton'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { IconStar, IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 const MARKETS = ['All', 'US', 'ASX', 'NZX']
 const TIMEFRAMES = ['3mo', '6mo', '12mo']
+const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
 
 interface Pick {
   rank: number; ticker: string; name: string; sector: string
@@ -24,6 +27,23 @@ export default function Top10Page() {
   const [selected, setSelected] = useState<Pick | null>(null)
   const [deepDive, setDeepDive] = useState<any>(null)
   const [diving, setDiving] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [watchlist, setWatchlist] = useState<string[]>([])
+  const [portfolio, setPortfolio] = useState<string[]>([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      const uid = data.user?.id ?? DEV_USER_ID
+      setUserId(uid)
+      const [{ data: h }, { data: w }] = await Promise.all([
+        supabase.from('holdings').select('ticker').eq('user_id', uid),
+        supabase.from('watchlist').select('ticker').eq('user_id', uid),
+      ])
+      setPortfolio(h?.map((x: any) => x.ticker) || [])
+      setWatchlist(w?.map((x: any) => x.ticker) || [])
+    })
+  }, [])
 
   async function generate() {
     setLoading(true)
@@ -46,6 +66,9 @@ export default function Top10Page() {
     } catch {}
     setDiving(false)
   }
+
+  const portfolioSet = new Set(portfolio)
+  const watchlistSet = new Set(watchlist)
 
   return (
     <div style={{ padding: 24 }}>
@@ -92,12 +115,14 @@ export default function Top10Page() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }} className="grid-cols-1 xl:grid-cols-[1fr_320px]">
           <div className="space-y-2">
             {picks.map((p, i) => (
-              <div key={i} onClick={() => openDeepDive(p)} className="card cursor-pointer hover:border-accent transition-colors"
+              <div key={i} className="card cursor-pointer hover:border-accent transition-colors"
                 style={{ display: 'flex', alignItems: 'center', gap: 16, transition: 'border-color 0.2s' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(91,106,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 15, color: 'var(--accent2)', flexShrink: 0 }}>
+                {/* Rank */}
+                <div onClick={() => openDeepDive(p)} style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(91,106,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 15, color: 'var(--accent2)', flexShrink: 0, cursor: 'pointer' }}>
                   #{p.rank}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Content */}
+                <div onClick={() => openDeepDive(p)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
                   <div className="flex items-center gap-2 mb-1">
                     <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>{p.ticker}</span>
                     <span style={{ fontSize: 12, color: 'var(--text2)' }}>{p.name}</span>
@@ -105,9 +130,18 @@ export default function Top10Page() {
                   </div>
                   <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.4 }}>{p.reason}</p>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>+{p.upside_pct}%</div>
-                  <div style={{ fontSize: 11, color: 'var(--text2)' }}>upside</div>
+                {/* Upside + watchlist */}
+                <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                  <div onClick={() => openDeepDive(p)}>
+                    <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>+{p.upside_pct}%</div>
+                    <div style={{ fontSize: 11, color: 'var(--text2)' }}>upside</div>
+                  </div>
+                  <WatchlistButton
+                    ticker={p.ticker} userId={userId}
+                    inWatchlist={watchlistSet.has(p.ticker)}
+                    inPortfolio={portfolioSet.has(p.ticker)}
+                    onAdded={t => setWatchlist(prev => [...prev, t])}
+                  />
                 </div>
               </div>
             ))}
@@ -130,33 +164,49 @@ export default function Top10Page() {
       )}
 
       <Modal open={!!selected} onClose={() => setSelected(null)} title={selected ? `${selected.ticker} — Deep Dive` : ''} wide>
-        {diving ? (
-          <div className="flex justify-center py-8"><LoadingSpinner size={32} /></div>
-        ) : deepDive ? (
-          <div className="space-y-4">
-            {[
-              { label: 'What happened', value: deepDive.what_happened },
-              { label: 'Why it matters', value: deepDive.why_it_matters },
-              { label: 'Portfolio impact', value: deepDive.portfolio_impact },
-              { label: 'Action suggestion', value: deepDive.action_suggestion },
-            ].map(s => s.value && (
-              <div key={s.label}>
-                <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</p>
-                <p style={{ fontSize: 14, lineHeight: 1.7 }}>{s.value}</p>
-              </div>
-            ))}
-            {deepDive.what_to_watch && (
+        {selected && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Watch for</p>
-                <ul style={{ listStyle: 'disc', paddingLeft: 20 }}>
-                  {deepDive.what_to_watch.map((w: string, i: number) => (
-                    <li key={i} style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 2 }}>{w}</li>
-                  ))}
-                </ul>
+                <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 18 }}>{selected.ticker}</span>
+                <span style={{ fontSize: 13, color: 'var(--text2)', marginLeft: 8 }}>{selected.name}</span>
               </div>
-            )}
+              <WatchlistButton
+                ticker={selected.ticker} userId={userId} size="md"
+                inWatchlist={watchlistSet.has(selected.ticker)}
+                inPortfolio={portfolioSet.has(selected.ticker)}
+                onAdded={t => setWatchlist(prev => [...prev, t])}
+              />
+            </div>
+            {diving ? (
+              <div className="flex justify-center py-8"><LoadingSpinner size={32} /></div>
+            ) : deepDive ? (
+              <div className="space-y-4">
+                {[
+                  { label: 'What happened', value: deepDive.what_happened },
+                  { label: 'Why it matters', value: deepDive.why_it_matters },
+                  { label: 'Portfolio impact', value: deepDive.portfolio_impact },
+                  { label: 'Action suggestion', value: deepDive.action_suggestion },
+                ].map(s => s.value && (
+                  <div key={s.label}>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</p>
+                    <p style={{ fontSize: 14, lineHeight: 1.7 }}>{s.value}</p>
+                  </div>
+                ))}
+                {deepDive.what_to_watch && (
+                  <div>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Watch for</p>
+                    <ul style={{ listStyle: 'disc', paddingLeft: 20 }}>
+                      {deepDive.what_to_watch.map((w: string, i: number) => (
+                        <li key={i} style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 2 }}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        )}
       </Modal>
     </div>
   )
