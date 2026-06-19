@@ -19,6 +19,14 @@ const SOURCES = [
   { id: 'daily-upside',name: 'The Daily Upside',     color: '#0066cc' },
   { id: 'finimize',    name: 'Finimize',              color: '#7b2d8b' },
   { id: 'investopedia',name: 'Investopedia',          color: '#003153' },
+  { id: 'hustle',      name: 'The Hustle',            color: '#ff4500' },
+  { id: 'bloomberg',   name: 'Bloomberg Markets',     color: '#000000' },
+  { id: 'axios',       name: 'Axios Markets',         color: '#ff5f57' },
+  { id: 'cnbc',        name: 'CNBC Daily Open',       color: '#0099cc' },
+  { id: 'barrons',     name: "Barron's Daily",        color: '#c8102e' },
+  { id: 'nzx',         name: 'NZX Market Update',     color: '#004B87' },
+  { id: 'commsec',     name: 'CommSec Daily',         color: '#FFCC00' },
+  { id: 'moby',        name: 'Moby',                  color: '#6366f1' },
 ]
 
 const CATEGORIES = ['All', 'Picks', 'Macro', 'Earnings']
