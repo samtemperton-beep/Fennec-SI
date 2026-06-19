@@ -11,6 +11,7 @@ import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { fmtCurrency } from '@/lib/utils'
 import { IconRefresh, IconBrain, IconPlus, IconUpload } from '@tabler/icons-react'
+import { PortfolioGoal } from '@/components/portfolio/PortfolioGoal'
 import { toast } from 'sonner'
 
 export default function PortfolioPage() {
@@ -158,6 +159,12 @@ export default function PortfolioPage() {
       </div>
 
       <StatsBar stats={stats} />
+
+      {!loading && totalValue > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <PortfolioGoal currentValue={totalValue} userId={userId} />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20"><LoadingSpinner size={32} /></div>
