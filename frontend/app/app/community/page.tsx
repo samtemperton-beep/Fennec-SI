@@ -113,7 +113,7 @@ export default function CommunityPage() {
       <div>
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24, marginBottom: 20 }}>Community</h1>
 
-        {profile && <PostComposer username={profile.username} onPost={onPost} />}
+        {profile && <PostComposer username={profile.username} avatarColor={profile.avatar_color} avatarEmoji={profile.avatar_emoji} avatarUrl={profile.avatar_url} onPost={onPost} />}
 
         {/* Filter tabs */}
         <div className="flex gap-2 mb-4 flex-wrap">

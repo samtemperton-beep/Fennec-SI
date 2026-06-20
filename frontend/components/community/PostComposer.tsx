@@ -3,16 +3,20 @@ import { useState } from 'react'
 import { api } from '@/lib/api'
 import { IconWand, IconSend } from '@tabler/icons-react'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { Avatar } from '@/components/shared/Avatar'
 
 interface Props {
   username: string
+  avatarColor?: string
+  avatarEmoji?: string
+  avatarUrl?: string
   onPost: (post: { type: string; ticker?: string; signal?: string; body: string }) => void
 }
 
 const TYPES = ['pick', 'milestone', 'news', 'discussion']
 const SIGNALS = ['bullish', 'bearish', 'neutral']
 
-export function PostComposer({ username, onPost }: Props) {
+export function PostComposer({ username, avatarColor, avatarEmoji, avatarUrl, onPost }: Props) {
   const [type, setType] = useState('discussion')
   const [ticker, setTicker] = useState('')
   const [signal, setSignal] = useState('')
@@ -39,9 +43,7 @@ export function PostComposer({ username, onPost }: Props) {
   return (
     <div className="card mb-4">
       <div className="flex items-center gap-2 mb-4">
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'white', fontWeight: 700, fontFamily: 'Syne, sans-serif' }}>
-          {(username || 'U')[0].toUpperCase()}
-        </div>
+        <Avatar username={username} avatarColor={avatarColor} avatarEmoji={avatarEmoji} avatarUrl={avatarUrl} size={32} />
         <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>{username}</span>
       </div>
 

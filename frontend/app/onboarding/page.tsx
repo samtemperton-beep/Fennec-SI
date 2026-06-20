@@ -12,6 +12,12 @@ const AVATAR_COLORS = [
   '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
 ]
 
+const AVATAR_EMOJIS = [
+  '🦊', '🐂', '🐻', '🦁', '🐯', '🦅', '🐺', '🦈', '🐉', '🦉',
+  '💰', '💵', '💲', '🤑', '🪙', '💹', '📈', '📊', '🏦', '💳',
+  '🚀', '💎', '🏆', '⚡', '🔥', '🎯', '👑', '🌊', '🦂', '🎲',
+]
+
 const INVESTOR_TYPES = [
   'Retail Investor', 'Active Trader', 'Day Trader', 'Swing Trader',
   'Long-Term / Buy & Hold', 'Dividend Investor', 'Growth Investor',
@@ -23,6 +29,8 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0)
   const [username, setUsername] = useState('')
   const [avatarColor, setAvatarColor] = useState(AVATAR_COLORS[0])
+  const [avatarEmoji, setAvatarEmoji] = useState('')
+  const [avatarTab, setAvatarTab] = useState<'colour' | 'emoji'>('colour')
   const [location, setLocation] = useState('')
   const [profession, setProfession] = useState('')
   const [riskLevel, setRiskLevel] = useState(7)
@@ -39,6 +47,7 @@ export default function OnboardingPage() {
         id: user.id,
         username,
         avatar_color: avatarColor,
+        avatar_emoji: avatarEmoji || null,
         location: location || null,
         profession: profession || null,
         risk_level: riskLevel,
@@ -87,30 +96,65 @@ export default function OnboardingPage() {
               <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 8 }}>Set up your profile</h2>
               <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 24 }}>This is how you'll appear in the community</p>
 
-              {/* Avatar preview + color picker */}
+              {/* Avatar preview + picker */}
               <div className="flex flex-col items-center mb-6">
                 <div style={{
                   width: 72, height: 72, borderRadius: '50%', background: avatarColor,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 28, fontWeight: 700, color: 'white', fontFamily: 'Syne, sans-serif', marginBottom: 12,
+                  fontSize: avatarEmoji && avatarTab === 'emoji' ? 36 : 28,
+                  fontWeight: 700, color: 'white', fontFamily: 'Syne, sans-serif', marginBottom: 12,
                 }}>
-                  {username ? username[0].toUpperCase() : '?'}
+                  {avatarTab === 'emoji' && avatarEmoji ? avatarEmoji : (username ? username[0].toUpperCase() : '?')}
                 </div>
-                <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>Pick an avatar colour</p>
-                <div className="flex gap-2">
-                  {AVATAR_COLORS.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => setAvatarColor(c)}
+
+                {/* Tabs */}
+                <div className="flex gap-1 mb-3 w-full" style={{ background: 'var(--surface2)', borderRadius: 8, padding: 3 }}>
+                  {(['colour', 'emoji'] as const).map(tab => (
+                    <button key={tab} type="button" onClick={() => setAvatarTab(tab)}
                       style={{
-                        width: 28, height: 28, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
-                        outline: avatarColor === c ? `3px solid white` : 'none',
-                        outlineOffset: 2,
-                        boxShadow: avatarColor === c ? `0 0 0 5px ${c}55` : 'none',
+                        flex: 1, padding: '6px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                        background: avatarTab === tab ? 'var(--accent)' : 'transparent',
+                        color: avatarTab === tab ? 'white' : 'var(--text2)',
+                        fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600,
                       }}
-                    />
+                    >
+                      {tab === 'colour' ? '🎨 Colour' : '😎 Character'}
+                    </button>
                   ))}
                 </div>
+
+                {avatarTab === 'colour' && (
+                  <div className="flex gap-2 flex-wrap justify-center">
+                    {AVATAR_COLORS.map(c => (
+                      <button key={c} type="button" onClick={() => setAvatarColor(c)}
+                        style={{
+                          width: 28, height: 28, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
+                          outline: avatarColor === c ? `3px solid white` : 'none',
+                          outlineOffset: 2,
+                          boxShadow: avatarColor === c ? `0 0 0 5px ${c}55` : 'none',
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {avatarTab === 'emoji' && (
+                  <div>
+                    <div className="flex flex-wrap gap-1 justify-center mb-2">
+                      {AVATAR_EMOJIS.map(em => (
+                        <button key={em} type="button" onClick={() => setAvatarEmoji(em)}
+                          style={{
+                            width: 40, height: 40, borderRadius: 8, border: 'none', cursor: 'pointer',
+                            background: avatarEmoji === em ? 'rgba(91,106,255,0.2)' : 'var(--surface2)',
+                            outline: avatarEmoji === em ? '2px solid var(--accent)' : 'none',
+                            fontSize: 20, lineHeight: 1,
+                          }}
+                        >{em}</button>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>Shown on your colour background</p>
+                  </div>
+                )}
               </div>
 
               {/* Username */}
