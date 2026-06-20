@@ -8,7 +8,7 @@ import { Modal } from '@/components/shared/Modal'
 import { WatchlistButton } from '@/components/shared/WatchlistButton'
 import { timeAgo } from '@/lib/utils'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { IconExternalLink } from '@tabler/icons-react'
+import { IconExternalLink, IconBookmark, IconBookmarkFilled, IconShare, IconSend } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 interface NewsItem {
@@ -31,6 +31,11 @@ export default function NewsPage() {
   const [portfolio, setPortfolio] = useState<string[]>([])
   const [watchlist, setWatchlist] = useState<string[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+  const [savedIds, setSavedIds] = useState<Set<number>>(new Set())
+  const [shareItem, setShareItem] = useState<NewsItem | null>(null)
+  const [shareBody, setShareBody] = useState('')
+  const [sharing, setSharing] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -48,6 +53,11 @@ export default function NewsPage() {
     const watchlistTickers = w?.map((x: any) => x.ticker) || []
     setPortfolio(portfolioTickers)
     setWatchlist(watchlistTickers)
+    // Load saved article IDs from localStorage
+    try {
+      const saved = JSON.parse(localStorage.getItem(`saved_news_${uid}`) || '[]')
+      setSavedIds(new Set(saved))
+    } catch {}
 
     setLoading(true)
     try {
@@ -78,10 +88,50 @@ export default function NewsPage() {
     setDiving(false)
   }
 
+  function toggleSave(item: NewsItem) {
+    if (!userId) return
+    setSavedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(item.id)) next.delete(item.id)
+      else next.add(item.id)
+      localStorage.setItem(`saved_news_${userId}`, JSON.stringify([...next]))
+      toast.success(next.has(item.id) ? 'Article saved for later' : 'Article removed from saved')
+      return next
+    })
+  }
+
+  function openShare(item: NewsItem, e: React.MouseEvent) {
+    e.stopPropagation()
+    setShareItem(item)
+    setShareBody(`📰 ${item.headline}${item.ticker ? ` $${item.ticker}` : ''} — ${item.source}`)
+  }
+
+  async function submitShare() {
+    if (!userId || !shareItem || !shareBody.trim()) return
+    setSharing(true)
+    try {
+      const { data: profile } = await supabase.from('profiles').select('username').eq('id', userId).single()
+      await supabase.from('posts').insert({
+        user_id: userId,
+        username: profile?.username || 'user',
+        type: 'news',
+        body: shareBody.trim(),
+        ticker: shareItem.ticker || null,
+      })
+      toast.success('Shared to community!')
+      setShareItem(null)
+      setShareBody('')
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+    setSharing(false)
+  }
+
   const portfolioSet = new Set(portfolio)
   const watchlistSet = new Set(watchlist)
 
   const filtered = news.filter(n => {
+    if (showSaved) return savedIds.has(n.id)
     if (sentFilter !== 'All' && n.sentiment !== sentFilter.toLowerCase()) return false
     if (listFilter === 'Portfolio') return n.ticker && portfolioSet.has(n.ticker)
     if (listFilter === 'Watchlist') return n.ticker && watchlistSet.has(n.ticker)
@@ -115,15 +165,26 @@ export default function NewsPage() {
           <div style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
           {/* List filter */}
           {['All', 'Portfolio', 'Watchlist'].map(f => (
-            <button key={f} onClick={() => setListFilter(f)}
+            <button key={f} onClick={() => { setListFilter(f); setShowSaved(false) }}
               style={{
                 padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer',
-                background: listFilter === f ? (f === 'Portfolio' ? 'rgba(16,185,129,0.2)' : f === 'Watchlist' ? 'rgba(91,106,255,0.2)' : 'var(--accent)') : 'var(--surface)',
-                color: listFilter === f ? (f === 'Portfolio' ? 'var(--green)' : f === 'Watchlist' ? 'var(--accent2)' : 'white') : 'var(--text2)',
-                border: listFilter === f ? 'none' : '1px solid var(--border)',
+                background: !showSaved && listFilter === f ? (f === 'Portfolio' ? 'rgba(16,185,129,0.2)' : f === 'Watchlist' ? 'rgba(91,106,255,0.2)' : 'var(--accent)') : 'var(--surface)',
+                color: !showSaved && listFilter === f ? (f === 'Portfolio' ? 'var(--green)' : f === 'Watchlist' ? 'var(--accent2)' : 'white') : 'var(--text2)',
+                border: !showSaved && listFilter === f ? 'none' : '1px solid var(--border)',
               }}
             >{f === 'All' ? 'All News' : `My ${f}`}</button>
           ))}
+          <button onClick={() => setShowSaved(s => !s)}
+            className="flex items-center gap-1"
+            style={{
+              padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer',
+              background: showSaved ? 'rgba(245,158,11,0.2)' : 'var(--surface)',
+              color: showSaved ? 'var(--amber)' : 'var(--text2)',
+              border: showSaved ? 'none' : '1px solid var(--border)',
+            }}
+          >
+            <IconBookmarkFilled size={11} /> Saved {savedIds.size > 0 && `(${savedIds.size})`}
+          </button>
         </div>
 
         {loading ? (
@@ -147,19 +208,26 @@ export default function NewsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>{n.source}</span>
                         <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 10, background: `${SENT_COLORS[n.sentiment]}18`, color: SENT_COLORS[n.sentiment], fontFamily: 'Syne, sans-serif', fontWeight: 600, textTransform: 'capitalize' }}>{n.sentiment}</span>
-                        {n.ticker && (
-                          <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--accent2)', fontWeight: 700 }}>{n.ticker}</span>
-                        )}
+                        {n.ticker && <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--accent2)', fontWeight: 700 }}>{n.ticker}</span>}
                         {n.ticker && (
                           <span onClick={e => e.stopPropagation()}>
-                            <WatchlistButton
-                              ticker={n.ticker} userId={userId}
-                              inWatchlist={inWatchlist} inPortfolio={inPortfolio}
-                              onAdded={t => setWatchlist(prev => [...prev, t])}
-                            />
+                            <WatchlistButton ticker={n.ticker} userId={userId} inWatchlist={inWatchlist} inPortfolio={inPortfolio} onAdded={t => setWatchlist(prev => [...prev, t])} />
                           </span>
                         )}
                         <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>{timeAgo(n.datetime)}</span>
+                        {/* Save & Share */}
+                        <span onClick={e => { e.stopPropagation(); toggleSave(n) }}
+                          title={savedIds.has(n.id) ? 'Remove from saved' : 'Save for later'}
+                          style={{ cursor: 'pointer', color: savedIds.has(n.id) ? 'var(--amber)' : 'var(--text2)', lineHeight: 0 }}
+                        >
+                          {savedIds.has(n.id) ? <IconBookmarkFilled size={14} /> : <IconBookmark size={14} />}
+                        </span>
+                        <span onClick={e => openShare(n, e)}
+                          title="Share to community"
+                          style={{ cursor: 'pointer', color: 'var(--text2)', lineHeight: 0 }}
+                        >
+                          <IconShare size={14} />
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -244,6 +312,36 @@ export default function NewsPage() {
                 ))}
               </div>
             ) : null}
+          </div>
+        )}
+      </Modal>
+
+      {/* Share to Community modal */}
+      <Modal open={!!shareItem} onClose={() => setShareItem(null)} title="Share to Community">
+        {shareItem && (
+          <div className="space-y-4">
+            <div style={{ padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>
+              {shareItem.headline}
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 6 }}>Your take (optional)</label>
+              <textarea
+                value={shareBody}
+                onChange={e => setShareBody(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="Add your thoughts..."
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, resize: 'none', outline: 'none' }}
+              />
+              <p style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'right', marginTop: 2 }}>{shareBody.length}/500</p>
+            </div>
+            <button onClick={submitShare} disabled={sharing || !shareBody.trim()}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-lg"
+              style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: sharing || !shareBody.trim() ? 0.6 : 1 }}
+            >
+              {sharing ? <LoadingSpinner size={16} /> : <IconSend size={16} />}
+              Post to Community
+            </button>
           </div>
         )}
       </Modal>

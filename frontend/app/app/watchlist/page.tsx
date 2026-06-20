@@ -7,7 +7,7 @@ import { SignalBadge } from '@/components/shared/SignalBadge'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
 import { fmtCurrency, fmtPct, fmtLarge, fmt } from '@/lib/utils'
-import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera } from '@tabler/icons-react'
+import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera, IconChevronUp, IconChevronDown, IconSelector } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 interface WItem {
@@ -26,7 +26,44 @@ export default function WatchlistPage() {
   const [analyzingSet, setAnalyzingSet] = useState(new Set<number>())
   const [screenshotOpen, setScreenshotOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [sortCol, setSortCol] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const supabase = createClient()
+
+  function parseMktCap(s?: string): number {
+    if (!s) return -1
+    const n = parseFloat(s.replace(/[^0-9.]/g, ''))
+    if (s.includes('T')) return n * 1e12
+    if (s.includes('B')) return n * 1e9
+    if (s.includes('M')) return n * 1e6
+    if (s.includes('K')) return n * 1e3
+    return n
+  }
+
+  function sortValue(item: WItem, col: string): number | string {
+    switch (col) {
+      case 'Ticker': return item.ticker
+      case 'Price': return item.current_price ?? -1
+      case 'Change %': return item.change_pct ?? -999
+      case 'Mkt Cap': return parseMktCap(item.mkt_cap)
+      case 'P/E': return item.pe ?? -1
+      case 'Div Yield': return item.div_yld ?? -1
+      case '52W Hi': return item.w52_hi ?? -1
+      case 'Signal': return item.signal ?? ''
+      default: return 0
+    }
+  }
+
+  function toggleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  const sortedItems = sortCol ? [...items].sort((a, b) => {
+    const av = sortValue(a, sortCol), bv = sortValue(b, sortCol)
+    const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number)
+    return sortDir === 'asc' ? cmp : -cmp
+  }) : items
 
   useEffect(() => {
     const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
@@ -204,13 +241,35 @@ export default function WatchlistPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Ticker', 'Price', 'Change %', 'Mkt Cap', 'P/E', 'Div Yield', '52W Range', 'Signal', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: h === 'Ticker' ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
+                {['Ticker', 'Price', 'Change %', 'Mkt Cap', 'P/E', 'Div Yield', '52W Hi', 'Signal', ''].map(h => {
+                  const sortable = h !== '' && h !== '52W Range'
+                  const active = sortCol === h
+                  return (
+                    <th key={h}
+                      onClick={sortable ? () => toggleSort(h) : undefined}
+                      style={{
+                        padding: '10px 12px', color: active ? 'var(--accent)' : 'var(--text2)',
+                        fontFamily: 'Syne, sans-serif', fontSize: 11, fontWeight: 600,
+                        textTransform: 'uppercase', letterSpacing: '0.05em',
+                        textAlign: h === 'Ticker' ? 'left' : 'center', whiteSpace: 'nowrap',
+                        cursor: sortable ? 'pointer' : 'default',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {h}
+                        {sortable && (active
+                          ? (sortDir === 'asc' ? <IconChevronUp size={11} /> : <IconChevronDown size={11} />)
+                          : <IconSelector size={11} style={{ opacity: 0.3 }} />
+                        )}
+                      </span>
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
+              {sortedItems.map(item => (
                 <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }} className="hover:bg-surface2">
                   <td style={{ padding: '12px' }}>
                     <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{item.ticker}</span>
@@ -225,7 +284,9 @@ export default function WatchlistPage() {
                   <td style={{ padding: '12px', textAlign: 'center', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{item.pe ? fmt(item.pe, 1) : '—'}</td>
                   <td style={{ padding: '12px', textAlign: 'center', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{item.div_yld ? `${fmt(item.div_yld, 2)}%` : '—'}</td>
                   <td style={{ padding: '12px', textAlign: 'center', fontSize: 12, color: 'var(--text2)' }}>
-                    {item.w52_lo && item.w52_hi ? `${fmtCurrency(item.w52_lo)} – ${fmtCurrency(item.w52_hi)}` : '—'}
+                    {item.w52_lo && item.w52_hi
+                      ? <span title={`Lo: ${fmtCurrency(item.w52_lo)} · Hi: ${fmtCurrency(item.w52_hi)}`}>{fmtCurrency(item.w52_hi)}</span>
+                      : '—'}
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
                     {analyzingSet.has(item.id) ? (
