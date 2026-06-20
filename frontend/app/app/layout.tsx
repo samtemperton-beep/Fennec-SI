@@ -9,6 +9,7 @@ import {
   IconSettings, IconMenu2, IconX, IconLogout,
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
+import { Avatar } from '@/components/shared/Avatar'
 
 const NAV = [
   { href: '/app/portfolio', label: 'Portfolio', icon: IconChartBar },
@@ -34,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user)
       if (data.user) {
-        const { data: p } = await supabase.from('profiles').select('username, avatar_color, location, profession').eq('id', data.user.id).single()
+        const { data: p } = await supabase.from('profiles').select('username, avatar_color, avatar_emoji, avatar_url, location, profession').eq('id', data.user.id).single()
         setProfile(p)
       }
     })
@@ -87,9 +88,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </button>
         {user && (
           <div className="flex items-center gap-2 mt-3 px-2">
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: profile?.avatar_color || 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'white', fontWeight: 700, fontFamily: 'Syne, sans-serif', flexShrink: 0 }}>
-              {(profile?.username || user.email || 'U')[0].toUpperCase()}
-            </div>
+            <Avatar
+              username={profile?.username || user.email}
+              avatarColor={profile?.avatar_color}
+              avatarEmoji={profile?.avatar_emoji}
+              avatarUrl={profile?.avatar_url}
+              size={28}
+            />
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, fontFamily: 'Syne, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {profile?.username || user.email}
