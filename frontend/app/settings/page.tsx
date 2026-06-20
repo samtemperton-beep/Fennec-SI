@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Avatar } from '@/components/shared/Avatar'
-import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar } from '@tabler/icons-react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 
 const AVATAR_COLORS = [
@@ -19,9 +20,11 @@ const AVATAR_EMOJIS = [
   '🔥', '🌊', '🎯', '🦂', '🦋', '🦉',
 ]
 
-const PROFESSIONS = [
-  'Retail Investor', 'Day Trader', 'Financial Advisor', 'Fund Manager',
-  'Student', 'Software Engineer', 'Accountant', 'Business Owner', 'Other',
+const INVESTOR_TYPES = [
+  'Retail Investor', 'Active Trader', 'Day Trader', 'Swing Trader',
+  'Long-Term / Buy & Hold', 'Dividend Investor', 'Growth Investor',
+  'Value Investor', 'Index / ETF Investor', 'Crypto Investor',
+  'Financial Advisor', 'Fund Manager', 'Student / Learning', 'Other',
 ]
 
 const GOAL_PRESETS = [
@@ -155,7 +158,11 @@ export default function SettingsPage() {
 
   const RISK_LABELS = ['', 'Very Conservative', 'Conservative', 'Moderate-Conservative', 'Moderate', 'Moderate', 'Moderate-Aggressive', 'Aggressive', 'Aggressive', 'Very Aggressive', 'Maximum Risk']
 
-  if (loading) return <div className="flex justify-center py-20"><LoadingSpinner size={32} /></div>
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <div className="flex justify-center py-20"><LoadingSpinner size={32} /></div>
+    </div>
+  )
 
   const avatarPreview = (
     <Avatar
@@ -168,11 +175,31 @@ export default function SettingsPage() {
   )
 
   return (
-    <div style={{ padding: 24, maxWidth: 600 }}>
-      <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24, marginBottom: 8 }}>
-        <IconSettings size={22} style={{ display: 'inline', marginRight: 8 }} />
-        Settings
-      </h1>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {/* Top nav */}
+      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '0 20px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div className="flex items-center gap-3">
+          <Link href="/app/portfolio" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text2)', fontSize: 13, fontFamily: 'Syne, sans-serif', textDecoration: 'none' }}
+            onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text)'}
+            onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text2)'}
+          >
+            <IconArrowLeft size={16} /> Back
+          </Link>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <div className="flex items-center gap-2">
+            <div style={{ background: 'var(--accent)', borderRadius: 6, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconChartBar size={13} color="white" />
+            </div>
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Fennec SI</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <IconSettings size={15} style={{ color: 'var(--text2)' }} />
+          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>Settings</span>
+        </div>
+      </div>
+
+    <div style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
       {user && <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 28 }}>{user.email}</p>}
 
       <form onSubmit={save} className="space-y-6">
@@ -296,12 +323,12 @@ export default function SettingsPage() {
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Profession</label>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Investor Type</label>
                 <select value={profession} onChange={e => setProfession(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: profession ? 'var(--text)' : 'var(--text2)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }}
                 >
                   <option value="">Select...</option>
-                  {PROFESSIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  {INVESTOR_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
             </div>
@@ -440,7 +467,7 @@ export default function SettingsPage() {
       </form>
 
       {/* Danger zone */}
-      <div className="card mt-6" style={{ border: '1px solid rgba(240,84,84,0.3)' }}>
+      <div className="card mt-6 mb-8" style={{ border: '1px solid rgba(240,84,84,0.3)' }}>
         <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--red)', marginBottom: 8 }}>Danger Zone</h2>
         <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>Permanently delete your account and all associated data.</p>
         <button onClick={async () => {
@@ -454,6 +481,7 @@ export default function SettingsPage() {
           <IconTrash size={16} /> Delete Account
         </button>
       </div>
+    </div>
     </div>
   )
 }

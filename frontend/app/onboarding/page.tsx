@@ -12,9 +12,11 @@ const AVATAR_COLORS = [
   '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
 ]
 
-const PROFESSIONS = [
-  'Retail Investor', 'Day Trader', 'Financial Advisor', 'Fund Manager',
-  'Student', 'Software Engineer', 'Accountant', 'Business Owner', 'Other',
+const INVESTOR_TYPES = [
+  'Retail Investor', 'Active Trader', 'Day Trader', 'Swing Trader',
+  'Long-Term / Buy & Hold', 'Dividend Investor', 'Growth Investor',
+  'Value Investor', 'Index / ETF Investor', 'Crypto Investor',
+  'Financial Advisor', 'Fund Manager', 'Student / Learning', 'Other',
 ]
 
 export default function OnboardingPage() {
@@ -135,14 +137,14 @@ export default function OnboardingPage() {
 
               {/* Profession */}
               <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Profession <span style={{ opacity: 0.5 }}>(optional)</span></label>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Investor Type <span style={{ opacity: 0.5 }}>(optional)</span></label>
                 <select
                   value={profession}
                   onChange={e => setProfession(e.target.value)}
                   style={{ width: '100%', padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: profession ? 'var(--text)' : 'var(--text2)', fontFamily: 'DM Mono, monospace', fontSize: 14, outline: 'none' }}
                 >
-                  <option value="">Select your profession...</option>
-                  {PROFESSIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  <option value="">Select your investor type...</option>
+                  {INVESTOR_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
 
