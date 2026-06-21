@@ -14,9 +14,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Apply saved theme before paint to avoid flash */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              var t = localStorage.getItem('theme') || 'dark';
+              document.documentElement.setAttribute('data-theme', t);
+            } catch(e){}
+          })();
+        `}} />
+      </head>
       <body>
         {children}
-        <Toaster theme="dark" position="bottom-right" toastOptions={{ style: { background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace' } }} />
+        <Toaster position="bottom-right" toastOptions={{ style: { background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace' } }} />
       </body>
     </html>
   );

@@ -7,6 +7,7 @@ import {
   IconChartBar, IconBrain, IconTrendingUp, IconStar, IconEye,
   IconNewSection, IconMail, IconCalendar, IconUsers, IconBell,
   IconSettings, IconMenu2, IconX, IconLogout, IconTrophy,
+  IconSun, IconMoon,
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
 import { Avatar } from '@/components/shared/Avatar'
@@ -30,7 +31,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const supabase = createClient()
+
+  useEffect(() => {
+    const saved = (typeof window !== 'undefined' && localStorage.getItem('theme')) || 'dark'
+    setTheme(saved as 'dark' | 'light')
+  }, [])
+
+  function toggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    document.documentElement.setAttribute('data-theme', next)
+    localStorage.setItem('theme', next)
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -83,6 +97,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <IconSettings size={17} />
           Settings
         </Link>
+        <button onClick={toggleTheme} className="nav-link w-full mb-1" style={{ cursor: 'pointer' }}>
+          {theme === 'dark' ? <IconSun size={17} /> : <IconMoon size={17} />}
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </button>
         <button onClick={signOut} className="nav-link w-full" style={{ cursor: 'pointer' }}>
           <IconLogout size={17} />
           Sign out

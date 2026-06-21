@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Avatar } from '@/components/shared/Avatar'
-import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar, IconCrown } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar, IconCrown, IconSun, IconMoon } from '@tabler/icons-react'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
 import Link from 'next/link'
@@ -57,6 +57,12 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
   // Goal
   const [premiumStatus, setPremiumStatus] = useState<{ tier: string; badges: any[]; verification: any } | null>(null)
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+
+  useEffect(() => {
+    const saved = (typeof window !== 'undefined' && localStorage.getItem('theme')) || 'dark'
+    setTheme(saved as 'dark' | 'light')
+  }, [])
   const [goal, setGoal] = useState<any>(null)
   const [goalForm, setGoalForm] = useState({ targetPct: '100', months: '12', label: 'Double my portfolio' })
   const [editingGoal, setEditingGoal] = useState(false)
@@ -200,9 +206,24 @@ export default function SettingsPage() {
             <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Fennec SI</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <IconSettings size={15} style={{ color: 'var(--text2)' }} />
-          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>Settings</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <IconSettings size={15} style={{ color: 'var(--text2)' }} />
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>Settings</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const next = theme === 'dark' ? 'light' : 'dark'
+              setTheme(next)
+              document.documentElement.setAttribute('data-theme', next)
+              localStorage.setItem('theme', next)
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', cursor: 'pointer', fontSize: 12, fontFamily: 'Syne, sans-serif', color: 'var(--text2)' }}
+          >
+            {theme === 'dark' ? <IconSun size={13} /> : <IconMoon size={13} />}
+            {theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
         </div>
       </div>
 

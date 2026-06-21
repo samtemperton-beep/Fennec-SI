@@ -3,7 +3,8 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* Dark mode (default) */
+:root, [data-theme="dark"] {
   --bg: #090c11;
   --surface: #10141c;
   --surface2: #171d28;
@@ -15,6 +16,21 @@
   --amber: #f0a940;
   --accent: #5b6aff;
   --accent2: #7c88ff;
+}
+
+/* Light mode */
+[data-theme="light"] {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface2: #e8ecf1;
+  --border: #d1d9e3;
+  --text: #0f1520;
+  --text2: #5a6a7e;
+  --green: #0fa855;
+  --red: #d93636;
+  --amber: #c97d10;
+  --accent: #4354f0;
+  --accent2: #5b6aff;
 }
 
 * { box-sizing: border-box; }
@@ -34,7 +50,7 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Syne', sans-serif; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
 
 .glass {
-  background: rgba(16, 20, 28, 0.8);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
 }
