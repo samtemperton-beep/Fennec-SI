@@ -25,10 +25,14 @@ Provide a JSON response with: signal (BUY/HOLD/SELL), confidence (1-10), reason 
   }
 }
 
-export async function generateTop10(market: string, timeframe: string, apiKey?: string) {
+export async function generateTop10(market: string, timeframe: string, apiKey?: string, newsContext?: string) {
   const client = getClient(apiKey);
-  const prompt = `You are a stock analyst. Generate the top 10 stock picks for the ${market} market with a ${timeframe} timeframe.
-Return a JSON array of 10 objects with: rank, ticker, name, sector, upside_pct, reason (2 sentences), risk_level (1-10).
+  const newsSection = newsContext
+    ? `\n\nLatest market news (use this to make picks timely and relevant):\n${newsContext}`
+    : '';
+  const prompt = `You are a stock analyst. Generate the top 10 stock picks for the ${market} market with a ${timeframe} timeframe.${newsSection}
+
+Return a JSON array of 10 objects with: rank, ticker, name, sector, upside_pct, reason (2 sentences — reference specific news/catalysts where relevant), risk_level (1-10).
 Focus on real, well-known stocks. Be specific and actionable.`;
 
   const msg = await client.messages.create({
@@ -47,6 +51,8 @@ export async function generateOpportunities(
   apiKey?: string,
   sector = 'All',
   market = 'US',
+  newsContext?: string,
+  userInterests?: { topSectors: string[]; topTickers: string[] },
 ) {
   const client = getClient(apiKey);
   const sectorFilter = sector !== 'All' ? `Focus specifically on the ${sector} sector.` : 'Spread across different sectors.';
@@ -58,9 +64,17 @@ export async function generateOpportunities(
     ? 'Only include stocks listed on the New Zealand Exchange (NZX).'
     : 'Only include stocks listed on US exchanges (NYSE, NASDAQ).';
 
+  const interestSection = userInterests?.topSectors?.length
+    ? `\nThis investor has shown interest in these sectors: ${userInterests.topSectors.join(', ')}. Weight picks accordingly.`
+    : '';
+
+  const newsSection = newsContext
+    ? `\n\nLatest market news — use this to find emerging opportunities and timely catalysts:\n${newsContext}`
+    : '';
+
   const prompt = `You are a specialist stock researcher focused on finding under-the-radar investment opportunities.
 Generate 6 hidden gem stock picks for an investor with risk level ${riskLevel}/10.
-${sectorFilter} ${marketFilter}
+${sectorFilter} ${marketFilter}${interestSection}${newsSection}
 Exclude these stocks already in their portfolio: ${holdings.join(', ') || 'none'}.
 
 IMPORTANT RULES:
@@ -68,6 +82,7 @@ IMPORTANT RULES:
 - Each pick must have a specific upcoming catalyst (earnings, product launch, regulatory approval, etc.)
 - Do NOT pick the same stocks as typical "top 10" lists (no AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA)
 - Focus on genuine research depth — obscure but real, publicly traded companies
+- Where the news context reveals an emerging theme or trend, prioritise picks that benefit from it
 
 Return a JSON array of 6 objects with these exact fields:
 ticker, name, market (US/ASX/NZX/LSE/etc), sector, market_cap_category (Small/Mid/Large),

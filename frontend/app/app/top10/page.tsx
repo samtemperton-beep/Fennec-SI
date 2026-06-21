@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { createClient } from '@/lib/supabase'
+import { loadPrefs } from '@/lib/newsPrefs'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { WatchlistButton } from '@/components/shared/WatchlistButton'
@@ -48,7 +49,17 @@ export default function Top10Page() {
   async function generate() {
     setLoading(true)
     try {
-      const { data } = await api.getTop10(market === 'All' ? 'US' : market, timeframe)
+      let newsContext: string | undefined
+      try {
+        const tickers = [...portfolio, ...watchlist].slice(0, 8)
+        const newsData = await api.getNews(tickers)
+        const headlines = (newsData?.news || [])
+          .filter((n: any) => (n.relevance || 0) >= 50)
+          .slice(0, 15)
+          .map((n: any) => n.headline)
+        if (headlines.length > 0) newsContext = headlines.join('\n')
+      } catch {}
+      const { data } = await api.getTop10(market === 'All' ? 'US' : market, timeframe, newsContext)
       setPicks(data || [])
     } catch (e: any) {
       toast.error(e.message)

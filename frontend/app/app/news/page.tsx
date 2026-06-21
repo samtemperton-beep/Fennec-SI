@@ -10,6 +10,7 @@ import { timeAgo } from '@/lib/utils'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { IconExternalLink, IconBookmark, IconBookmarkFilled, IconShare, IconSend } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { loadPrefs, recordInteraction, personalBoost } from '@/lib/newsPrefs'
 
 interface NewsItem {
   id: number; headline: string; summary?: string; source: string; url: string
@@ -80,6 +81,8 @@ export default function NewsPage() {
     setSelected(item)
     setDeepDive(null)
     setDiving(true)
+    // Record interest — used to personalise future news ranking
+    if (userId) recordInteraction(userId, item, undefined, 2)
     try {
       const d = await api.deepDive(item.ticker || 'market', `${item.headline}. ${item.summary || ''}`)
       setDeepDive(d)
@@ -94,10 +97,16 @@ export default function NewsPage() {
     if (!userId) return
     setSavedIds(prev => {
       const next = new Set(prev)
-      if (next.has(item.id)) next.delete(item.id)
-      else next.add(item.id)
+      const adding = !prev.has(item.id)
+      if (adding) {
+        next.add(item.id)
+        // Bookmarking is a stronger signal than clicking
+        recordInteraction(userId, item, undefined, 4)
+      } else {
+        next.delete(item.id)
+      }
       localStorage.setItem(`saved_news_${userId}`, JSON.stringify([...next]))
-      toast.success(next.has(item.id) ? 'Article saved for later' : 'Article removed from saved')
+      toast.success(adding ? 'Article saved for later' : 'Article removed from saved')
       return next
     })
   }
@@ -132,13 +141,24 @@ export default function NewsPage() {
   const portfolioSet = new Set(portfolio)
   const watchlistSet = new Set(watchlist)
 
-  const filtered = news.filter(n => {
-    if (showSaved) return savedIds.has(n.id)
-    if (sentFilter !== 'All' && n.sentiment !== sentFilter.toLowerCase()) return false
-    if (listFilter === 'Portfolio') return n.ticker && portfolioSet.has(n.ticker)
-    if (listFilter === 'Watchlist') return n.ticker && watchlistSet.has(n.ticker)
-    return true
-  })
+  const prefs = userId ? loadPrefs(userId) : { tickers: {}, sectors: {}, sources: {} }
+
+  const filtered = news
+    .filter(n => {
+      if (showSaved) return savedIds.has(n.id)
+      if (sentFilter !== 'All' && n.sentiment !== sentFilter.toLowerCase()) return false
+      if (listFilter === 'Portfolio') return n.ticker && portfolioSet.has(n.ticker)
+      if (listFilter === 'Watchlist') return n.ticker && watchlistSet.has(n.ticker)
+      return true
+    })
+    .map(n => ({ ...n, _score: (n.relevance || 50) + personalBoost(prefs, n) }))
+    .sort((a, b) => {
+      // Tier by combined score, then recency
+      const tierA = a._score >= 75 ? 2 : a._score >= 55 ? 1 : 0
+      const tierB = b._score >= 75 ? 2 : b._score >= 55 ? 1 : 0
+      if (tierB !== tierA) return tierB - tierA
+      return b.datetime - a.datetime
+    })
 
   const sentCounts = {
     positive: news.filter(n => n.sentiment === 'positive').length,

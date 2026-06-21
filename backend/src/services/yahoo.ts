@@ -18,24 +18,26 @@ export async function fetchPrices(tickers: string[]): Promise<Record<string, num
 }
 
 export async function fetchQuote(ticker: string) {
-  const [{ data: q }, { data: p }] = await Promise.all([
+  const [{ data: q }, { data: p }, metricsRes] = await Promise.all([
     axios.get(`${FINNHUB}/quote?symbol=${ticker}&token=${key()}`, { timeout: 8000 }),
     axios.get(`${FINNHUB}/stock/profile2?symbol=${ticker}&token=${key()}`, { timeout: 8000 }),
+    axios.get(`${FINNHUB}/stock/metric?symbol=${ticker}&metric=all&token=${key()}`, { timeout: 8000 }).catch(() => ({ data: {} })),
   ]);
   if (!q.c) throw new Error(`No quote found for ${ticker}`);
+  const metrics = (metricsRes as any).data?.metric || {};
   return {
     ticker,
     name: p.name || ticker,
     price: q.c,
     change: q.d,
     changePct: q.dp,
-    volume: null,
+    volume: q.v || null,
     marketCap: p.marketCapitalization ? p.marketCapitalization * 1e6 : null,
-    pe: null,
+    pe: metrics['peTTM'] || null,
     forwardPE: null,
-    divYield: null,
-    w52Hi: q.h,
-    w52Lo: q.l,
+    divYield: metrics['dividendYieldIndicatedAnnual'] || null,
+    w52Hi: metrics['52WeekHigh'] || null,
+    w52Lo: metrics['52WeekLow'] || null,
     sector: p.finnhubIndustry || null,
     industry: p.finnhubIndustry || null,
     exchange: p.exchange || null,

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { createClient } from '@/lib/supabase'
+import { loadPrefs, topInterests } from '@/lib/newsPrefs'
 import { LoadingSpinner, SkeletonCard } from '@/components/shared/LoadingSpinner'
 import { IconBrain, IconSearch, IconPlus, IconClock, IconTrendingUp } from '@tabler/icons-react'
 import { toast } from 'sonner'
@@ -51,7 +52,21 @@ export default function OpportunitiesPage() {
   async function generate() {
     setLoading(true)
     try {
-      const { data } = await api.getOpportunities(riskLevel, holdings, sector, market)
+      let newsContext: string | undefined
+      let interests: { topSectors: string[]; topTickers: string[] } | undefined
+      try {
+        if (userId) {
+          const prefs = loadPrefs(userId)
+          interests = topInterests(prefs)
+          const newsData = await api.getNews(holdings.slice(0, 8))
+          const headlines = (newsData?.news || [])
+            .filter((n: any) => (n.relevance || 0) >= 50)
+            .slice(0, 15)
+            .map((n: any) => n.headline)
+          if (headlines.length > 0) newsContext = headlines.join('\n')
+        }
+      } catch {}
+      const { data } = await api.getOpportunities(riskLevel, holdings, sector, market, newsContext, interests)
       setOpps(data || [])
     } catch (e: any) {
       toast.error(e.message)

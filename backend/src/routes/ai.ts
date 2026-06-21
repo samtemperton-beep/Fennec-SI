@@ -60,17 +60,17 @@ router.post('/chat', requireAuth, async (req, res) => {
   res.end();
 });
 
-// Shared cache: top 10 picks served to all users for 6 hours
+// Shared cache: top 10 picks served to all users; news-aware picks get shorter cache
 router.post('/top10', requireAuth, async (req, res) => {
-  const { market = 'US', timeframe = '12mo' } = req.body;
-  const cacheKey = `top10:${market}:${timeframe}`;
+  const { market = 'US', timeframe = '12mo', newsContext } = req.body;
+  const cacheKey = `top10:${market}:${timeframe}:${newsContext ? 'news' : 'base'}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
   const user = (req as any).user;
   try {
-    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key);
-    await setCached(cacheKey, data, 6);
+    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key, newsContext);
+    await setCached(cacheKey, data, newsContext ? 4 : 6);
     res.json({ data, cached: false });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -79,15 +79,15 @@ router.post('/top10', requireAuth, async (req, res) => {
 
 // Per-user cache: keyed by user + filters so different filter combos are cached separately
 router.post('/opportunities', requireAuth, async (req, res) => {
-  const { riskLevel = 7, holdings = [], sector = 'All', market = 'US' } = req.body;
+  const { riskLevel = 7, holdings = [], sector = 'All', market = 'US', newsContext, userInterests } = req.body;
   const user = (req as any).user;
-  const cacheKey = `opportunities:${user.id}:${sector}:${market}:${riskLevel}`;
+  const cacheKey = `opportunities:${user.id}:${sector}:${market}:${riskLevel}:${newsContext ? 'news' : 'base'}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
   try {
-    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key, sector, market);
-    await setCached(cacheKey, data, 4);
+    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key, sector, market, newsContext, userInterests);
+    await setCached(cacheKey, data, newsContext ? 3 : 4);
     res.json({ data, cached: false });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
