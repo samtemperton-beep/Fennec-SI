@@ -10,9 +10,12 @@ import { StatsBar } from '@/components/shared/StatsBar'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { fmtCurrency } from '@/lib/utils'
-import { IconRefresh, IconBrain, IconPlus, IconUpload, IconShield } from '@tabler/icons-react'
+import { IconRefresh, IconBrain, IconPlus, IconUpload, IconShield, IconShieldCheck } from '@tabler/icons-react'
 import Link from 'next/link'
 import { PortfolioGoal } from '@/components/portfolio/PortfolioGoal'
+import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
+import { VerifyPortfolioModal } from '@/components/premium/VerifyPortfolioModal'
+import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { toast } from 'sonner'
 
 const RISK_LABELS = ['', 'Very Conservative', 'Conservative', 'Moderate-Conservative', 'Moderate', 'Moderate', 'Moderate-Aggressive', 'Aggressive', 'Aggressive', 'Very Aggressive', 'Maximum Risk']
@@ -67,8 +70,13 @@ export default function PortfolioPage() {
   const [analyzingSet, setAnalyzingSet] = useState(new Set<number>())
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [verifyOpen, setVerifyOpen] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [riskLevel, setRiskLevel] = useState(5)
+  const [isPremium, setIsPremium] = useState(false)
+  const [badges, setBadges] = useState<any[]>([])
+  const [verification, setVerification] = useState<any>(null)
+  const [aiUsage, setAiUsage] = useState<{ used: number; limit: number; unlimited?: boolean } | null>(null)
   const [form, setForm] = useState({ ticker: '', shares: '', buy_price: '', market: 'US' })
   const [csvText, setCsvText] = useState('')
   const supabase = createClient()
@@ -81,6 +89,12 @@ export default function PortfolioPage() {
       const { data: profile } = await supabase.from('profiles').select('risk_level').eq('id', uid).single()
       if (profile?.risk_level) setRiskLevel(profile.risk_level)
       loadHoldings(uid)
+      api.getPremiumStatus().then(s => {
+        setIsPremium(s.tier === 'premium')
+        setBadges(s.badges || [])
+        setVerification(s.verification)
+      }).catch(() => {})
+      api.getAiUsage().then(setAiUsage).catch(() => {})
     })
   }, [])
 
@@ -138,6 +152,10 @@ export default function PortfolioPage() {
   async function addHolding(e: React.FormEvent) {
     e.preventDefault()
     if (!userId) return
+    if (!isPremium && holdings.length >= 10) {
+      toast.error('Free plan limit: 10 holdings. Upgrade to Premium for unlimited.')
+      return
+    }
     const { data, error } = await supabase.from('holdings').insert({
       user_id: userId,
       ticker: form.ticker.toUpperCase(),
@@ -155,6 +173,10 @@ export default function PortfolioPage() {
 
   async function importCSV() {
     if (!csvText.trim() || !userId) return
+    if (!isPremium && holdings.length >= 10) {
+      toast.error('Free plan limit: 10 holdings. Upgrade to Premium for unlimited.')
+      return
+    }
     try {
       const { holdings: imported } = await api.importCSV(csvText)
       for (const h of imported) {
@@ -192,6 +214,11 @@ export default function PortfolioPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Portfolio</h1>
         <div className="flex items-center gap-2 flex-wrap">
+          {isPremium && (
+            <button onClick={() => setVerifyOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: verification?.status === 'verified' ? 'rgba(16,185,129,0.12)' : 'rgba(251,191,36,0.12)', border: `1px solid ${verification?.status === 'verified' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)'}`, color: verification?.status === 'verified' ? 'var(--green)' : '#f59e0b', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+              <IconShieldCheck size={14} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
+            </button>
+          )}
           <button onClick={refreshPrices} disabled={refreshing} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
             {refreshing ? <LoadingSpinner size={14} /> : <IconRefresh size={14} />} Refresh
           </button>
@@ -208,6 +235,33 @@ export default function PortfolioPage() {
       </div>
 
       <StatsBar stats={stats} />
+
+      {/* Free tier usage bar */}
+      {aiUsage && !aiUsage.unlimited && (
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div className="flex items-center justify-between mb-1">
+              <span style={{ fontSize: 12, fontFamily: 'Syne, sans-serif', color: 'var(--text2)' }}>Daily AI calls</span>
+              <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: aiUsage.used >= aiUsage.limit ? 'var(--red)' : 'var(--text)' }}>
+                {aiUsage.used} / {aiUsage.limit}
+              </span>
+            </div>
+            <div style={{ height: 4, background: 'var(--surface)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 4, width: `${Math.min(100, (aiUsage.used / aiUsage.limit) * 100)}%`, background: aiUsage.used >= aiUsage.limit ? 'var(--red)' : aiUsage.used >= aiUsage.limit * 0.8 ? 'var(--amber)' : 'var(--accent)' }} />
+            </div>
+          </div>
+          <Link href="/settings" style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600, color: '#f59e0b', textDecoration: 'none', whiteSpace: 'nowrap', background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 8, padding: '4px 10px' }}>
+            ✦ Upgrade
+          </Link>
+        </div>
+      )}
+
+      {!loading && !isPremium && holdings.length >= 8 && holdings.length < 10 && (
+        <div style={{ marginTop: 8, padding: '8px 14px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 12, color: '#f59e0b', fontFamily: 'Syne, sans-serif' }}>
+          You have {10 - holdings.length} holding slot{10 - holdings.length !== 1 ? 's' : ''} left on the free plan.{' '}
+          <Link href="/settings" style={{ color: '#f59e0b', fontWeight: 700, textDecoration: 'underline' }}>Upgrade to Premium</Link> for unlimited.
+        </div>
+      )}
 
       {!loading && totalValue > 0 && (
         <div style={{ marginTop: 16 }}>
@@ -235,8 +289,9 @@ export default function PortfolioPage() {
             </div>
             {holdings.length > 1 && <PLChart holdings={holdings} />}
             <RiskCard riskLevel={riskLevel} />
+            {badges.length > 0 && <BadgesDisplay badges={badges} />}
           </div>
-          <div style={{ height: 600 }}>
+          <div style={{ position: 'sticky', top: 24, alignSelf: 'start' }}>
             <AIAdvisor portfolio={portfolio} />
           </div>
         </div>
@@ -274,6 +329,16 @@ export default function PortfolioPage() {
           </button>
         </form>
       </Modal>
+
+      <VerifyPortfolioModal
+        open={verifyOpen}
+        onClose={() => setVerifyOpen(false)}
+        onVerified={(tickers) => {
+          setVerification({ status: 'verified', verified_tickers: tickers })
+          api.getPremiumStatus().then(s => setBadges(s.badges || [])).catch(() => {})
+          toast.success(`${tickers.length} holding${tickers.length !== 1 ? 's' : ''} verified!`)
+        }}
+      />
 
       {/* Import Modal */}
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import Portfolio" wide>

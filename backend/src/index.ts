@@ -10,6 +10,8 @@ import aiRouter from './routes/ai';
 import newsRouter from './routes/news';
 import importRouter from './routes/import';
 import alertsRouter from './routes/alerts';
+import adminRouter from './routes/admin';
+import premiumRouter from './routes/premium';
 
 dotenv.config();
 
@@ -41,6 +43,8 @@ app.use('/api/ai', aiRouter);
 app.use('/api/news', newsRouter);
 app.use('/api/import', importRouter);
 app.use('/api/alerts', alertsRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/premium', premiumRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));
 

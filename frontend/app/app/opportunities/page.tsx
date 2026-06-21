@@ -34,6 +34,7 @@ export default function OpportunitiesPage() {
   const [market, setMarket] = useState('US')
   const [holdings, setHoldings] = useState<string[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+  const [limited, setLimited] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -66,8 +67,9 @@ export default function OpportunitiesPage() {
           if (headlines.length > 0) newsContext = headlines.join('\n')
         }
       } catch {}
-      const { data } = await api.getOpportunities(riskLevel, holdings, sector, market, newsContext, interests)
-      setOpps(data || [])
+      const result = await api.getOpportunities(riskLevel, holdings, sector, market, newsContext, interests)
+      setOpps(result.data || [])
+      setLimited(result.limited === true)
     } catch (e: any) {
       toast.error(e.message)
     }
@@ -240,6 +242,22 @@ export default function OpportunitiesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Premium teaser for free users */}
+      {limited && opps.length > 0 && (
+        <div style={{ marginTop: 24, padding: '20px 24px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(251,191,36,0.08), rgba(91,106,255,0.08))', border: '1px solid rgba(251,191,36,0.3)', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, marginBottom: 8 }}>🔒</div>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+            4 more hidden gems available
+          </p>
+          <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 14 }}>
+            Upgrade to Premium to see all 6 picks including the highest-conviction opportunities.
+          </p>
+          <a href="/settings" style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#1a1a1a', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>
+            ✦ Upgrade to Premium
+          </a>
         </div>
       )}
     </div>

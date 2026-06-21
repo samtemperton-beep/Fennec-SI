@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase'
 import {
   IconChartBar, IconBrain, IconTrendingUp, IconStar, IconEye,
   IconNewSection, IconMail, IconCalendar, IconUsers, IconBell,
-  IconSettings, IconMenu2, IconX, IconLogout,
+  IconSettings, IconMenu2, IconX, IconLogout, IconTrophy,
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
 import { Avatar } from '@/components/shared/Avatar'
@@ -21,6 +21,7 @@ const NAV = [
   { href: '/app/ipo', label: 'IPO Calendar', icon: IconCalendar },
   { href: '/app/community', label: 'Community', icon: IconUsers },
   { href: '/app/alerts', label: 'Alerts', icon: IconBell },
+  { href: '/app/leaderboard', label: 'Leaderboard', icon: IconTrophy },
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

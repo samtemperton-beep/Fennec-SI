@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Avatar } from '@/components/shared/Avatar'
-import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar, IconCrown } from '@tabler/icons-react'
+import { PremiumBadge } from '@/components/premium/PremiumBadge'
+import { api } from '@/lib/api'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
@@ -54,6 +56,7 @@ export default function SettingsPage() {
   const [finnhubKey, setFinnhubKey] = useState('')
   const [user, setUser] = useState<any>(null)
   // Goal
+  const [premiumStatus, setPremiumStatus] = useState<{ tier: string; badges: any[]; verification: any } | null>(null)
   const [goal, setGoal] = useState<any>(null)
   const [goalForm, setGoalForm] = useState({ targetPct: '100', months: '12', label: 'Double my portfolio' })
   const [editingGoal, setEditingGoal] = useState(false)
@@ -78,6 +81,7 @@ export default function SettingsPage() {
         if (data.avatar_url) setAvatarTab('upload')
         else if (data.avatar_emoji) setAvatarTab('emoji')
       }
+      api.getPremiumStatus().then(s => setPremiumStatus(s)).catch(() => {})
       // Load goal from localStorage
       const saved = localStorage.getItem(`portfolio_goal_${u.id}`)
       if (saved) {
@@ -446,6 +450,51 @@ export default function SettingsPage() {
             </div>
           ) : null}
           </div>
+        </div>
+
+        {/* Subscription */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <IconCrown size={16} style={{ color: '#f59e0b' }} /> Subscription
+            </h2>
+            {premiumStatus?.tier === 'premium' && <PremiumBadge />}
+          </div>
+          {premiumStatus ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10, marginBottom: 12 }}>
+                <div style={{
+                  width: 10, height: 10, borderRadius: '50%',
+                  background: premiumStatus.tier === 'premium' ? '#fbbf24' : 'var(--text2)',
+                  flexShrink: 0,
+                }} />
+                <div>
+                  <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>
+                    {premiumStatus.tier === 'premium' ? 'Premium' : 'Free'} Plan
+                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    {premiumStatus.tier === 'premium'
+                      ? 'Full Claude AI on all features, portfolio verification & leaderboard access'
+                      : 'Upgrade to Premium for full Claude AI, portfolio verification and badges'}
+                  </p>
+                </div>
+              </div>
+              {premiumStatus.badges?.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 8 }}>
+                    Badges earned ({premiumStatus.badges.length})
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {premiumStatus.badges.map((b: any) => (
+                      <span key={b.badge_id} style={{ fontSize: 14 }} title={b.badges?.name}>{b.badges?.icon}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ height: 32, background: 'var(--surface2)', borderRadius: 8 }} />
+          )}
         </div>
 
         {/* API Keys */}
