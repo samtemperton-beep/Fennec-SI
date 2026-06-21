@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 
 interface NewsItem {
   id: number; headline: string; summary?: string; source: string; url: string
-  datetime: number; sentiment: 'positive' | 'negative' | 'neutral'; ticker?: string
+  datetime: number; sentiment: 'positive' | 'negative' | 'neutral'; ticker?: string; relevance?: number
 }
 
 const SENT_COLORS = { positive: 'var(--green)', negative: 'var(--red)', neutral: 'var(--amber)' }
@@ -61,7 +61,9 @@ export default function NewsPage() {
 
     setLoading(true)
     try {
-      const data = await api.getNews(portfolioTickers.slice(0, 5))
+      // Pass portfolio + watchlist tickers so backend can match/extract tickers in articles
+      const allTickers = [...new Set([...portfolioTickers, ...watchlistTickers])].slice(0, 12)
+      const data = await api.getNews(allTickers)
       setNews(data)
       if (data.length > 0) {
         const headlines = data.map((n: NewsItem) => n.headline)
@@ -199,31 +201,42 @@ export default function NewsPage() {
               const inPortfolio = !!(n.ticker && portfolioSet.has(n.ticker))
               const inWatchlist = !!(n.ticker && watchlistSet.has(n.ticker))
               return (
-                <div key={i} className="card hover:border-accent transition-colors cursor-pointer" onClick={() => openDeepDive(n)} style={{ transition: 'border-color 0.2s' }}>
+                <div key={i} className="card hover:border-accent transition-colors cursor-pointer" onClick={() => openDeepDive(n)}
+                  style={{ transition: 'border-color 0.2s', borderColor: (n.relevance || 0) >= 70 && n.ticker && (inPortfolio || inWatchlist) ? 'rgba(91,106,255,0.35)' : undefined }}
+                >
                   <div className="flex items-start gap-3">
                     <div style={{ width: 3, flexShrink: 0, alignSelf: 'stretch', borderRadius: 2, background: SENT_COLORS[n.sentiment] }} />
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{n.headline}</p>
-                      {n.summary && <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 6 }}>{n.summary.slice(0, 150)}{n.summary.length > 150 ? '…' : ''}</p>}
+                      {n.summary && n.summary !== n.headline && (
+                        <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 6 }}>{n.summary.slice(0, 150)}{n.summary.length > 150 ? '…' : ''}</p>
+                      )}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>{n.source}</span>
                         <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 10, background: `${SENT_COLORS[n.sentiment]}18`, color: SENT_COLORS[n.sentiment], fontFamily: 'Syne, sans-serif', fontWeight: 600, textTransform: 'capitalize' }}>{n.sentiment}</span>
-                        {n.ticker && <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--accent2)', fontWeight: 700 }}>{n.ticker}</span>}
+
+                        {/* Ticker + portfolio/watchlist badge */}
                         {n.ticker && (
-                          <span onClick={e => e.stopPropagation()}>
-                            <WatchlistButton ticker={n.ticker} userId={userId} inWatchlist={inWatchlist} inPortfolio={inPortfolio} onAdded={t => setWatchlist(prev => [...prev, t])} />
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', fontWeight: 700, padding: '1px 6px', borderRadius: 6, background: 'rgba(91,106,255,0.12)', color: 'var(--accent)' }}>${n.ticker}</span>
+                            {inPortfolio && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 6, background: 'rgba(16,185,129,0.15)', color: 'var(--green)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Portfolio</span>}
+                            {!inPortfolio && inWatchlist && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 6, background: 'rgba(91,106,255,0.15)', color: 'var(--accent)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Watchlist</span>}
                           </span>
                         )}
+                        {n.ticker && !inPortfolio && !inWatchlist && (
+                          <span onClick={e => e.stopPropagation()}>
+                            <WatchlistButton ticker={n.ticker} userId={userId} inWatchlist={false} inPortfolio={false} onAdded={t => setWatchlist(prev => [...prev, t])} />
+                          </span>
+                        )}
+
                         <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>{timeAgo(n.datetime)}</span>
-                        {/* Save & Share */}
                         <span onClick={e => { e.stopPropagation(); toggleSave(n) }}
                           title={savedIds.has(n.id) ? 'Remove from saved' : 'Save for later'}
                           style={{ cursor: 'pointer', color: savedIds.has(n.id) ? 'var(--amber)' : 'var(--text2)', lineHeight: 0 }}
                         >
                           {savedIds.has(n.id) ? <IconBookmarkFilled size={14} /> : <IconBookmark size={14} />}
                         </span>
-                        <span onClick={e => openShare(n, e)}
-                          title="Share to community"
+                        <span onClick={e => openShare(n, e)} title="Share to community"
                           style={{ cursor: 'pointer', color: 'var(--text2)', lineHeight: 0 }}
                         >
                           <IconShare size={14} />
