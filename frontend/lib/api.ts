@@ -26,6 +26,9 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
+  searchStocks: (q: string) =>
+    apiFetch(`/api/prices/search?q=${encodeURIComponent(q)}`),
+
   getPrices: (tickers: string[]) =>
     apiFetch(`/api/prices?tickers=${tickers.join(',')}`),
 

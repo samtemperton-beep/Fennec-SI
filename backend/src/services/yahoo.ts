@@ -46,6 +46,22 @@ export async function fetchQuote(ticker: string) {
   };
 }
 
+export async function searchSymbols(query: string): Promise<{ ticker: string; name: string; exchange: string; type: string }[]> {
+  const { data } = await axios.get(
+    `${FINNHUB}/search?q=${encodeURIComponent(query)}&token=${key()}`,
+    { timeout: 8000 }
+  );
+  return (data?.result || [])
+    .filter((r: any) => r.type === 'Common Stock' || r.type === 'ETP')
+    .slice(0, 8)
+    .map((r: any) => ({
+      ticker: r.symbol,
+      name: r.description,
+      exchange: r.primaryExchange || r.displaySymbol,
+      type: r.type,
+    }));
+}
+
 export async function fetchChart(ticker: string, range = '1y'): Promise<any[]> {
   const now = Math.floor(Date.now() / 1000);
   const fromMap: Record<string, number> = {

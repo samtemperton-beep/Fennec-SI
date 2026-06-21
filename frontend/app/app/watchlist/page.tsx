@@ -1,6 +1,6 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { SignalBadge } from '@/components/shared/SignalBadge'
@@ -33,6 +33,11 @@ export default function WatchlistPage() {
   const [filterMktCap, setFilterMktCap] = useState('All')
   const [filterMinPrice, setFilterMinPrice] = useState('')
   const [filterMaxPrice, setFilterMaxPrice] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{ ticker: string; name: string; exchange: string }[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [selectedResult, setSelectedResult] = useState<{ ticker: string; name: string; exchange: string } | null>(null)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = createClient()
 
   function parseMktCap(s?: string): number {
@@ -228,6 +233,37 @@ export default function WatchlistPage() {
     }
   }
 
+  function onSearchChange(q: string) {
+    setSearchQuery(q)
+    setSelectedResult(null)
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    if (q.length < 2) { setSearchResults([]); return }
+    setSearchLoading(true)
+    searchDebounce.current = setTimeout(async () => {
+      try {
+        const results = await api.searchStocks(q)
+        setSearchResults(results)
+      } catch {}
+      setSearchLoading(false)
+    }, 300)
+  }
+
+  function selectSearchResult(r: { ticker: string; name: string; exchange: string }) {
+    setSelectedResult(r)
+    setTicker(r.ticker)
+    // Auto-detect market from exchange
+    if (r.exchange?.includes('ASX') || r.ticker.endsWith('.AX')) setMarket('ASX')
+    else if (r.exchange?.includes('NZX') || r.ticker.endsWith('.NZ')) setMarket('NZX')
+    else setMarket('US')
+    setSearchResults([])
+    setSearchQuery(r.name)
+  }
+
+  function resetAddModal() {
+    setSearchQuery(''); setSearchResults([]); setSelectedResult(null)
+    setTicker(''); setMarket('US')
+  }
+
   async function addToPortfolio(item: WItem) {
     if (!userId) return
     const buyPrice = item.current_price || 0
@@ -402,23 +438,92 @@ export default function WatchlistPage() {
         </label>
       </Modal>
 
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add to Watchlist">
+      <Modal open={addOpen} onClose={() => { setAddOpen(false); resetAddModal() }} title="Add to Watchlist">
         <form onSubmit={add} className="space-y-4">
-          <div>
-            <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Ticker</label>
-            <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} placeholder="AAPL" required
+          <div style={{ position: 'relative' }}>
+            <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>
+              Search by name or ticker
+            </label>
+            <input
+              value={searchQuery}
+              onChange={e => onSearchChange(e.target.value)}
+              placeholder="e.g. Micron, Apple, NVDA…"
+              autoFocus
               style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', outline: 'none' }}
             />
+            {/* Dropdown results */}
+            {(searchResults.length > 0 || searchLoading) && !selectedResult && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+                marginTop: 4, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              }}>
+                {searchLoading && !searchResults.length && (
+                  <div style={{ padding: '10px 12px', color: 'var(--text2)', fontSize: 12 }}>Searching…</div>
+                )}
+                {searchResults.map(r => (
+                  <button
+                    key={r.ticker}
+                    type="button"
+                    onClick={() => selectSearchResult(r)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '10px 14px', textAlign: 'left',
+                      background: 'none', border: 'none', borderBottom: '1px solid var(--border)',
+                      cursor: 'pointer', transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    <div>
+                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{r.ticker}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 8 }}>{r.name}</span>
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--text2)', background: 'var(--surface2)', padding: '2px 6px', borderRadius: 4, flexShrink: 0, marginLeft: 8 }}>{r.exchange}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>Market</label>
-            <select value={market} onChange={e => setMarket(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace' }}
-            >
-              <option>US</option><option>ASX</option><option>NZX</option>
-            </select>
-          </div>
-          <button type="submit" style={{ width: '100%', background: 'var(--accent)', color: 'white', padding: '10px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+
+          {/* Selected stock confirmation */}
+          {selectedResult && (
+            <div style={{ background: 'rgba(91,106,255,0.1)', border: '1px solid rgba(91,106,255,0.3)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'var(--accent2)' }}>{selectedResult.ticker}</span>
+                <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 8 }}>{selectedResult.name}</span>
+              </div>
+              <button type="button" onClick={resetAddModal} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: 11 }}>Change</button>
+            </div>
+          )}
+
+          {/* Manual ticker fallback — shown if no result selected */}
+          {!selectedResult && (
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>
+                Or enter ticker directly
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={ticker}
+                  onChange={e => setTicker(e.target.value.toUpperCase())}
+                  placeholder="MU"
+                  style={{ flex: 1, padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', outline: 'none' }}
+                />
+                <select value={market} onChange={e => setMarket(e.target.value)}
+                  style={{ padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace' }}
+                >
+                  <option>US</option><option>ASX</option><option>NZX</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={!ticker}
+            style={{ width: '100%', background: 'var(--accent)', color: 'white', padding: '10px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: ticker ? 1 : 0.5, cursor: ticker ? 'pointer' : 'default' }}
+          >
             Add to Watchlist
           </button>
         </form>
