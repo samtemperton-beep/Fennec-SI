@@ -10,9 +10,55 @@ import { StatsBar } from '@/components/shared/StatsBar'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { fmtCurrency } from '@/lib/utils'
-import { IconRefresh, IconBrain, IconPlus, IconUpload } from '@tabler/icons-react'
+import { IconRefresh, IconBrain, IconPlus, IconUpload, IconShield } from '@tabler/icons-react'
+import Link from 'next/link'
 import { PortfolioGoal } from '@/components/portfolio/PortfolioGoal'
 import { toast } from 'sonner'
+
+const RISK_LABELS = ['', 'Very Conservative', 'Conservative', 'Moderate-Conservative', 'Moderate', 'Moderate', 'Moderate-Aggressive', 'Aggressive', 'Aggressive', 'Very Aggressive', 'Maximum Risk']
+const RISK_COLOR = (r: number) => r <= 3 ? 'var(--green)' : r <= 6 ? 'var(--amber)' : 'var(--red)'
+
+function RiskCard({ riskLevel }: { riskLevel: number }) {
+  const pct = ((riskLevel - 1) / 9) * 100
+  return (
+    <div className="card" style={{ padding: '16px 20px' }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <IconShield size={15} style={{ color: RISK_COLOR(riskLevel) }} />
+          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>Risk Tolerance</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 13, color: RISK_COLOR(riskLevel) }}>
+            {RISK_LABELS[riskLevel]} ({riskLevel}/10)
+          </span>
+          <Link href="/settings" style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px' }}
+            onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text)'}
+            onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text2)'}
+          >
+            Edit
+          </Link>
+        </div>
+      </div>
+      <div style={{ position: 'relative', height: 6, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{
+          position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 4,
+          width: `${pct}%`,
+          background: `linear-gradient(to right, var(--green), var(--amber) 50%, var(--red))`,
+          backgroundSize: '200% 100%',
+          backgroundPosition: `${pct}% 0`,
+        }} />
+      </div>
+      <div className="flex justify-between mt-1">
+        <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>Conservative</span>
+        <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>Aggressive</span>
+      </div>
+      <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8 }}>
+        AI signals are calibrated to your risk profile. Change in{' '}
+        <Link href="/settings" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Settings</Link>.
+      </p>
+    </div>
+  )
+}
 
 export default function PortfolioPage() {
   const [holdings, setHoldings] = useState<Holding[]>([])
@@ -188,6 +234,7 @@ export default function PortfolioPage() {
               <HoldingsTable holdings={holdings} analyzingSet={analyzingSet} onDelete={deleteHolding} onAnalyze={analyzeHolding} />
             </div>
             {holdings.length > 1 && <PLChart holdings={holdings} />}
+            <RiskCard riskLevel={riskLevel} />
           </div>
           <div style={{ height: 600 }}>
             <AIAdvisor portfolio={portfolio} />
