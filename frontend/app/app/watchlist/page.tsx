@@ -11,7 +11,7 @@ import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera
 import { toast } from 'sonner'
 
 interface WItem {
-  id: number; ticker: string; market: string; current_price?: number
+  id: number; ticker: string; market: string; name?: string; current_price?: number
   change_pct?: number; signal?: string; sector?: string; pe?: number
   mkt_cap?: string; div_yld?: number; w52_lo?: number; w52_hi?: number; note?: string
 }
@@ -28,6 +28,11 @@ export default function WatchlistPage() {
   const [importing, setImporting] = useState(false)
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [filterSector, setFilterSector] = useState('All')
+  const [filterMarket, setFilterMarket] = useState('All')
+  const [filterMktCap, setFilterMktCap] = useState('All')
+  const [filterMinPrice, setFilterMinPrice] = useState('')
+  const [filterMaxPrice, setFilterMaxPrice] = useState('')
   const supabase = createClient()
 
   function parseMktCap(s?: string): number {
@@ -64,6 +69,26 @@ export default function WatchlistPage() {
     const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number)
     return sortDir === 'asc' ? cmp : -cmp
   }) : items
+
+  const sectors = ['All', ...Array.from(new Set(items.map(i => i.sector).filter(Boolean))).sort()] as string[]
+  const markets = ['All', ...Array.from(new Set(items.map(i => i.market).filter(Boolean))).sort()] as string[]
+
+  const filteredItems = sortedItems.filter(item => {
+    if (filterSector !== 'All' && item.sector !== filterSector) return false
+    if (filterMarket !== 'All' && item.market !== filterMarket) return false
+    if (filterMinPrice && (item.current_price || 0) < parseFloat(filterMinPrice)) return false
+    if (filterMaxPrice && (item.current_price || 0) > parseFloat(filterMaxPrice)) return false
+    if (filterMktCap !== 'All') {
+      const raw = parseMktCap(item.mkt_cap)
+      if (filterMktCap === 'Small' && raw >= 2e9) return false
+      if (filterMktCap === 'Mid' && (raw < 2e9 || raw >= 10e9)) return false
+      if (filterMktCap === 'Large' && raw < 10e9) return false
+    }
+    return true
+  })
+
+  const activeFilters = [filterSector, filterMarket, filterMktCap].filter(f => f !== 'All').length
+    + (filterMinPrice || filterMaxPrice ? 1 : 0)
 
   useEffect(() => {
     const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
@@ -113,6 +138,7 @@ export default function WatchlistPage() {
         try {
           const q = await api.getQuote(item.ticker)
           const updates: Partial<WItem> = {
+            name: q.name || item.name,
             current_price: q.price || item.current_price,
             change_pct: q.changePct ?? item.change_pct,
             sector: q.sector || item.sector,
@@ -229,6 +255,58 @@ export default function WatchlistPage() {
         </div>
       </div>
 
+      {/* Filter bar */}
+      {!loading && items.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          {/* Sector */}
+          <select value={filterSector} onChange={e => setFilterSector(e.target.value)}
+            style={{ padding: '6px 10px', background: filterSector !== 'All' ? 'rgba(91,106,255,0.15)' : 'var(--surface)', border: `1px solid ${filterSector !== 'All' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: filterSector !== 'All' ? 'var(--accent)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
+          >
+            {sectors.map(s => <option key={s} value={s}>{s === 'All' ? 'All Sectors' : s}</option>)}
+          </select>
+
+          {/* Market */}
+          {markets.length > 2 && (
+            <select value={filterMarket} onChange={e => setFilterMarket(e.target.value)}
+              style={{ padding: '6px 10px', background: filterMarket !== 'All' ? 'rgba(91,106,255,0.15)' : 'var(--surface)', border: `1px solid ${filterMarket !== 'All' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: filterMarket !== 'All' ? 'var(--accent)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
+            >
+              {markets.map(m => <option key={m} value={m}>{m === 'All' ? 'All Markets' : m}</option>)}
+            </select>
+          )}
+
+          {/* Market cap */}
+          <select value={filterMktCap} onChange={e => setFilterMktCap(e.target.value)}
+            style={{ padding: '6px 10px', background: filterMktCap !== 'All' ? 'rgba(91,106,255,0.15)' : 'var(--surface)', border: `1px solid ${filterMktCap !== 'All' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: filterMktCap !== 'All' ? 'var(--accent)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
+          >
+            {['All', 'Small', 'Mid', 'Large'].map(c => <option key={c} value={c}>{c === 'All' ? 'All Cap Sizes' : `${c}-cap`}</option>)}
+          </select>
+
+          {/* Price range */}
+          <div className="flex items-center gap-1">
+            <input type="number" placeholder="Min $" value={filterMinPrice} onChange={e => setFilterMinPrice(e.target.value)}
+              style={{ width: 72, padding: '6px 8px', background: 'var(--surface)', border: `1px solid ${filterMinPrice ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 12, outline: 'none' }}
+            />
+            <span style={{ color: 'var(--text2)', fontSize: 12 }}>–</span>
+            <input type="number" placeholder="Max $" value={filterMaxPrice} onChange={e => setFilterMaxPrice(e.target.value)}
+              style={{ width: 72, padding: '6px 8px', background: 'var(--surface)', border: `1px solid ${filterMaxPrice ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 12, outline: 'none' }}
+            />
+          </div>
+
+          {/* Clear filters */}
+          {activeFilters > 0 && (
+            <button onClick={() => { setFilterSector('All'); setFilterMarket('All'); setFilterMktCap('All'); setFilterMinPrice(''); setFilterMaxPrice('') }}
+              style={{ padding: '6px 10px', background: 'rgba(240,84,84,0.1)', border: '1px solid rgba(240,84,84,0.3)', borderRadius: 8, color: 'var(--red)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              Clear {activeFilters} filter{activeFilters > 1 ? 's' : ''}
+            </button>
+          )}
+
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>
+            {filteredItems.length} / {items.length} stocks
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12"><LoadingSpinner size={32} /></div>
       ) : items.length === 0 ? (
@@ -269,12 +347,15 @@ export default function WatchlistPage() {
               </tr>
             </thead>
             <tbody>
-              {sortedItems.map(item => (
+              {filteredItems.map(item => (
                 <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }} className="hover:bg-surface2">
-                  <td style={{ padding: '12px' }}>
-                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{item.ticker}</span>
-                    {item.market !== 'US' && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text2)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4 }}>{item.market}</span>}
-                    {item.sector && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{item.sector}</p>}
+                  <td style={{ padding: '12px', minWidth: 160 }}>
+                    <div className="flex items-center gap-2">
+                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{item.ticker}</span>
+                      {item.market !== 'US' && <span style={{ fontSize: 10, color: 'var(--text2)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4 }}>{item.market}</span>}
+                    </div>
+                    {item.name && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>{item.name}</p>}
+                    {item.sector && <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1, opacity: 0.7 }}>{item.sector}</p>}
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{item.current_price ? fmtCurrency(item.current_price) : '—'}</td>
                   <td style={{ padding: '12px', textAlign: 'center', fontFamily: 'DM Mono, monospace', fontSize: 13, color: (item.change_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
