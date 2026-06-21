@@ -101,8 +101,21 @@ export default function PortfolioPage() {
   async function loadHoldings(uid: string) {
     setLoading(true)
     const { data } = await supabase.from('holdings').select('*').eq('user_id', uid).order('added_at', { ascending: false })
-    setHoldings(data || [])
+    const rows = data || []
+    setHoldings(rows)
     setLoading(false)
+    // Enrich with live prices + company names in background
+    if (rows.length) {
+      try {
+        const tickers = [...new Set(rows.map((h: any) => h.ticker as string))]
+        const priceData = await api.getPrices(tickers)
+        setHoldings(rows.map((h: any) => ({
+          ...h,
+          current_price: priceData[h.ticker]?.price ?? h.current_price,
+          name: priceData[h.ticker]?.name ?? h.name,
+        })))
+      } catch {}
+    }
   }
 
   async function refreshPrices() {
@@ -110,8 +123,12 @@ export default function PortfolioPage() {
     setRefreshing(true)
     try {
       const tickers = [...new Set(holdings.map(h => h.ticker))]
-      const prices = await api.getPrices(tickers)
-      const updates = holdings.map(h => ({ ...h, current_price: prices[h.ticker] ?? h.current_price }))
+      const data = await api.getPrices(tickers)
+      const updates = holdings.map(h => ({
+        ...h,
+        current_price: data[h.ticker]?.price ?? h.current_price,
+        name: data[h.ticker]?.name ?? h.name,
+      }))
       setHoldings(updates)
       for (const h of updates) {
         await supabase.from('holdings').update({ current_price: h.current_price }).eq('id', h.id)
@@ -211,27 +228,8 @@ export default function PortfolioPage() {
 
   return (
     <div style={{ padding: '24px' }}>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div className="flex items-center mb-6">
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Portfolio</h1>
-        <div className="flex items-center gap-2 flex-wrap">
-          {isPremium && (
-            <button onClick={() => setVerifyOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: verification?.status === 'verified' ? 'rgba(16,185,129,0.12)' : 'rgba(251,191,36,0.12)', border: `1px solid ${verification?.status === 'verified' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)'}`, color: verification?.status === 'verified' ? 'var(--green)' : '#f59e0b', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-              <IconShieldCheck size={14} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
-            </button>
-          )}
-          <button onClick={refreshPrices} disabled={refreshing} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            {refreshing ? <LoadingSpinner size={14} /> : <IconRefresh size={14} />} Refresh
-          </button>
-          <button onClick={analyzeAll} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'rgba(91,106,255,0.15)', border: '1px solid rgba(91,106,255,0.3)', color: 'var(--accent2)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconBrain size={14} /> Analyze All
-          </button>
-          <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconUpload size={14} /> Import
-          </button>
-          <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconPlus size={14} /> Add Stock
-          </button>
-        </div>
       </div>
 
       <StatsBar stats={stats} />
@@ -269,6 +267,29 @@ export default function PortfolioPage() {
         </div>
       )}
 
+      {/* Action buttons — below portfolio goal */}
+      {!loading && holdings.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap mt-4">
+          {isPremium && (
+            <button onClick={() => setVerifyOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: verification?.status === 'verified' ? 'rgba(16,185,129,0.12)' : 'rgba(251,191,36,0.12)', border: `1px solid ${verification?.status === 'verified' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)'}`, color: verification?.status === 'verified' ? 'var(--green)' : '#f59e0b', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
+              <IconShieldCheck size={15} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
+            </button>
+          )}
+          <button onClick={refreshPrices} disabled={refreshing} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'var(--surface)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
+            {refreshing ? <LoadingSpinner size={14} /> : <IconRefresh size={14} />} Refresh Prices
+          </button>
+          <button onClick={analyzeAll} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'rgba(91,106,255,0.18)', border: '1px solid rgba(91,106,255,0.4)', color: 'var(--accent2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
+            <IconBrain size={15} /> Analyze All
+          </button>
+          <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'var(--surface)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
+            <IconUpload size={15} /> Import CSV
+          </button>
+          <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg ml-auto" style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>
+            <IconPlus size={15} /> Add Stock
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20"><LoadingSpinner size={32} /></div>
       ) : holdings.length === 0 ? (
@@ -287,8 +308,8 @@ export default function PortfolioPage() {
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <HoldingsTable holdings={holdings} analyzingSet={analyzingSet} onDelete={deleteHolding} onAnalyze={analyzeHolding} />
             </div>
-            {holdings.length > 1 && <PLChart holdings={holdings} />}
             <RiskCard riskLevel={riskLevel} />
+            {holdings.length > 1 && <PLChart holdings={holdings} />}
             {badges.length > 0 && <BadgesDisplay badges={badges} />}
           </div>
           <div style={{ position: 'sticky', top: 24, alignSelf: 'start' }}>

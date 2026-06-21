@@ -8,8 +8,7 @@ router.get('/', async (req, res) => {
   const tickers = String(req.query.tickers || '').split(',').filter(Boolean);
   if (!tickers.length) return res.status(400).json({ error: 'No tickers' });
   try {
-    const prices = await fetchPrices(tickers);
-    res.json(prices);
+    res.json(await fetchPrices(tickers));
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

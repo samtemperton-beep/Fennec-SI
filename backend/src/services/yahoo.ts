@@ -3,14 +3,17 @@ import axios from 'axios';
 const FINNHUB = 'https://finnhub.io/api/v1';
 const key = () => process.env.FINNHUB_API_KEY || '';
 
-export async function fetchPrices(tickers: string[]): Promise<Record<string, number>> {
+export async function fetchPrices(tickers: string[]): Promise<Record<string, { price: number; name?: string }>> {
   const results = await Promise.all(
     tickers.map(async t => {
       try {
-        const { data } = await axios.get(`${FINNHUB}/quote?symbol=${t}&token=${key()}`, { timeout: 8000 });
-        return [t, data.c ?? 0] as [string, number];
+        const [{ data: q }, { data: p }] = await Promise.all([
+          axios.get(`${FINNHUB}/quote?symbol=${t}&token=${key()}`, { timeout: 8000 }),
+          axios.get(`${FINNHUB}/stock/profile2?symbol=${t}&token=${key()}`, { timeout: 8000 }),
+        ]);
+        return [t, { price: q.c ?? 0, name: p.name || undefined }] as [string, { price: number; name?: string }];
       } catch {
-        return [t, 0] as [string, number];
+        return [t, { price: 0 }] as [string, { price: number }];
       }
     })
   );

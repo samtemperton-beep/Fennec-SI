@@ -7,6 +7,7 @@ import { IconChevronUp, IconChevronDown, IconTrash, IconLoader } from '@tabler/i
 export interface Holding {
   id: number
   ticker: string
+  name?: string | null
   shares: number
   buy_price: number
   current_price: number
@@ -95,11 +96,14 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze }: P
               >
                 <td style={{ padding: '12px' }}>
                   <div>
-                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{h.ticker}</span>
-                    {h.market !== 'US' && (
-                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text2)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4 }}>{h.market}</span>
-                    )}
-                    {h.sector && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{h.sector}</p>}
+                    <div className="flex items-center gap-2">
+                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{h.ticker}</span>
+                      {h.market !== 'US' && (
+                        <span style={{ fontSize: 10, color: 'var(--text2)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4 }}>{h.market}</span>
+                      )}
+                    </div>
+                    {h.name && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{h.name}</p>}
+                    {h.sector && !h.name && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{h.sector}</p>}
                   </div>
                 </td>
                 <td style={{ padding: '12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{fmt(h.shares)}</td>
