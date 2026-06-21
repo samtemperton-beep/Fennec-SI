@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import * as claude from '../services/claude';
+import * as gemini from '../services/gemini';
 import { getCached, setCached } from '../services/cache';
 
 const router = Router();
@@ -12,9 +13,8 @@ router.post('/analyze', requireAuth, async (req, res) => {
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
-  const user = (req as any).user;
   try {
-    const result = await claude.analyzeStock(ticker, data, user.user_metadata?.anthropic_key);
+    const result = await gemini.analyzeStock(ticker, data);
     await setCached(cacheKey, result, 6);
     res.json(result);
   } catch (e: any) {
@@ -24,14 +24,13 @@ router.post('/analyze', requireAuth, async (req, res) => {
 
 router.post('/helper', requireAuth, async (req, res) => {
   const { messages } = req.body;
-  const user = (req as any).user;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
   try {
-    for await (const chunk of claude.streamHelper(messages, user.user_metadata?.anthropic_key)) {
+    for await (const chunk of gemini.streamHelper(messages)) {
       res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
     }
     res.write('data: [DONE]\n\n');
@@ -119,9 +118,8 @@ router.post('/ipo-analysis', requireAuth, async (req, res) => {
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
-  const user = (req as any).user;
   try {
-    const data = await claude.analyzeIPO(ipo, user.user_metadata?.anthropic_key);
+    const data = await gemini.analyzeIPO(ipo);
     await setCached(cacheKey, data, 24);
     res.json({ data, cached: false });
   } catch (e: any) {
@@ -149,9 +147,8 @@ router.post('/deep-dive', requireAuth, async (req, res) => {
 // No cache: draft post is personal and instant
 router.post('/draft-post', requireAuth, async (req, res) => {
   const { ticker, signal, context } = req.body;
-  const user = (req as any).user;
   try {
-    const text = await claude.draftPost(ticker, signal, context, user.user_metadata?.anthropic_key);
+    const text = await gemini.draftPost(ticker, signal, context);
     res.json({ text });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
