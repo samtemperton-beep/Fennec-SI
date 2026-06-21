@@ -221,15 +221,25 @@ export default function PortfolioPage() {
     { label: 'Total P&L', value: totalPL, type: 'currency' as const, positive: totalPL >= 0 },
     { label: 'P&L %', value: totalPLPct, type: 'pct' as const, positive: totalPLPct >= 0 },
     { label: 'Holdings', value: holdings.length, type: 'number' as const },
-    { label: 'AI Signals', value: signals, type: 'number' as const },
   ]
 
   const portfolio = holdings.map(h => h.ticker)
 
   return (
     <div style={{ padding: '24px' }}>
-      <div className="flex items-center mb-6">
+      {/* Header with Verify + Import on right */}
+      <div className="flex items-center justify-between mb-6">
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Portfolio</h1>
+        <div className="flex items-center gap-2">
+          {isPremium && (
+            <button onClick={() => setVerifyOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: verification?.status === 'verified' ? 'rgba(16,185,129,0.12)' : 'rgba(251,191,36,0.12)', border: `1px solid ${verification?.status === 'verified' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)'}`, color: verification?.status === 'verified' ? 'var(--green)' : '#f59e0b', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+              <IconShieldCheck size={14} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
+            </button>
+          )}
+          <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+            <IconUpload size={14} /> Import
+          </button>
+        </div>
       </div>
 
       <StatsBar stats={stats} />
@@ -261,6 +271,11 @@ export default function PortfolioPage() {
         </div>
       )}
 
+      {/* Risk tolerance — below stats, above goal */}
+      {!loading && holdings.length > 0 && (
+        <div style={{ marginTop: 16 }}><RiskCard riskLevel={riskLevel} /></div>
+      )}
+
       {!loading && totalValue > 0 && (
         <div style={{ marginTop: 16 }}>
           <PortfolioGoal currentValue={totalValue} userId={userId} />
@@ -270,19 +285,11 @@ export default function PortfolioPage() {
       {/* Action buttons — below portfolio goal */}
       {!loading && holdings.length > 0 && (
         <div className="flex items-center gap-3 flex-wrap mt-4">
-          {isPremium && (
-            <button onClick={() => setVerifyOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: verification?.status === 'verified' ? 'rgba(16,185,129,0.12)' : 'rgba(251,191,36,0.12)', border: `1px solid ${verification?.status === 'verified' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)'}`, color: verification?.status === 'verified' ? 'var(--green)' : '#f59e0b', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
-              <IconShieldCheck size={15} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
-            </button>
-          )}
-          <button onClick={refreshPrices} disabled={refreshing} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'var(--surface)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
+          <button onClick={refreshPrices} disabled={refreshing} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
             {refreshing ? <LoadingSpinner size={14} /> : <IconRefresh size={14} />} Refresh Prices
           </button>
           <button onClick={analyzeAll} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'rgba(91,106,255,0.18)', border: '1px solid rgba(91,106,255,0.4)', color: 'var(--accent2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
             <IconBrain size={15} /> Analyze All
-          </button>
-          <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'var(--surface)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
-            <IconUpload size={15} /> Import CSV
           </button>
           <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg ml-auto" style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>
             <IconPlus size={15} /> Add Stock
@@ -308,7 +315,6 @@ export default function PortfolioPage() {
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <HoldingsTable holdings={holdings} analyzingSet={analyzingSet} onDelete={deleteHolding} onAnalyze={analyzeHolding} />
             </div>
-            <RiskCard riskLevel={riskLevel} />
             {holdings.length > 1 && <PLChart holdings={holdings} />}
             {badges.length > 0 && <BadgesDisplay badges={badges} />}
           </div>
