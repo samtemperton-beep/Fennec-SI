@@ -22,15 +22,18 @@ export default function PortfolioPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [riskLevel, setRiskLevel] = useState(5)
   const [form, setForm] = useState({ ticker: '', shares: '', buy_price: '', market: 'US' })
   const [csvText, setCsvText] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
     const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       const uid = data.user?.id ?? DEV_USER_ID
       setUserId(uid)
+      const { data: profile } = await supabase.from('profiles').select('risk_level').eq('id', uid).single()
+      if (profile?.risk_level) setRiskLevel(profile.risk_level)
       loadHoldings(uid)
     })
   }, [])
@@ -63,7 +66,7 @@ export default function PortfolioPage() {
   async function analyzeHolding(h: Holding) {
     setAnalyzingSet(s => new Set(s).add(h.id))
     try {
-      const result = await api.analyzeStock(h.ticker, { price: h.current_price, buyPrice: h.buy_price, sector: h.sector })
+      const result = await api.analyzeStock(h.ticker, { price: h.current_price, buyPrice: h.buy_price, sector: h.sector }, riskLevel)
       await supabase.from('holdings').update({ signal: result.signal, signal_reason: result.reason }).eq('id', h.id)
       setHoldings(prev => prev.map(p => p.id === h.id ? { ...p, signal: result.signal, signal_reason: result.reason } : p))
     } catch (e: any) {

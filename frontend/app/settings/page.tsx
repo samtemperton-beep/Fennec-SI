@@ -336,27 +336,36 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 8 }}>
-                Risk Level — {RISK_LABELS[riskLevel]}
-              </label>
-              <div className="flex items-center gap-3">
-                <span style={{ fontSize: 11, color: 'var(--green)' }}>Conservative</span>
-                <input type="range" min={1} max={10} value={riskLevel} onChange={e => setRiskLevel(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent)' }} />
-                <span style={{ fontSize: 11, color: 'var(--red)' }}>Aggressive</span>
-              </div>
-              <p className="text-center mt-1" style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{riskLevel}/10</p>
-            </div>
           </div>
         </div>
 
-        {/* Portfolio Goal */}
+        {/* Investment Profile */}
         <div className="card">
+          <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 16 }}>
+            <IconTarget size={16} style={{ display: 'inline', marginRight: 6, color: 'var(--accent)' }} />
+            Investment Profile
+          </h2>
+
+          {/* Risk tolerance */}
+          <div style={{ marginBottom: 24 }}>
+            <div className="flex items-baseline justify-between mb-2">
+              <label style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>Risk Tolerance</label>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{riskLevel}/10 — {RISK_LABELS[riskLevel]}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span style={{ fontSize: 11, color: 'var(--green)', whiteSpace: 'nowrap' }}>Conservative</span>
+              <input type="range" min={1} max={10} value={riskLevel} onChange={e => setRiskLevel(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent)' }} />
+              <span style={{ fontSize: 11, color: 'var(--red)', whiteSpace: 'nowrap' }}>Aggressive</span>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>
+              Influences stock signals — conservative settings favour lower-risk BUY recommendations; aggressive settings widen the range.
+            </p>
+          </div>
+
+          {/* Portfolio Goal */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>
-              <IconTarget size={16} style={{ display: 'inline', marginRight: 6, color: 'var(--accent)' }} />
-              Portfolio Goal
-            </h2>
+            <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>Portfolio Goal</h3>
             {goal && !editingGoal && (
               <div className="flex gap-2">
                 <button type="button" onClick={() => setEditingGoal(true)}
@@ -436,6 +445,7 @@ export default function SettingsPage() {
               <p style={{ fontSize: 11, color: 'var(--text2)', margin: 0 }}>Progress is tracked from your portfolio value when the goal was created.</p>
             </div>
           ) : null}
+          </div>
         </div>
 
         {/* API Keys */}

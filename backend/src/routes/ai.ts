@@ -8,13 +8,15 @@ const router = Router();
 
 // Shared cache: same ticker analysis served to all users for 6 hours
 router.post('/analyze', requireAuth, async (req, res) => {
-  const { ticker, data } = req.body;
-  const cacheKey = `analyze:${ticker}`;
+  const { ticker, data, riskLevel } = req.body;
+  // Cache key includes risk bucket so conservative/aggressive users get different signals
+  const riskBucket = riskLevel ? (riskLevel <= 3 ? 'low' : riskLevel <= 6 ? 'mid' : 'high') : 'mid';
+  const cacheKey = `analyze:${ticker}:${riskBucket}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
   try {
-    const result = await gemini.analyzeStock(ticker, data);
+    const result = await gemini.analyzeStock(ticker, data, riskLevel);
     await setCached(cacheKey, result, 6);
     res.json(result);
   } catch (e: any) {

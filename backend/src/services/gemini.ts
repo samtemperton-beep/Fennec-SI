@@ -35,10 +35,17 @@ function parseJSON<T>(text: string, fallback: T): T {
 
 // --- Simple features routed to Gemini ---
 
-export async function analyzeStock(ticker: string, data: any) {
+export async function analyzeStock(ticker: string, data: any, riskLevel = 5) {
+  const riskContext = riskLevel <= 3
+    ? 'The investor is CONSERVATIVE — only recommend BUY for genuinely low-risk opportunities with strong fundamentals and limited downside. Prefer HOLD or SELL when uncertain.'
+    : riskLevel <= 6
+    ? 'The investor has a MODERATE risk tolerance — balance growth potential against downside risk in your recommendation.'
+    : 'The investor is AGGRESSIVE — they accept high risk for high reward. Factor in growth potential and upside even if volatility is elevated.';
+
   const text = await generate(
     `You are a stock analyst. Analyze ${ticker} with this data: ${JSON.stringify(data)}.
-Return JSON only: { "signal": "BUY"|"HOLD"|"SELL", "confidence": 1-10, "reason": "2 sentences", "upside_pct": number, "risks": ["string","string"] }`,
+Investor risk profile: ${riskContext}
+Return JSON only: { "signal": "BUY"|"HOLD"|"SELL", "confidence": 1-10, "reason": "2 sentences that reference the investor risk profile", "upside_pct": number, "risks": ["string","string"] }`,
     512
   );
   return parseJSON(text, { signal: 'HOLD', reason: text, confidence: 5 });

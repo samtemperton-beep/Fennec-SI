@@ -21,6 +21,7 @@ export default function WatchlistPage() {
   const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [riskLevel, setRiskLevel] = useState(5)
   const [ticker, setTicker] = useState('')
   const [market, setMarket] = useState('US')
   const [analyzingSet, setAnalyzingSet] = useState(new Set<number>())
@@ -97,9 +98,11 @@ export default function WatchlistPage() {
 
   useEffect(() => {
     const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       const uid = data.user?.id ?? DEV_USER_ID
       setUserId(uid)
+      const { data: profile } = await supabase.from('profiles').select('risk_level').eq('id', uid).single()
+      if (profile?.risk_level) setRiskLevel(profile.risk_level)
       load(uid)
     })
   }, [])
@@ -182,7 +185,7 @@ export default function WatchlistPage() {
   async function analyzeItem(item: WItem) {
     setAnalyzingSet(s => new Set(s).add(item.id))
     try {
-      const result = await api.analyzeStock(item.ticker, { price: item.current_price, sector: item.sector })
+      const result = await api.analyzeStock(item.ticker, { price: item.current_price, sector: item.sector }, riskLevel)
       await supabase.from('watchlist').update({ signal: result.signal }).eq('id', item.id)
       setItems(prev => prev.map(i => i.id === item.id ? { ...i, signal: result.signal } : i))
     } catch {}

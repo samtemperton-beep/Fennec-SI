@@ -43,8 +43,8 @@ export const api = {
 
   getIPOs: () => apiFetch('/api/news/ipo'),
 
-  analyzeStock: (ticker: string, data: any) =>
-    apiFetch('/api/ai/analyze', { method: 'POST', body: JSON.stringify({ ticker, data }) }),
+  analyzeStock: (ticker: string, data: any, riskLevel?: number) =>
+    apiFetch('/api/ai/analyze', { method: 'POST', body: JSON.stringify({ ticker, data, riskLevel }) }),
 
   getTop10: (market: string, timeframe: string, newsContext?: string) =>
     apiFetch('/api/ai/top10', { method: 'POST', body: JSON.stringify({ market, timeframe, newsContext }) }),
