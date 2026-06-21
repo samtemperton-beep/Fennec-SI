@@ -141,12 +141,18 @@ export default function Top10Page() {
                   </div>
                   <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.4 }}>{p.reason}</p>
                 </div>
-                {/* Upside + watchlist */}
+                {/* Upside + risk + watchlist */}
                 <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                   <div onClick={() => openDeepDive(p)}>
                     <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>+{p.upside_pct}%</div>
                     <div style={{ fontSize: 11, color: 'var(--text2)' }}>upside</div>
                   </div>
+                  {p.risk_level && (
+                    <div className="flex items-center gap-1" style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600, color: p.risk_level <= 3 ? 'var(--green)' : p.risk_level <= 6 ? 'var(--amber)' : 'var(--red)' }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block', flexShrink: 0 }} />
+                      Risk {p.risk_level}/10
+                    </div>
+                  )}
                   <WatchlistButton
                     ticker={p.ticker} userId={userId}
                     inWatchlist={watchlistSet.has(p.ticker)}
