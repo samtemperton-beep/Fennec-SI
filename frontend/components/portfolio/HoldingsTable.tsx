@@ -2,7 +2,8 @@
 import { useState } from 'react'
 import { SignalBadge } from '@/components/shared/SignalBadge'
 import { fmtCurrency, fmtPct, fmt } from '@/lib/utils'
-import { IconChevronUp, IconChevronDown, IconTrash, IconLoader } from '@tabler/icons-react'
+import { IconChevronUp, IconChevronDown, IconTrash, IconLoader, IconExternalLink } from '@tabler/icons-react'
+import { type Broker, getBrokerTradeUrl } from '@/lib/brokers'
 
 export interface Holding {
   id: number
@@ -24,9 +25,10 @@ interface Props {
   analyzingSet: Set<number>
   onDelete: (id: number) => void
   onAnalyze: (h: Holding) => void
+  broker?: Broker | null
 }
 
-export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze }: Props) {
+export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, broker }: Props) {
   const [sort, setSort] = useState<SortKey>('ticker')
   const [dir, setDir] = useState<1 | -1>(1)
 
@@ -125,6 +127,17 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze }: P
                         <span style={{ fontSize: 10, color: 'var(--text2)', maxWidth: 140, textAlign: 'center', display: 'block', lineHeight: 1.3 }} title={h.signal_reason}>
                           {h.signal_reason.slice(0, 60)}{h.signal_reason.length > 60 ? '…' : ''}
                         </span>
+                      )}
+                      {broker && (h.signal === 'BUY' || h.signal === 'SELL') && (
+                        <a
+                          href={getBrokerTradeUrl(broker, h.ticker)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--accent)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none', marginTop: 2 }}
+                          title={`Trade on ${broker.name}`}
+                        >
+                          {broker.flag} Trade <IconExternalLink size={9} />
+                        </a>
                       )}
                     </div>
                   ) : (

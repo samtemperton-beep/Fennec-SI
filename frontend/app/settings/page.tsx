@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Avatar } from '@/components/shared/Avatar'
-import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar, IconCrown, IconSun, IconMoon } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar, IconCrown, IconSun, IconMoon, IconExternalLink } from '@tabler/icons-react'
+import { BROKERS, getBrokerById, type Broker } from '@/lib/brokers'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
 import Link from 'next/link'
@@ -52,6 +53,7 @@ export default function SettingsPage() {
   const [location, setLocation] = useState('')
   const [profession, setProfession] = useState('')
   const [riskLevel, setRiskLevel] = useState(7)
+  const [broker, setBroker] = useState<string>('')
   const [anthropicKey, setAnthropicKey] = useState('')
   const [finnhubKey, setFinnhubKey] = useState('')
   const [user, setUser] = useState<any>(null)
@@ -84,6 +86,7 @@ export default function SettingsPage() {
         setLocation(data.location || '')
         setProfession(data.profession || '')
         setRiskLevel(data.risk_level || 7)
+        setBroker(data.broker || '')
         if (data.avatar_url) setAvatarTab('upload')
         else if (data.avatar_emoji) setAvatarTab('emoji')
       }
@@ -134,6 +137,7 @@ export default function SettingsPage() {
         avatar_emoji: avatarTab === 'emoji' ? avatarEmoji : null,
         avatar_url: avatarTab === 'upload' ? avatarUrl : null,
         location: location || null, profession: profession || null, risk_level: riskLevel,
+        broker: broker || null,
       }
       await supabase.from('profiles').upsert(update)
       if (anthropicKey || finnhubKey) {
@@ -515,6 +519,61 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div style={{ height: 32, background: 'var(--surface2)', borderRadius: 8 }} />
+          )}
+        </div>
+
+        {/* Brokerage Platform */}
+        <div className="card">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Brokerage Platform</h2>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16, maxWidth: 460, lineHeight: 1.6 }}>
+                Tell us where you trade and we&apos;ll add a one-click link to your broker from the portfolio page.{' '}
+                <span style={{ color: 'var(--green)', fontWeight: 600 }}>We never access your account</span> — Fennec SI advises, you execute.
+              </p>
+            </div>
+            {broker && (
+              <a
+                href={getBrokerById(broker)?.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--accent)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none', flexShrink: 0, marginTop: 2 }}
+              >
+                Open <IconExternalLink size={12} />
+              </a>
+            )}
+          </div>
+          {['NZ', 'AU', 'US / Global'].map(region => {
+            const regionBrokers = BROKERS.filter(b => region === 'US / Global' ? b.region === 'US' || b.region === 'Global' : b.region === region)
+            return (
+              <div key={region} style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{region}</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {regionBrokers.map(b => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setBroker(broker === b.id ? '' : b.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '7px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                        fontFamily: 'Syne, sans-serif', fontWeight: 600,
+                        border: broker === b.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                        background: broker === b.id ? 'rgba(91,106,255,0.12)' : 'var(--surface2)',
+                        color: broker === b.id ? 'var(--accent2)' : 'var(--text)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span>{b.flag}</span> {b.name}
+                      {broker === b.id && <span style={{ fontSize: 10, marginLeft: 2 }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+          {!broker && (
+            <p style={{ fontSize: 12, color: 'var(--text2)', fontStyle: 'italic' }}>No broker selected — select one above to enable quick-access links on your portfolio.</p>
           )}
         </div>
 

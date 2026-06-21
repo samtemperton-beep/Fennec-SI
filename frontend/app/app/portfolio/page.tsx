@@ -10,7 +10,8 @@ import { StatsBar } from '@/components/shared/StatsBar'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { fmtCurrency } from '@/lib/utils'
-import { IconRefresh, IconBrain, IconPlus, IconUpload, IconShield, IconShieldCheck } from '@tabler/icons-react'
+import { IconRefresh, IconBrain, IconPlus, IconUpload, IconShield, IconShieldCheck, IconExternalLink } from '@tabler/icons-react'
+import { getBrokerById, getBrokerTradeUrl, type Broker } from '@/lib/brokers'
 import Link from 'next/link'
 import { PortfolioGoal } from '@/components/portfolio/PortfolioGoal'
 import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
@@ -77,6 +78,7 @@ export default function PortfolioPage() {
   const [badges, setBadges] = useState<any[]>([])
   const [verification, setVerification] = useState<any>(null)
   const [aiUsage, setAiUsage] = useState<{ used: number; limit: number; unlimited?: boolean } | null>(null)
+  const [broker, setBroker] = useState<Broker | null>(null)
   const [form, setForm] = useState({ ticker: '', shares: '', buy_price: '', market: 'US' })
   const [csvText, setCsvText] = useState('')
   const supabase = createClient()
@@ -86,8 +88,9 @@ export default function PortfolioPage() {
     supabase.auth.getUser().then(async ({ data }) => {
       const uid = data.user?.id ?? DEV_USER_ID
       setUserId(uid)
-      const { data: profile } = await supabase.from('profiles').select('risk_level').eq('id', uid).single()
+      const { data: profile } = await supabase.from('profiles').select('risk_level, broker').eq('id', uid).single()
       if (profile?.risk_level) setRiskLevel(profile.risk_level)
+      if (profile?.broker) setBroker(getBrokerById(profile.broker) ?? null)
       loadHoldings(uid)
       api.getPremiumStatus().then(s => {
         setIsPremium(s.tier === 'premium')
@@ -236,6 +239,17 @@ export default function PortfolioPage() {
               <IconShieldCheck size={14} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
             </button>
           )}
+          {broker && (
+            <a
+              href={broker.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', color: 'var(--green)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}
+            >
+              {broker.flag} {broker.name} <IconExternalLink size={13} />
+            </a>
+          )}
           <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
             <IconUpload size={14} /> Import
           </button>
@@ -313,7 +327,7 @@ export default function PortfolioPage() {
         <div style={{ display: 'grid', gridTemplateColumns: holdings.length ? '1fr 320px' : '1fr', gap: 20 }} className="xl:grid-cols-[1fr_320px] grid-cols-1">
           <div className="space-y-4">
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <HoldingsTable holdings={holdings} analyzingSet={analyzingSet} onDelete={deleteHolding} onAnalyze={analyzeHolding} />
+              <HoldingsTable holdings={holdings} analyzingSet={analyzingSet} onDelete={deleteHolding} onAnalyze={analyzeHolding} broker={broker} />
             </div>
             {holdings.length > 1 && <PLChart holdings={holdings} />}
             {badges.length > 0 && <BadgesDisplay badges={badges} />}
