@@ -83,14 +83,22 @@ export default function PortfolioPage() {
   const [csvText, setCsvText] = useState('')
   const supabase = createClient()
 
+  const userIdRef = useCallback((uid: string) => {
+    setUserId(uid)
+  }, [])
+
+  async function loadProfile(uid: string) {
+    const { data: profile } = await supabase.from('profiles').select('risk_level, broker').eq('id', uid).single()
+    if (profile?.risk_level != null) setRiskLevel(profile.risk_level)
+    if (profile?.broker) setBroker(getBrokerById(profile.broker) ?? null)
+  }
+
   useEffect(() => {
-    const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
     supabase.auth.getUser().then(async ({ data }) => {
-      const uid = data.user?.id ?? DEV_USER_ID
+      if (!data.user) return
+      const uid = data.user.id
       setUserId(uid)
-      const { data: profile } = await supabase.from('profiles').select('risk_level, broker').eq('id', uid).single()
-      if (profile?.risk_level) setRiskLevel(profile.risk_level)
-      if (profile?.broker) setBroker(getBrokerById(profile.broker) ?? null)
+      await loadProfile(uid)
       loadHoldings(uid)
       api.getPremiumStatus().then(s => {
         setIsPremium(s.tier === 'premium')
@@ -100,6 +108,17 @@ export default function PortfolioPage() {
       api.getAiUsage().then(setAiUsage).catch(() => {})
     })
   }, [])
+
+  // Re-read profile when user returns from Settings (e.g. changed risk level)
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible' && userId) {
+        loadProfile(userId)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [userId])
 
   async function loadHoldings(uid: string) {
     setLoading(true)
