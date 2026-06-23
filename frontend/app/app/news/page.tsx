@@ -171,6 +171,15 @@ export default function NewsPage() {
     { name: 'Neutral', value: sentCounts.neutral, color: 'var(--amber)' },
   ].filter(d => d.value > 0)
 
+  // Source breakdown — group raw news by source, sorted by count desc
+  const sourceCounts = news.reduce<Record<string, number>>((acc, n) => {
+    acc[n.source] = (acc[n.source] || 0) + 1
+    return acc
+  }, {})
+  const sourcesRanked = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1])
+  const maxSourceCount = sourcesRanked[0]?.[1] || 1
+  const isReddit = (src: string) => src.startsWith('r/')
+
   return (
     <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20 }} className="grid-cols-1 xl:grid-cols-[1fr_280px]">
       <div>
@@ -289,6 +298,31 @@ export default function NewsPage() {
                 <div key={d.name} className="flex items-center gap-1">
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color }} />
                   <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.name} ({d.value})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {sourcesRanked.length > 0 && (
+          <div className="card">
+            <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 12, fontSize: 14 }}>
+              Pipeline Sources
+              <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 400, marginLeft: 8 }}>{news.length} articles</span>
+            </p>
+            <div className="space-y-2">
+              {sourcesRanked.map(([src, count]) => (
+                <div key={src}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', color: isReddit(src) ? 'var(--accent2)' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {isReddit(src) && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,69,0,0.15)', color: '#ff6314', fontWeight: 700 }}>r/</span>}
+                      {isReddit(src) ? src.slice(2) : src}
+                    </span>
+                    <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{count}</span>
+                  </div>
+                  <div style={{ height: 3, borderRadius: 2, background: 'var(--surface2)' }}>
+                    <div style={{ height: '100%', borderRadius: 2, width: `${(count / maxSourceCount) * 100}%`, background: isReddit(src) ? '#ff6314' : 'var(--accent)', opacity: 0.7, transition: 'width 0.3s' }} />
+                  </div>
                 </div>
               ))}
             </div>
