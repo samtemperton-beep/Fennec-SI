@@ -145,8 +145,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Mobile top bar */}
-        <div className="flex items-center gap-3 px-4 py-3 md:hidden" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+        {/* Mobile top bar — z-51 keeps it above the overlay (z-50) so the toggle button stays clickable */}
+        <div className="flex items-center gap-3 px-4 py-3 md:hidden" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'relative', zIndex: 51 }}>
           <button onClick={() => setOpen(o => !o)}>
             {open ? <IconX size={22} /> : <IconMenu2 size={22} />}
           </button>
