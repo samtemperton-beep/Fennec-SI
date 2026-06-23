@@ -25,6 +25,9 @@ const FINANCE_SOURCES = new Set([
   'motley fool', 'benzinga', 'the street', 'zacks', 'morningstar', 'kavout',
   'alpha vantage', 'finnhub', 'investing.com', 'nasdaq', 'stock analysis',
   'simply wall st', 'nzx', 'asx', 'sharesight',
+  // Reddit finance communities — treated as trusted finance sources
+  'r/wallstreetbets', 'r/stocks', 'r/investing', 'r/securityanalysis',
+  'r/stockmarket', 'r/asx_bets', 'r/ausfinance', 'r/options', 'r/valueinvesting',
 ]);
 
 const FINANCE_KEYWORDS = [
@@ -314,6 +317,59 @@ async function seekingAlphaRSS(knownTickers: string[]): Promise<NewsItem[]> {
   } catch { return []; }
 }
 
+// ─── Source: Reddit stock communities ────────────────────────────────────────
+
+const REDDIT_SUBS = [
+  'wallstreetbets', // retail retail options + meme stocks
+  'stocks',         // general US stock discussion
+  'investing',      // longer-term investing
+  'SecurityAnalysis', // fundamental analysis
+  'StockMarket',    // broad market
+  'ASX_Bets',       // ASX retail sentiment
+  'AusFinance',     // Australian finance
+  'options',        // options flow
+];
+
+async function redditPosts(knownTickers: string[]): Promise<NewsItem[]> {
+  const results: NewsItem[] = [];
+  for (const sub of REDDIT_SUBS) {
+    try {
+      const { data } = await axios.get(
+        `https://www.reddit.com/r/${sub}/hot.json?limit=15`,
+        {
+          timeout: 8000,
+          headers: { 'User-Agent': 'FennecSI/1.0 (investment research aggregator)' },
+        }
+      );
+      const posts: any[] = (data?.data?.children || []).map((c: any) => c.data);
+      for (const post of posts) {
+        if (post.stickied) continue; // skip mod-pinned announcements
+        if ((post.score || 0) < 15) continue; // filter very low-engagement posts
+        if (post.selftext === '[deleted]' || post.selftext === '[removed]') continue;
+
+        const summary = post.is_self && post.selftext
+          ? post.selftext.slice(0, 300).replace(/\n+/g, ' ').trim()
+          : undefined;
+        // Link posts point to external articles; self posts point to the reddit thread
+        const url = post.is_self
+          ? `https://reddit.com${post.permalink}`
+          : post.url;
+
+        results.push(clean({
+          id: uid(),
+          headline: post.title,
+          summary,
+          source: `r/${sub}`,
+          url,
+          datetime: (post.created_utc || 0) * 1000,
+          sentiment: simpleSentiment(`${post.title} ${summary || ''}`),
+        }, knownTickers));
+      }
+    } catch { /* silently skip failed subreddits */ }
+  }
+  return results;
+}
+
 // ─── Source: Alpha Vantage News & Sentiment ───────────────────────────────────
 
 async function alphaVantageNews(tickers: string[], knownTickers: string[]): Promise<NewsItem[]> {
@@ -353,7 +409,7 @@ async function alphaVantageNews(tickers: string[], knownTickers: string[]): Prom
 export async function fetchNews(tickers: string[] = []): Promise<NewsItem[]> {
   const knownTickers = tickers; // used for ticker matching across all sources
 
-  const [fhGeneral, fhCompany, yahoo, google, mw, reuters, sa, av] = await Promise.all([
+  const [fhGeneral, fhCompany, yahoo, google, mw, reuters, sa, av, reddit] = await Promise.all([
     finnhubGeneral(knownTickers),
     tickers.length ? finnhubCompany(tickers, knownTickers) : Promise.resolve([]),
     tickers.length ? yahooRSS(tickers, knownTickers) : Promise.resolve([]),
@@ -362,6 +418,7 @@ export async function fetchNews(tickers: string[] = []): Promise<NewsItem[]> {
     reutersRSS(knownTickers),
     seekingAlphaRSS(knownTickers),
     alphaVantageNews(tickers, knownTickers),
+    redditPosts(knownTickers),
   ]);
 
   // Ticker-specific news gets a relevance boost
@@ -373,12 +430,14 @@ export async function fetchNews(tickers: string[] = []): Promise<NewsItem[]> {
     ...boost(yahoo, 15),
     ...boost(google.filter(n => n.ticker), 15),
     ...boost(av.filter(n => n.ticker), 15),
+    ...boost(reddit.filter(n => n.ticker), 10), // ticker-matched Reddit posts
     ...fhGeneral,
     ...av.filter(n => !n.ticker),
     ...google.filter(n => !n.ticker),
     ...mw,
     ...reuters,
     ...sa,
+    ...reddit.filter(n => !n.ticker), // general Reddit sentiment at natural relevance
   ]);
 
   return all
