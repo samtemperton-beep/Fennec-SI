@@ -12,17 +12,32 @@ import {
 import { StockHelper } from '@/components/shared/StockHelper'
 import { Avatar } from '@/components/shared/Avatar'
 
-const NAV = [
-  { href: '/app/portfolio', label: 'Portfolio', icon: IconChartBar },
-  { href: '/app/top10', label: 'Top 10 Picks', icon: IconStar },
-  { href: '/app/opportunities', label: 'Opportunities', icon: IconBrain },
-  { href: '/app/watchlist', label: 'Watchlist', icon: IconEye },
-  { href: '/app/news', label: 'News', icon: IconNewSection },
-  { href: '/app/newsletters', label: 'Newsletters', icon: IconMail },
-  { href: '/app/ipo', label: 'IPO Calendar', icon: IconCalendar },
-  { href: '/app/community', label: 'Community', icon: IconUsers },
-  { href: '/app/alerts', label: 'Alerts', icon: IconBell },
-  { href: '/app/leaderboard', label: 'Leaderboard', icon: IconTrophy },
+const NAV_SECTIONS = [
+  {
+    label: 'Investing',
+    items: [
+      { href: '/app/portfolio', label: 'My Portfolio', icon: IconChartBar },
+      { href: '/app/top10', label: "Today's Picks", icon: IconStar },
+      { href: '/app/opportunities', label: 'Discover', icon: IconBrain },
+      { href: '/app/watchlist', label: 'Watchlist', icon: IconEye },
+    ],
+  },
+  {
+    label: 'Market',
+    items: [
+      { href: '/app/news', label: 'News', icon: IconNewSection },
+      { href: '/app/newsletters', label: 'Newsletters', icon: IconMail },
+      { href: '/app/ipo', label: 'IPO Calendar', icon: IconCalendar },
+    ],
+  },
+  {
+    label: 'Community',
+    items: [
+      { href: '/app/community', label: 'Community', icon: IconUsers },
+      { href: '/app/leaderboard', label: 'Leaderboard', icon: IconTrophy },
+      { href: '/app/alerts', label: 'Alerts', icon: IconBell },
+    ],
+  },
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -31,12 +46,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const supabase = createClient()
 
   useEffect(() => {
-    const saved = (typeof window !== 'undefined' && localStorage.getItem('theme')) || 'dark'
+    const saved = (typeof window !== 'undefined' && localStorage.getItem('theme')) || 'light'
     setTheme(saved as 'dark' | 'light')
+    document.documentElement.setAttribute('data-theme', saved)
   }, [])
 
   function toggleTheme() {
@@ -62,60 +78,75 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const sidebar = (
-    <aside
-      style={{
-        width: 220, background: 'var(--surface)', borderRight: '1px solid var(--border)',
-        display: 'flex', flexDirection: 'column', height: '100vh', position: 'sticky', top: 0, flexShrink: 0,
-      }}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div style={{ background: 'var(--accent)', borderRadius: 7, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <IconChartBar size={16} color="white" />
+    <aside style={{
+      width: 240,
+      background: 'var(--surface)',
+      borderRight: '1px solid var(--border)',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      position: 'sticky',
+      top: 0,
+      flexShrink: 0,
+    }}>
+      {/* Logo + tagline */}
+      <div style={{ padding: '22px 18px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <IconTrendingUp size={18} color="white" />
+          </div>
+          <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>
         </div>
-        <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>Fennec SI</span>
+        <p style={{ fontSize: 10.5, color: 'var(--text3)', fontStyle: 'italic', paddingLeft: 44, lineHeight: 1.3, marginTop: -2 }}>grow with confidence</p>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {NAV.map(n => (
-          <Link
-            key={n.href}
-            href={n.href}
-            onClick={() => setOpen(false)}
-            className={`nav-link mb-1 ${pathname === n.href ? 'active' : ''}`}
-          >
-            <n.icon size={17} />
-            {n.label}
-          </Link>
+      <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
+        {NAV_SECTIONS.map(section => (
+          <div key={section.label}>
+            <span style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: '.1em', color: 'var(--text3)', textTransform: 'uppercase', padding: '14px 8px 5px' }}>
+              {section.label}
+            </span>
+            {section.items.map(n => (
+              <Link
+                key={n.href}
+                href={n.href}
+                onClick={() => setOpen(false)}
+                className={`nav-link mb-1 ${pathname === n.href ? 'active' : ''}`}
+              >
+                <n.icon size={16} />
+                {n.label}
+              </Link>
+            ))}
+          </div>
         ))}
       </nav>
 
-      {/* Bottom */}
-      <div className="px-3 pb-4" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-        <Link href="/settings" className={`nav-link mb-1 ${pathname === '/settings' ? 'active' : ''}`}>
-          <IconSettings size={17} />
+      {/* Footer */}
+      <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
+        <Link href="/settings" className={`nav-link mb-1 ${pathname === '/settings' ? 'active' : ''}`} style={{ marginBottom: 2 }}>
+          <IconSettings size={15} />
           Settings
         </Link>
-        <button onClick={toggleTheme} className="nav-link w-full mb-1" style={{ cursor: 'pointer' }}>
-          {theme === 'dark' ? <IconSun size={17} /> : <IconMoon size={17} />}
+        <button onClick={toggleTheme} className="nav-link w-full mb-1" style={{ marginBottom: 2 }}>
+          {theme === 'dark' ? <IconSun size={15} /> : <IconMoon size={15} />}
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
-        <button onClick={signOut} className="nav-link w-full" style={{ cursor: 'pointer' }}>
-          <IconLogout size={17} />
+        <button onClick={signOut} className="nav-link w-full" style={{ color: 'var(--text2)' }}>
+          <IconLogout size={15} />
           Sign out
         </button>
         {user && (
-          <div className="flex items-center gap-2 mt-3 px-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, background: 'var(--surface2)', marginTop: 8 }}>
             <Avatar
               username={profile?.username || user.email}
               avatarColor={profile?.avatar_color}
               avatarEmoji={profile?.avatar_emoji}
               avatarUrl={profile?.avatar_url}
-              size={28}
+              size={30}
             />
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, fontFamily: 'Syne, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ overflow: 'hidden', flex: 1 }}>
+              <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {profile?.username || user.email}
               </div>
               {profile?.profession && (
@@ -138,19 +169,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile overlay */}
       {open && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          <div style={{ background: 'rgba(9,12,17,0.7)' }} onClick={() => setOpen(false)} className="flex-1" />
-          <div style={{ width: 220 }}>{sidebar}</div>
+          <div style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setOpen(false)} className="flex-1" />
+          <div style={{ width: 240 }}>{sidebar}</div>
         </div>
       )}
 
       {/* Main */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Mobile top bar — z-51 keeps it above the overlay (z-50) so the toggle button stays clickable */}
+        {/* Mobile top bar — z-51 keeps it above the overlay (z-50) so toggle button stays clickable */}
         <div className="flex items-center gap-3 px-4 py-3 md:hidden" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'relative', zIndex: 51 }}>
           <button onClick={() => setOpen(o => !o)}>
             {open ? <IconX size={22} /> : <IconMenu2 size={22} />}
           </button>
-          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700 }}>Fennec SI</span>
+          <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
           {children}

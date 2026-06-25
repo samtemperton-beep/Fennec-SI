@@ -79,6 +79,7 @@ export default function PortfolioPage() {
   const [verification, setVerification] = useState<any>(null)
   const [aiUsage, setAiUsage] = useState<{ used: number; limit: number; unlimited?: boolean } | null>(null)
   const [broker, setBroker] = useState<Broker | null>(null)
+  const [username, setUsername] = useState('')
   const [form, setForm] = useState({ ticker: '', shares: '', buy_price: '', market: 'US' })
   const [csvText, setCsvText] = useState('')
   const supabase = createClient()
@@ -88,9 +89,10 @@ export default function PortfolioPage() {
   }, [])
 
   async function loadProfile(uid: string) {
-    const { data: profile } = await supabase.from('profiles').select('risk_level, broker').eq('id', uid).single()
+    const { data: profile } = await supabase.from('profiles').select('risk_level, broker, username').eq('id', uid).single()
     if (profile?.risk_level != null) setRiskLevel(profile.risk_level)
     if (profile?.broker) setBroker(getBrokerById(profile.broker) ?? null)
+    if (profile?.username) setUsername(profile.username)
   }
 
   useEffect(() => {
@@ -247,111 +249,173 @@ export default function PortfolioPage() {
 
   const portfolio = holdings.map(h => h.ticker)
 
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const displayName = username || 'there'
+  const todayStr = new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+  // Ring chart: outer = all-time gain progress (0–100% mapped to 0–100% arc), capped at 100%
+  const R = 68
+  const CIRC = 2 * Math.PI * R
+  const gainProgress = totalCost > 0 ? Math.min(1, Math.max(0, totalPLPct / 100)) : 0
+  const dashOffset = CIRC * (1 - gainProgress)
+
   return (
-    <div style={{ padding: '24px' }}>
-      {/* Header with Verify + Import on right */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Portfolio</h1>
-        <div className="flex items-center gap-2">
+    <div style={{ padding: 28 }}>
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontWeight: 800, fontSize: 22, marginBottom: 2 }}>{greeting}, {displayName} 👋</h1>
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>{todayStr}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={refreshPrices} disabled={refreshing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--sh)' }}>
+            {refreshing ? <LoadingSpinner size={13} /> : <IconRefresh size={13} />} Refresh
+          </button>
           {isPremium && (
-            <button onClick={() => setVerifyOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: verification?.status === 'verified' ? 'rgba(16,185,129,0.12)' : 'rgba(251,191,36,0.12)', border: `1px solid ${verification?.status === 'verified' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)'}`, color: verification?.status === 'verified' ? 'var(--green)' : '#f59e0b', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-              <IconShieldCheck size={14} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
+            <button onClick={() => setVerifyOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: verification?.status === 'verified' ? 'var(--green-light)' : 'var(--surface)', border: `1px solid ${verification?.status === 'verified' ? 'var(--green)' : 'var(--border)'}`, color: verification?.status === 'verified' ? 'var(--green)' : 'var(--text)', boxShadow: 'var(--sh)' }}>
+              <IconShieldCheck size={13} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
             </button>
           )}
-          {broker && (
-            <a
-              href={broker.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
-              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', color: 'var(--green)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}
-            >
-              {broker.flag} {broker.name} <IconExternalLink size={13} />
-            </a>
-          )}
-          <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconUpload size={14} /> Import
+          <button onClick={analyzeAll} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <IconBrain size={13} /> Analyse all
+          </button>
+          <button onClick={() => setAddOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
+            <IconPlus size={13} /> Add stock
           </button>
         </div>
       </div>
 
-      <StatsBar stats={stats} />
-
-      {/* Free tier usage bar */}
-      {aiUsage && !aiUsage.unlimited && (
-        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ flex: 1 }}>
-            <div className="flex items-center justify-between mb-1">
-              <span style={{ fontSize: 12, fontFamily: 'Syne, sans-serif', color: 'var(--text2)' }}>Daily AI calls</span>
-              <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: aiUsage.used >= aiUsage.limit ? 'var(--red)' : 'var(--text)' }}>
-                {aiUsage.used} / {aiUsage.limit}
-              </span>
+      {/* Summary card with ring chart */}
+      {!loading && totalValue > 0 && (
+        <div className="card" style={{ marginBottom: 20, padding: 28 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 32, alignItems: 'center' }} className="grid-cols-1 md:grid-cols-[auto_1fr]">
+            {/* Ring chart */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <div style={{ position: 'relative', width: 170, height: 170 }}>
+                <svg width="170" height="170" viewBox="0 0 170 170" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx="85" cy="85" r={R} fill="none" stroke="var(--surface2)" strokeWidth="9" />
+                  <circle
+                    cx="85" cy="85" r={R} fill="none"
+                    stroke="var(--primary)" strokeWidth="9"
+                    strokeLinecap="round"
+                    strokeDasharray={CIRC}
+                    strokeDashoffset={dashOffset}
+                    style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)' }}
+                  />
+                  <circle cx="85" cy="85" r="54" fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round"
+                    strokeDasharray="339" strokeDashoffset="325" opacity=".45" />
+                </svg>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Portfolio</p>
+                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 500, color: 'var(--text)', lineHeight: 1.1 }}>{fmtCurrency(totalValue)}</p>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: totalPL >= 0 ? 'var(--green)' : 'var(--red)', marginTop: 3 }}>{totalPL >= 0 ? '+' : ''}{totalPLPct.toFixed(2)}% all time</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)' }} />
+                  <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600 }}>Gain</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', opacity: .6 }} />
+                  <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600 }}>Today</span>
+                </div>
+              </div>
             </div>
-            <div style={{ height: 4, background: 'var(--surface)', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{ height: '100%', borderRadius: 4, width: `${Math.min(100, (aiUsage.used / aiUsage.limit) * 100)}%`, background: aiUsage.used >= aiUsage.limit ? 'var(--red)' : aiUsage.used >= aiUsage.limit * 0.8 ? 'var(--amber)' : 'var(--accent)' }} />
+
+            {/* Metrics + goal */}
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
+                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Total gain</p>
+                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 500, color: totalPL >= 0 ? 'var(--green)' : 'var(--red)' }}>{totalPL >= 0 ? '+' : ''}{fmtCurrency(totalPL)}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>since you started</p>
+                </div>
+                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Holdings</p>
+                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 500 }}>{holdings.length}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>{signals} with AI signals</p>
+                </div>
+                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>AI usage</p>
+                  {aiUsage?.unlimited ? (
+                    <>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 500, color: 'var(--primary)' }}>∞</p>
+                      <span style={{ background: 'linear-gradient(135deg,#f59e0b,#fbbf24)', color: '#7a3f00', fontSize: 9, padding: '2px 6px', borderRadius: 20, fontWeight: 700 }}>✦ Unlimited</span>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 500 }}>{aiUsage?.used || 0}<span style={{ fontSize: 12, color: 'var(--text3)' }}>/{aiUsage?.limit || 10}</span></p>
+                      <div style={{ height: 4, background: 'var(--surface3)', borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--primary)', borderRadius: 2, width: `${Math.min(100, ((aiUsage?.used || 0) / (aiUsage?.limit || 10)) * 100)}%` }} />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Risk bar */}
+              <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <IconShield size={14} style={{ color: RISK_COLOR(riskLevel) }} />
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>Risk Tolerance</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 12, color: RISK_COLOR(riskLevel) }}>{RISK_LABELS[riskLevel]} · {riskLevel}/10</span>
+                    <Link href="/settings" style={{ fontSize: 10, color: 'var(--text2)', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px' }}>Edit</Link>
+                  </div>
+                </div>
+                <div style={{ position: 'relative', height: 5, background: 'var(--surface3)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 4, width: `${((riskLevel - 1) / 9) * 100}%`, background: RISK_COLOR(riskLevel) }} />
+                </div>
+              </div>
+
+              <PortfolioGoal currentValue={totalValue} userId={userId} />
             </div>
           </div>
-          <Link href="/settings" style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600, color: '#f59e0b', textDecoration: 'none', whiteSpace: 'nowrap', background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 8, padding: '4px 10px' }}>
-            ✦ Upgrade
-          </Link>
         </div>
       )}
 
       {!loading && !isPremium && holdings.length >= 8 && holdings.length < 10 && (
-        <div style={{ marginTop: 8, padding: '8px 14px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 12, color: '#f59e0b', fontFamily: 'Syne, sans-serif' }}>
-          You have {10 - holdings.length} holding slot{10 - holdings.length !== 1 ? 's' : ''} left on the free plan.{' '}
-          <Link href="/settings" style={{ color: '#f59e0b', fontWeight: 700, textDecoration: 'underline' }}>Upgrade to Premium</Link> for unlimited.
-        </div>
-      )}
-
-      {/* Risk tolerance — below stats, above goal */}
-      {!loading && holdings.length > 0 && (
-        <div style={{ marginTop: 16 }}><RiskCard riskLevel={riskLevel} /></div>
-      )}
-
-      {!loading && totalValue > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <PortfolioGoal currentValue={totalValue} userId={userId} />
-        </div>
-      )}
-
-      {/* Action buttons — below portfolio goal */}
-      {!loading && holdings.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap mt-4">
-          <button onClick={refreshPrices} disabled={refreshing} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
-            {refreshing ? <LoadingSpinner size={14} /> : <IconRefresh size={14} />} Refresh Prices
-          </button>
-          <button onClick={analyzeAll} className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'rgba(91,106,255,0.18)', border: '1px solid rgba(91,106,255,0.4)', color: 'var(--accent2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>
-            <IconBrain size={15} /> Analyze All
-          </button>
-          <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg ml-auto" style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>
-            <IconPlus size={15} /> Add Stock
-          </button>
+        <div style={{ marginBottom: 16, padding: '8px 14px', borderRadius: 8, background: 'var(--amber-light)', border: '1px solid var(--amber)', fontSize: 12, color: 'var(--amber)' }}>
+          {10 - holdings.length} holding slot{10 - holdings.length !== 1 ? 's' : ''} left on the free plan.{' '}
+          <Link href="/settings" style={{ color: 'var(--amber)', fontWeight: 700, textDecoration: 'underline' }}>Upgrade to Premium</Link> for unlimited.
         </div>
       )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20"><LoadingSpinner size={32} /></div>
       ) : holdings.length === 0 ? (
-        <div className="card text-center py-16">
-          <IconBrain size={40} style={{ color: 'var(--text2)', margin: '0 auto 12px' }} />
-          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 18, marginBottom: 8 }}>No holdings yet</p>
-          <p style={{ color: 'var(--text2)', marginBottom: 20 }}>Add stocks manually or import from your broker</p>
+        <div className="card text-center" style={{ padding: '48px 24px' }}>
+          <p style={{ fontSize: 32, marginBottom: 12 }}>📊</p>
+          <p style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>No holdings yet</p>
+          <p style={{ color: 'var(--text2)', marginBottom: 24 }}>Add stocks manually or import from your broker</p>
           <div className="flex items-center justify-center gap-3">
-            <button onClick={() => setAddOpen(true)} style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Add Stock</button>
-            <button onClick={() => setImportOpen(true)} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Import CSV</button>
+            <button onClick={() => setAddOpen(true)} style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: 10, fontWeight: 700, border: 'none', cursor: 'pointer' }}>Add Stock</button>
+            <button onClick={() => setImportOpen(true)} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Import CSV</button>
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: holdings.length ? '1fr 320px' : '1fr', gap: 20 }} className="xl:grid-cols-[1fr_320px] grid-cols-1">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20 }} className="xl:grid-cols-[1fr_300px] grid-cols-1">
           <div className="space-y-4">
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '20px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 1 }}>Holdings</p>
+                  <p style={{ fontSize: 12, color: 'var(--text2)' }}>Click Analyse to get AI signals</p>
+                </div>
+                <button onClick={() => setImportOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'none', border: '1px solid var(--border)', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: 'var(--text2)' }}>
+                  <IconUpload size={12} /> Import
+                </button>
+              </div>
               <HoldingsTable holdings={holdings} analyzingSet={analyzingSet} onDelete={deleteHolding} onAnalyze={analyzeHolding} broker={broker} />
             </div>
             {holdings.length > 1 && <PLChart holdings={holdings} />}
             {badges.length > 0 && <BadgesDisplay badges={badges} />}
           </div>
-          <div style={{ position: 'sticky', top: 24, alignSelf: 'start' }}>
+          <div>
             <AIAdvisor portfolio={portfolio} />
           </div>
         </div>

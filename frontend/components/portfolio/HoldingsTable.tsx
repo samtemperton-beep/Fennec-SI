@@ -3,6 +3,13 @@ import { useState } from 'react'
 import { SignalBadge } from '@/components/shared/SignalBadge'
 import { fmtCurrency, fmtPct, fmt } from '@/lib/utils'
 import { IconChevronUp, IconChevronDown, IconTrash, IconLoader, IconExternalLink } from '@tabler/icons-react'
+
+const BUBBLE_COLORS = ['#5B7CF0','#14B8A6','#22C55E','#F59E0B','#EF4444','#A855F7','#F97316','#0EA5E9','#EC4899','#6366F1']
+function tickerColor(t: string) {
+  let h = 0
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0
+  return BUBBLE_COLORS[h % BUBBLE_COLORS.length]
+}
 import { type Broker, getBrokerTradeUrl } from '@/lib/brokers'
 
 export interface Holding {
@@ -64,7 +71,7 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
   const th = (k: SortKey, label: string) => (
     <th
       onClick={() => toggleSort(k)}
-      style={{ cursor: 'pointer', color: sort === k ? 'var(--accent2)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 12px', textAlign: k === 'ticker' ? 'left' : 'right', whiteSpace: 'nowrap' }}
+      style={{ cursor: 'pointer', color: sort === k ? 'var(--primary)' : 'var(--text3)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '12px 16px', textAlign: k === 'ticker' ? 'left' : 'right', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }}
     >
       <span className="inline-flex items-center gap-1">{label}<SortIcon k={k} /></span>
     </th>
@@ -75,12 +82,10 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--border)' }}>
-            {th('ticker', 'Ticker')}
-            {th('shares', 'Shares')}
-            {th('buy_price', 'Buy Price')}
-            {th('current_price', 'Current')}
-            {th('pl', 'P&L')}
-            {th('plpct', 'P&L %')}
+            {th('ticker', 'Stock')}
+            {th('current_price', 'Value')}
+            {th('pl', 'Your gain')}
+            {th('plpct', 'Return')}
             <th style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 12px', textAlign: 'center' }}>Signal</th>
             <th style={{ padding: '10px 12px' }} />
           </tr>
@@ -96,25 +101,30 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
                 style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }}
                 className="hover:bg-surface2"
               >
-                <td style={{ padding: '12px' }}>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{h.ticker}</span>
-                      {h.market !== 'US' && (
-                        <span style={{ fontSize: 10, color: 'var(--text2)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4 }}>{h.market}</span>
-                      )}
+                <td style={{ padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 9, background: tickerColor(h.ticker), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: 'white', flexShrink: 0, letterSpacing: '-.01em' }}>
+                      {h.ticker.slice(0, 4)}
                     </div>
-                    {h.name && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{h.name}</p>}
-                    {h.sector && !h.name && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{h.sector}</p>}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ fontWeight: 700, fontSize: 13 }}>{h.name || h.ticker}</span>
+                        {h.market !== 'US' && (
+                          <span style={{ fontSize: 9, color: 'var(--text3)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>{h.market}</span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{h.shares} shares{h.name ? ` · ${h.ticker}` : ''}</p>
+                    </div>
                   </div>
                 </td>
-                <td style={{ padding: '12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{fmt(h.shares)}</td>
-                <td style={{ padding: '12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{fmtCurrency(h.buy_price)}</td>
-                <td style={{ padding: '12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{fmtCurrency(h.current_price)}</td>
-                <td style={{ padding: '12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: pl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 500 }}>{fmtCurrency(h.current_price * h.shares)}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>@ {fmtCurrency(h.current_price)}</p>
+                </td>
+                <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: pl >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
                   {pl >= 0 ? '+' : ''}{fmtCurrency(pl)}
                 </td>
-                <td style={{ padding: '12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: plpct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: plpct >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
                   {fmtPct(plpct)}
                 </td>
                 <td style={{ padding: '12px', textAlign: 'center' }}>
