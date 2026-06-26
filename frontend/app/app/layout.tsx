@@ -171,11 +171,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar */}
       <div className="hidden md:block">{sidebar}</div>
 
-      {/* Mobile overlay */}
+      {/* Mobile overlay — sidebar left, backdrop right */}
       {open && (
         <div className="fixed inset-0 z-50 flex md:hidden">
+          <div style={{ width: 240, flexShrink: 0 }}>{sidebar}</div>
           <div style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setOpen(false)} className="flex-1" />
-          <div style={{ width: 240 }}>{sidebar}</div>
         </div>
       )}
 
@@ -183,10 +183,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* Mobile top bar — z-51 keeps it above the overlay (z-50) so toggle button stays clickable */}
         <div className="flex items-center gap-3 px-4 py-3 md:hidden" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'relative', zIndex: 51 }}>
-          <button onClick={() => setOpen(o => !o)}>
+          <button onClick={() => setOpen(o => !o)} style={{ color: 'var(--primary)' }}>
             {open ? <IconX size={22} /> : <IconMenu2 size={22} />}
           </button>
-          <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>
+          {!open && <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>}
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
           {children}
