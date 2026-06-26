@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Avatar } from '@/components/shared/Avatar'
-import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar, IconCrown, IconSun, IconMoon, IconExternalLink } from '@tabler/icons-react'
+import { IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconCrown, IconExternalLink } from '@tabler/icons-react'
 import { BROKERS, getBrokerById, type Broker } from '@/lib/brokers'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
@@ -59,12 +59,6 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
   // Goal
   const [premiumStatus, setPremiumStatus] = useState<{ tier: string; badges: any[]; verification: any } | null>(null)
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-
-  useEffect(() => {
-    const saved = (typeof window !== 'undefined' && localStorage.getItem('theme')) || 'dark'
-    setTheme(saved as 'dark' | 'light')
-  }, [])
   const [goal, setGoal] = useState<any>(null)
   const [goalForm, setGoalForm] = useState({ targetPct: '100', months: '12', label: 'Double my portfolio' })
   const [editingGoal, setEditingGoal] = useState(false)
@@ -192,47 +186,11 @@ export default function SettingsPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Top nav */}
-      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '0 20px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div className="flex items-center gap-3">
-          <Link href="/app/portfolio" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text2)', fontSize: 13, fontFamily: 'Syne, sans-serif', textDecoration: 'none' }}
-            onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text)'}
-            onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text2)'}
-          >
-            <IconArrowLeft size={16} /> Back
-          </Link>
-          <span style={{ color: 'var(--border)' }}>|</span>
-          <div className="flex items-center gap-2">
-            <div style={{ background: 'var(--primary)', borderRadius: 6, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <IconChartBar size={13} color="white" />
-            </div>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Fennec SI</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <IconSettings size={15} style={{ color: 'var(--text2)' }} />
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>Settings</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const next = theme === 'dark' ? 'light' : 'dark'
-              setTheme(next)
-              document.documentElement.setAttribute('data-theme', next)
-              localStorage.setItem('theme', next)
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', cursor: 'pointer', fontSize: 12, fontFamily: 'Syne, sans-serif', color: 'var(--text2)' }}
-          >
-            {theme === 'dark' ? <IconSun size={13} /> : <IconMoon size={13} />}
-            {theme === 'dark' ? 'Light' : 'Dark'}
-          </button>
-        </div>
+    <div style={{ padding: 28, maxWidth: 640, margin: '0 auto' }}>
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Settings</h1>
+        <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>{user?.email}</p>
       </div>
-
-    <div style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
-      {user && <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 28 }}>{user.email}</p>}
 
       <form onSubmit={save} className="space-y-6">
         {/* Profile */}
@@ -623,7 +581,6 @@ export default function SettingsPage() {
           <IconTrash size={16} /> Delete Account
         </button>
       </div>
-    </div>
     </div>
   )
 }

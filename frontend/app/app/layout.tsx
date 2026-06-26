@@ -127,7 +127,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Footer */}
       <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
-        <Link href="/settings" className={`nav-link mb-1 ${pathname === '/settings' ? 'active' : ''}`} style={{ marginBottom: 2 }}>
+        <Link href="/app/settings" className={`nav-link mb-1 ${pathname === '/app/settings' ? 'active' : ''}`} style={{ marginBottom: 2 }}>
           <IconSettings size={15} />
           Settings
         </Link>

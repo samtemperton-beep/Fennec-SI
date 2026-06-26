@@ -217,7 +217,7 @@ export default function DiscoverPage() {
           <div style={{ fontSize: 22, marginBottom: 8 }}>🔒</div>
           <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>More picks available</p>
           <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 14 }}>Upgrade to Premium to see all picks including the highest-conviction opportunities.</p>
-          <a href="/settings" style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#1a1a1a', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>
+          <a href="/app/settings" style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#1a1a1a', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>
             ✦ Upgrade to Premium
           </a>
         </div>

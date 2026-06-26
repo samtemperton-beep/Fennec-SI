@@ -106,11 +106,11 @@ export default function NewslettersPage() {
               return (
                 <div key={i} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   {/* Coloured top bar */}
-                  <div style={{ height: 3, background: d.source_color || 'var(--accent)' }} />
+                  <div style={{ height: 3, background: d.source_color || 'var(--primary)' }} />
                   <div style={{ padding: '14px 16px' }}>
                     {/* Meta row */}
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 700, color: d.source_color || 'var(--accent)' }}>{d.source_name}</span>
+                      <span style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 700, color: d.source_color || 'var(--primary)' }}>{d.source_name}</span>
                       {d.category && (
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: 'var(--surface2)', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textTransform: 'uppercase' }}>{d.category}</span>
                       )}

@@ -35,7 +35,7 @@ function RiskCard({ riskLevel }: { riskLevel: number }) {
           <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 13, color: RISK_COLOR(riskLevel) }}>
             {RISK_LABELS[riskLevel]} ({riskLevel}/10)
           </span>
-          <Link href="/settings" style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px' }}
+          <Link href="/app/settings" style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px' }}
             onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text)'}
             onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text2)'}
           >
@@ -58,7 +58,7 @@ function RiskCard({ riskLevel }: { riskLevel: number }) {
       </div>
       <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8 }}>
         AI signals are calibrated to your risk profile. Change in{' '}
-        <Link href="/settings" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Settings</Link>.
+        <Link href="/app/settings" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Settings</Link>.
       </p>
     </div>
   )
@@ -364,7 +364,7 @@ export default function PortfolioPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 12, color: RISK_COLOR(riskLevel) }}>{RISK_LABELS[riskLevel]} · {riskLevel}/10</span>
-                    <Link href="/settings" style={{ fontSize: 10, color: 'var(--text2)', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px' }}>Edit</Link>
+                    <Link href="/app/settings" style={{ fontSize: 10, color: 'var(--text2)', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px' }}>Edit</Link>
                   </div>
                 </div>
                 <div style={{ position: 'relative', height: 5, background: 'var(--surface3)', borderRadius: 4, overflow: 'hidden' }}>
@@ -381,7 +381,7 @@ export default function PortfolioPage() {
       {!loading && !isPremium && holdings.length >= 8 && holdings.length < 10 && (
         <div style={{ marginBottom: 16, padding: '8px 14px', borderRadius: 8, background: 'var(--amber-light)', border: '1px solid var(--amber)', fontSize: 12, color: 'var(--amber)' }}>
           {10 - holdings.length} holding slot{10 - holdings.length !== 1 ? 's' : ''} left on the free plan.{' '}
-          <Link href="/settings" style={{ color: 'var(--amber)', fontWeight: 700, textDecoration: 'underline' }}>Upgrade to Premium</Link> for unlimited.
+          <Link href="/app/settings" style={{ color: 'var(--amber)', fontWeight: 700, textDecoration: 'underline' }}>Upgrade to Premium</Link> for unlimited.
         </div>
       )}
 
