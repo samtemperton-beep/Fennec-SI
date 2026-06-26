@@ -35,16 +35,16 @@ export default function LoginPage() {
       <div style={{
         display: 'flex', flexDirection: 'column', justifyContent: 'center',
         padding: '60px 48px', borderRight: '1px solid var(--border)',
-        background: 'linear-gradient(135deg,rgba(91,106,255,.07) 0%,var(--bg) 60%)',
+        background: 'linear-gradient(135deg,rgba(44,110,106,.07) 0%,var(--bg) 60%)',
         position: 'relative', overflow: 'hidden',
       }}>
         {/* Ambient glows */}
-        <div style={{ position: 'absolute', top: -100, left: -100, width: 400, height: 400, background: 'radial-gradient(circle,rgba(91,106,255,.12) 0%,transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -100, left: -100, width: 400, height: 400, background: 'radial-gradient(circle,rgba(44,110,106,.12) 0%,transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -60, right: -60, width: 300, height: 300, background: 'radial-gradient(circle,rgba(16,185,129,.08) 0%,transparent 70%)', pointerEvents: 'none' }} />
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 56 }}>
-          <div style={{ background: 'var(--accent)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--primary)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="18" height="18" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
               <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
               <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -54,7 +54,7 @@ export default function LoginPage() {
         </div>
 
         <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 'clamp(1.6rem,3vw,2.4rem)', fontWeight: 800, lineHeight: 1.2, marginBottom: 16 }}>
-          Invest smarter with<br /><span style={{ color: 'var(--accent)' }}>AI at your side</span>
+          Invest smarter with<br /><span style={{ color: 'var(--primary)' }}>AI at your side</span>
         </h2>
         <p style={{ color: 'var(--text2)', fontSize: 16, lineHeight: 1.7, marginBottom: 48, maxWidth: 440 }}>
           Track your NZ, ASX &amp; US portfolio, get real-time AI signals, and compete on verified leaderboards.
@@ -64,7 +64,7 @@ export default function LoginPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 48 }}>
           {[
             {
-              bg: 'rgba(91,106,255,.15)', color: 'var(--accent2)',
+              bg: 'var(--primary-light)', color: 'var(--primary)',
               icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58"/></svg>,
               title: 'AI-powered signals on every holding',
               body: 'Claude generates BUY / HOLD / SELL reasoning in real time, calibrated to your risk profile.',
@@ -118,12 +118,12 @@ export default function LoginPage() {
 
           {sent ? (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(91,106,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-                <IconMail size={26} style={{ color: 'var(--accent)' }} />
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <IconMail size={26} style={{ color: 'var(--primary)' }} />
               </div>
               <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Check your email</p>
               <p style={{ color: 'var(--text2)', fontSize: 13 }}>We sent a magic link to <strong>{email}</strong></p>
-              <button onClick={() => setSent(false)} style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'Syne, sans-serif', fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => setSent(false)} style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontSize: 13, cursor: 'pointer' }}>
                 ← Try a different email
               </button>
             </div>
@@ -165,13 +165,13 @@ export default function LoginPage() {
                   onChange={e => setEmail(e.target.value)}
                   required
                   style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 14, outline: 'none', marginBottom: 10, display: 'block' }}
-                  onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+                  onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
                   onBlur={e => (e.target.style.borderColor = 'var(--border)')}
                 />
                 <button
                   type="submit"
                   disabled={!!loading || !email}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: 'pointer', opacity: loading === 'magic' || !email ? 0.7 : 1 }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: 'pointer', opacity: loading === 'magic' || !email ? 0.7 : 1 }}
                 >
                   {loading === 'magic' ? <IconLoader size={16} className="animate-spin" /> : <IconMail size={16} />}
                   Send magic link
@@ -182,15 +182,15 @@ export default function LoginPage() {
 
           <p style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, marginTop: 20, lineHeight: 1.6 }}>
             By signing in you agree to our{' '}
-            <a href="#" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Terms of Service</a>
+            <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Terms of Service</a>
             {' '}and{' '}
-            <a href="#" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Privacy Policy</a>
+            <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Privacy Policy</a>
           </p>
 
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 24, paddingTop: 20, textAlign: 'center' }}>
             <p style={{ color: 'var(--text2)', fontSize: 13 }}>
               Don&apos;t have an account?{' '}
-              <a href="/login" style={{ color: 'var(--accent)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none', marginLeft: 4 }}>
+              <a href="/login" style={{ color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none', marginLeft: 4 }}>
                 Sign up free →
               </a>
             </p>

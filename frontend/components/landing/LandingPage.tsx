@@ -54,7 +54,7 @@ const PRO_FEATURES = [
 ]
 
 const COMMUNITY_POSTS = [
-  { user: 'kiwi_trader', initial: 'K', bg: 'var(--accent)', signal: 'BUY', ticker: 'AAPL', body: '📱 Apple Q1 earnings crush estimates. $AAPL BUY — services revenue up 17% YoY. Target $230.', time: '2m ago', likes: 12 },
+  { user: 'kiwi_trader', initial: 'K', bg: 'var(--primary)', signal: 'BUY', ticker: 'AAPL', body: '📱 Apple Q1 earnings crush estimates. $AAPL BUY — services revenue up 17% YoY. Target $230.', time: '2m ago', likes: 12 },
   { user: 'asx_bull', initial: 'A', bg: '#10b981', signal: 'HOLD', ticker: 'BHP', body: '⛏️ Iron ore holding steady. BHP looks range-bound near-term. Accumulate on dips.', time: '8m ago', likes: 7 },
   { user: 'nzx_picks', initial: 'N', bg: '#f59e0b', signal: 'BUY', ticker: 'FPH', body: '🏥 Fisher & Paykel Health recovering well. Export sales data solid. Long-term BUY.', time: '15m ago', likes: 19 },
 ]
@@ -79,7 +79,7 @@ export default function LandingPage() {
       {/* ── Nav ── */}
       <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ background: 'var(--accent)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--primary)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="18" height="18" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
               <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
               <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -92,7 +92,7 @@ export default function LandingPage() {
           <a href="#pricing" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Pricing</a>
           <Link href="/app/community" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Community</Link>
           <Link href="/login" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Sign in</Link>
-          <Link href="/login" style={{ background: 'var(--accent)', color: 'white', padding: '8px 18px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+          <Link href="/login" style={{ background: 'var(--primary)', color: 'white', padding: '8px 18px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
             Get Started Free
           </Link>
         </div>
@@ -100,12 +100,12 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section style={{ maxWidth: 900, margin: '0 auto', padding: '60px 32px 56px', textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, background: 'rgba(91,106,255,.1)', border: '1px solid rgba(91,106,255,.3)', fontSize: 12, color: 'var(--accent2)', marginBottom: 24, fontFamily: 'Syne, sans-serif' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, background: 'var(--primary-light)', border: '1px solid var(--primary)', fontSize: 12, color: 'var(--primary)', marginBottom: 24, fontFamily: 'Syne, sans-serif' }}>
           ✦ AI-powered · NZ, ASX &amp; US markets
         </div>
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 'clamp(2rem,5vw,3.6rem)', fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
           Your AI-powered stock<br />
-          <span style={{ color: 'var(--accent)' }}>portfolio tracker</span>
+          <span style={{ color: 'var(--primary)' }}>portfolio tracker</span>
         </h1>
         <p style={{ color: 'var(--text2)', fontSize: 18, lineHeight: 1.6, marginBottom: 40, maxWidth: 560, margin: '0 auto 40px' }}>
           Track NZ, ASX &amp; US stocks. Get AI signals, daily picks, and community insights — all in one place.
@@ -113,7 +113,7 @@ export default function LandingPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
           <Link
             href="/login"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--accent)', color: 'white', padding: '14px 28px', borderRadius: 10, fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, textDecoration: 'none' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--primary)', color: 'white', padding: '14px 28px', borderRadius: 10, fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, textDecoration: 'none' }}
           >
             Start for free <IconArrowRight size={18} />
           </Link>
@@ -162,7 +162,7 @@ export default function LandingPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {FEATURES.map(({ icon, title, desc }) => (
             <div key={title} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, transition: 'border-color 0.2s' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(91,106,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--accent2)' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--primary)' }}>
                 {icon}
               </div>
               <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 8 }}>{title}</h3>
@@ -199,23 +199,23 @@ export default function LandingPage() {
           </div>
 
           {/* Premium */}
-          <div style={{ background: 'rgba(91,106,255,.04)', border: '1px solid var(--accent)', borderRadius: 12, padding: 24 }}>
+          <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 12, padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20 }}>Premium</p>
-              <span style={{ background: 'var(--accent)', color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, fontFamily: 'Syne, sans-serif' }}>POPULAR</span>
+              <span style={{ background: 'var(--primary)', color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, fontFamily: 'Syne, sans-serif' }}>POPULAR</span>
             </div>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 36, fontWeight: 800, marginBottom: 20, color: 'var(--accent2)' }}>
+            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 36, fontWeight: 800, marginBottom: 20, color: 'var(--primary)' }}>
               $9<span style={{ fontSize: 14, color: 'var(--text2)' }}>/mo</span>
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
               {PRO_FEATURES.map(f => (
                 <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <IconCheck size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <IconCheck size={15} style={{ color: 'var(--green)', flexShrink: 0 }} />
                   <span style={{ fontSize: 14 }}>{f}</span>
                 </div>
               ))}
             </div>
-            <Link href="/login" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}>
+            <Link href="/login" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}>
               Start Premium free for 7 days
             </Link>
           </div>
@@ -226,7 +226,7 @@ export default function LandingPage() {
       <footer style={{ borderTop: '1px solid var(--border)', padding: '24px 32px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ background: 'var(--accent)', borderRadius: 6, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'var(--primary)', borderRadius: 6, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="12" height="12" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
                 <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                 <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
