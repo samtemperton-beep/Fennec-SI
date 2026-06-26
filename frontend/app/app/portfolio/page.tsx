@@ -58,7 +58,7 @@ function RiskCard({ riskLevel }: { riskLevel: number }) {
       </div>
       <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8 }}>
         AI signals are calibrated to your risk profile. Change in{' '}
-        <Link href="/settings" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Settings</Link>.
+        <Link href="/settings" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Settings</Link>.
       </p>
     </div>
   )
@@ -280,7 +280,7 @@ export default function PortfolioPage() {
           <button onClick={analyzeAll} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
             <IconBrain size={13} /> Analyse all
           </button>
-          <button onClick={() => setAddOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
+          <button onClick={() => setAddOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--primary)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
             <IconPlus size={13} /> Add stock
           </button>
         </div>
@@ -393,7 +393,7 @@ export default function PortfolioPage() {
           <p style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>No holdings yet</p>
           <p style={{ color: 'var(--text2)', marginBottom: 24 }}>Add stocks manually or import from your broker</p>
           <div className="flex items-center justify-center gap-3">
-            <button onClick={() => setAddOpen(true)} style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: 10, fontWeight: 700, border: 'none', cursor: 'pointer' }}>Add Stock</button>
+            <button onClick={() => setAddOpen(true)} style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 10, fontWeight: 700, border: 'none', cursor: 'pointer' }}>Add Stock</button>
             <button onClick={() => setImportOpen(true)} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Import CSV</button>
           </div>
         </div>
@@ -448,7 +448,7 @@ export default function PortfolioPage() {
               <option>US</option><option>ASX</option><option>NZX</option>
             </select>
           </div>
-          <button type="submit" style={{ width: '100%', background: 'var(--accent)', color: 'white', padding: '10px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+          <button type="submit" style={{ width: '100%', background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
             Add to Portfolio
           </button>
         </form>
@@ -475,7 +475,7 @@ export default function PortfolioPage() {
             color: 'var(--text2)', fontSize: 13,
           }}
         >
-          <IconUpload size={24} style={{ color: 'var(--accent)' }} />
+          <IconUpload size={24} style={{ color: 'var(--primary)' }} />
           {csvText ? <span style={{ color: 'var(--text)' }}>File loaded — ready to import</span> : <span>Click to choose a CSV file</span>}
           <input
             type="file"
@@ -491,7 +491,7 @@ export default function PortfolioPage() {
           />
         </label>
         <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-          <button onClick={importCSV} disabled={!csvText} style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: csvText ? 1 : 0.5 }}>
+          <button onClick={importCSV} disabled={!csvText} style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: csvText ? 1 : 0.5 }}>
             Import
           </button>
           <button onClick={() => { setImportOpen(false); setCsvText('') }} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>

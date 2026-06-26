@@ -11,6 +11,7 @@ import {
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
 import { Avatar } from '@/components/shared/Avatar'
+import { PremiumBadge } from '@/components/premium/PremiumBadge'
 
 const NAV_SECTIONS = [
   {
@@ -46,6 +47,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [isPremium, setIsPremium] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const supabase = createClient()
 
@@ -66,8 +68,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user)
       if (data.user) {
-        const { data: p } = await supabase.from('profiles').select('username, avatar_color, avatar_emoji, avatar_url, location, profession').eq('id', data.user.id).single()
+        const { data: p } = await supabase.from('profiles').select('username, avatar_color, avatar_emoji, avatar_url, location, profession, is_premium').eq('id', data.user.id).single()
         setProfile(p)
+        if (p?.is_premium) setIsPremium(true)
       }
     })
   }, [])
@@ -91,12 +94,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }}>
       {/* Logo + tagline */}
       <div style={{ padding: '22px 18px 16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <Link href="/app/portfolio" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, textDecoration: 'none' }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <IconTrendingUp size={18} color="white" />
           </div>
           <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>
-        </div>
+        </Link>
         <p style={{ fontSize: 10.5, color: 'var(--text3)', fontStyle: 'italic', paddingLeft: 44, lineHeight: 1.3, marginTop: -2 }}>grow with confidence</p>
       </div>
 
@@ -149,11 +152,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {profile?.username || user.email}
               </div>
-              {profile?.profession && (
+              {isPremium ? (
+                <PremiumBadge size="sm" />
+              ) : profile?.profession ? (
                 <div style={{ fontSize: 10, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {profile.profession}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}
