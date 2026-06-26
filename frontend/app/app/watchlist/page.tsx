@@ -7,8 +7,9 @@ import { SignalBadge } from '@/components/shared/SignalBadge'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
 import { fmtCurrency, fmtPct, fmtLarge, fmt } from '@/lib/utils'
-import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera, IconChevronUp, IconChevronDown, IconSelector } from '@tabler/icons-react'
+import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera, IconChevronUp, IconChevronDown, IconSelector, IconExternalLink } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { getBrokerById, getStockUrl, type Broker } from '@/lib/brokers'
 
 interface WItem {
   id: number; ticker: string; market: string; name?: string; current_price?: number
@@ -22,6 +23,7 @@ export default function WatchlistPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [riskLevel, setRiskLevel] = useState(5)
+  const [broker, setBroker] = useState<Broker | null>(null)
   const [ticker, setTicker] = useState('')
   const [market, setMarket] = useState('US')
   const [analyzingSet, setAnalyzingSet] = useState(new Set<number>())
@@ -101,8 +103,9 @@ export default function WatchlistPage() {
     supabase.auth.getUser().then(async ({ data }) => {
       const uid = data.user?.id ?? DEV_USER_ID
       setUserId(uid)
-      const { data: profile } = await supabase.from('profiles').select('risk_level').eq('id', uid).single()
+      const { data: profile } = await supabase.from('profiles').select('risk_level, broker').eq('id', uid).single()
       if (profile?.risk_level) setRiskLevel(profile.risk_level)
+      if (profile?.broker) setBroker(getBrokerById(profile.broker) ?? null)
       load(uid)
     })
   }, [])
@@ -392,12 +395,17 @@ export default function WatchlistPage() {
               {filteredItems.map(item => (
                 <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }} className="hover:bg-surface2">
                   <td style={{ padding: '12px', minWidth: 160 }}>
-                    <div className="flex items-center gap-2">
-                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{item.ticker}</span>
-                      {item.market !== 'US' && <span style={{ fontSize: 10, color: 'var(--text2)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4 }}>{item.market}</span>}
-                    </div>
-                    {item.name && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>{item.name}</p>}
-                    {item.sector && <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1, opacity: 0.7 }}>{item.sector}</p>}
+                    <a href={getStockUrl(broker, item.ticker, item.market)} target="_blank" rel="noopener noreferrer"
+                      title={broker ? `View on ${broker.name}` : undefined}
+                      style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{item.ticker}</span>
+                        {item.market !== 'US' && <span style={{ fontSize: 10, color: 'var(--text2)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4 }}>{item.market}</span>}
+                        <IconExternalLink size={11} style={{ color: 'var(--primary)', opacity: 0.5, flexShrink: 0 }} />
+                      </div>
+                      {item.name && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>{item.name}</p>}
+                      {item.sector && <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1, opacity: 0.7 }}>{item.sector}</p>}
+                    </a>
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>{item.current_price ? fmtCurrency(item.current_price) : '—'}</td>
                   <td style={{ padding: '12px', textAlign: 'center', fontFamily: 'DM Mono, monospace', fontSize: 13, color: (item.change_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
@@ -421,9 +429,18 @@ export default function WatchlistPage() {
                     )}
                   </td>
                   <td style={{ padding: '12px' }}>
-                    <div className="flex gap-1">
-                      <button onClick={() => addToPortfolio(item)} title="Add to Portfolio" style={{ color: 'var(--primary)', padding: 4 }}><IconArrowRight size={14} /></button>
-                      <button onClick={() => remove(item.id)} style={{ color: 'var(--text2)', padding: 4 }}><IconTrash size={14} /></button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <a
+                        href={getStockUrl(broker, item.ticker, item.market)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={broker ? `View on ${broker.name}` : item.market === 'NZX' ? 'View on NZX' : item.market === 'ASX' ? 'View on ASX' : 'View on Yahoo Finance'}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}
+                      >
+                        {broker ? <>{broker.flag} Trade</> : <><IconExternalLink size={11} /> View</>}
+                      </a>
+                      <button onClick={() => addToPortfolio(item)} title="Add to Portfolio" style={{ color: 'var(--primary)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}><IconArrowRight size={14} /></button>
+                      <button onClick={() => remove(item.id)} title="Remove" style={{ color: 'var(--text2)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}><IconTrash size={14} /></button>
                     </div>
                   </td>
                 </tr>
