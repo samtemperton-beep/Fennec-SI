@@ -3,25 +3,59 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { createClient } from '@/lib/supabase'
-import { loadPrefs } from '@/lib/newsPrefs'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { WatchlistButton } from '@/components/shared/WatchlistButton'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { IconStar, IconRefresh } from '@tabler/icons-react'
+import { IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
-const MARKETS = ['All', 'US', 'ASX', 'NZX']
-const TIMEFRAMES = ['3mo', '6mo', '12mo']
+const BUBBLE_COLORS = ['#5B7CF0','#14B8A6','#22C55E','#F59E0B','#EF4444','#A855F7','#F97316','#0EA5E9','#EC4899','#6366F1']
+function tickerColor(t: string) {
+  let h = 0
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0
+  return BUBBLE_COLORS[h % BUBBLE_COLORS.length]
+}
+
+function deriveSignal(upside: number): 'BUY' | 'HOLD' | 'WATCH' {
+  if (upside >= 15) return 'BUY'
+  if (upside >= 5) return 'HOLD'
+  return 'WATCH'
+}
+
+function riskLabel(r: number) {
+  if (r <= 3) return 'Low'
+  if (r <= 6) return 'Med'
+  return 'High'
+}
+function riskColor(r: number) {
+  if (r <= 3) return 'var(--green)'
+  if (r <= 6) return 'var(--amber)'
+  return 'var(--red)'
+}
+
+const SIGNAL_COLOR: Record<string, string> = {
+  BUY: 'var(--green)',
+  HOLD: 'var(--amber)',
+  WATCH: 'var(--primary)',
+}
+const SIGNAL_BG: Record<string, string> = {
+  BUY: 'var(--green-light)',
+  HOLD: 'var(--amber-light)',
+  WATCH: 'var(--primary-light)',
+}
+
 const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
 
 interface Pick {
   rank: number; ticker: string; name: string; sector: string
-  upside_pct: number; reason: string; risk_level: number
+  upside_pct: number; reason: string; risk_level: number; market?: string
 }
 
+type ActiveFilter = 'All markets' | 'NZX' | 'ASX' | 'US' | 'Low risk' | 'High upside'
+const TIMEFRAMES = ['3mo', '6mo', '12mo']
+
 export default function Top10Page() {
-  const [market, setMarket] = useState('US')
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('All markets')
   const [timeframe, setTimeframe] = useState('12mo')
   const [picks, setPicks] = useState<Pick[]>([])
   const [loading, setLoading] = useState(false)
@@ -49,17 +83,8 @@ export default function Top10Page() {
   async function generate() {
     setLoading(true)
     try {
-      let newsContext: string | undefined
-      try {
-        const tickers = [...portfolio, ...watchlist].slice(0, 8)
-        const newsData = await api.getNews(tickers)
-        const headlines = (newsData?.news || [])
-          .filter((n: any) => (n.relevance || 0) >= 50)
-          .slice(0, 15)
-          .map((n: any) => n.headline)
-        if (headlines.length > 0) newsContext = headlines.join('\n')
-      } catch {}
-      const { data } = await api.getTop10(market === 'All' ? 'US' : market, timeframe, newsContext)
+      const marketForApi = (activeFilter === 'All markets' || activeFilter === 'Low risk' || activeFilter === 'High upside') ? 'US' : activeFilter
+      const { data } = await api.getTop10(marketForApi, timeframe)
       setPicks(data || [])
     } catch (e: any) {
       toast.error(e.message)
@@ -81,112 +106,199 @@ export default function Top10Page() {
   const portfolioSet = new Set(portfolio)
   const watchlistSet = new Set(watchlist)
 
+  const visiblePicks = picks.filter(p => {
+    if (activeFilter === 'Low risk') return p.risk_level <= 3
+    if (activeFilter === 'High upside') return p.upside_pct >= 20
+    return true
+  })
+
+  const now = new Date()
+  const timeStr = now.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' }) + ' NZT'
+
+  const FILTERS: ActiveFilter[] = ['All markets', 'NZX', 'ASX', 'US', 'Low risk', 'High upside']
+
   return (
-    <div style={{ padding: 24 }}>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>
-          <IconStar size={22} style={{ display: 'inline', color: 'var(--amber)', marginRight: 8 }} />
-          Daily Top 10 Picks
-        </h1>
+    <div style={{ padding: 28 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Today's Top 10 Picks</h1>
+        <p style={{ color: 'var(--text2)', fontSize: 13 }}>
+          AI-curated across NZ, ASX &amp; US markets · Updated {timeStr}
+        </p>
       </div>
 
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <div className="flex gap-1">
-          {MARKETS.map(m => (
-            <button key={m} onClick={() => setMarket(m)}
-              style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: market === m ? 'var(--accent)' : 'var(--surface)', color: market === m ? 'white' : 'var(--text2)', border: market === m ? 'none' : '1px solid var(--border)' }}
-            >{m}</button>
+      {/* Filters + generate */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+          {FILTERS.map(f => (
+            <button key={f} onClick={() => setActiveFilter(f)}
+              style={{
+                padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                background: activeFilter === f ? 'var(--primary)' : 'var(--surface2)',
+                color: activeFilter === f ? 'white' : 'var(--text2)',
+                border: activeFilter === f ? 'none' : '1px solid var(--border)',
+                transition: 'all 0.15s',
+              }}
+            >{f}</button>
           ))}
         </div>
-        <div className="flex gap-1">
+        <div style={{ display: 'flex', gap: 6 }}>
           {TIMEFRAMES.map(t => (
             <button key={t} onClick={() => setTimeframe(t)}
-              style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: timeframe === t ? 'rgba(91,106,255,0.2)' : 'var(--surface)', color: timeframe === t ? 'var(--accent2)' : 'var(--text2)', border: '1px solid var(--border)' }}
+              style={{
+                padding: '7px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: timeframe === t ? 'var(--primary-light)' : 'var(--surface2)',
+                color: timeframe === t ? 'var(--primary)' : 'var(--text2)',
+                border: timeframe === t ? '1px solid var(--primary)' : '1px solid var(--border)',
+              }}
             >{t}</button>
           ))}
         </div>
         <button onClick={generate} disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg ml-auto"
-          style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10,
+            background: 'var(--primary)', color: 'white', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer',
+            opacity: loading ? 0.7 : 1,
+          }}
         >
-          {loading ? <LoadingSpinner size={16} /> : <IconRefresh size={16} />}
+          {loading ? <LoadingSpinner size={15} /> : <IconRefresh size={15} />}
           Generate Picks
         </button>
       </div>
 
+      {/* Empty state */}
       {picks.length === 0 && !loading && (
-        <div className="card text-center py-16">
-          <IconStar size={40} style={{ color: 'var(--text2)', margin: '0 auto 12px' }} />
-          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 18, marginBottom: 8 }}>Click Generate to get AI picks</p>
-          <p style={{ color: 'var(--text2)' }}>AI curates top 10 stocks based on current market conditions</p>
+        <div className="card" style={{ textAlign: 'center', padding: '64px 24px' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📈</div>
+          <p style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Ready to find your next pick?</p>
+          <p style={{ color: 'var(--text2)', marginBottom: 20 }}>AI curates the top 10 stocks based on current market conditions and your timeframe</p>
+          <button onClick={generate} disabled={loading}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 10, background: 'var(--primary)', color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+          >
+            {loading ? <LoadingSpinner size={16} /> : <IconRefresh size={16} />}
+            Generate Picks
+          </button>
         </div>
       )}
 
-      {picks.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }} className="grid-cols-1 xl:grid-cols-[1fr_320px]">
-          <div className="space-y-2">
-            {picks.map((p, i) => (
-              <div key={i} className="card cursor-pointer hover:border-accent transition-colors"
-                style={{ display: 'flex', alignItems: 'center', gap: 16, transition: 'border-color 0.2s' }}>
-                {/* Rank */}
-                <div onClick={() => openDeepDive(p)} style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(91,106,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 15, color: 'var(--accent2)', flexShrink: 0, cursor: 'pointer' }}>
-                  #{p.rank}
-                </div>
-                {/* Content */}
-                <div onClick={() => openDeepDive(p)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>{p.ticker}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text2)' }}>{p.name}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>{p.sector}</span>
-                  </div>
-                  <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.4 }}>{p.reason}</p>
-                </div>
-                {/* Upside + risk + watchlist */}
-                <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                  <div onClick={() => openDeepDive(p)}>
-                    <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>+{p.upside_pct}%</div>
-                    <div style={{ fontSize: 11, color: 'var(--text2)' }}>upside</div>
-                  </div>
-                  {p.risk_level && (
-                    <div className="flex items-center gap-1" style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600, color: p.risk_level <= 3 ? 'var(--green)' : p.risk_level <= 6 ? 'var(--amber)' : 'var(--red)' }}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block', flexShrink: 0 }} />
-                      Risk {p.risk_level}/10
+      {loading && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '64px 0' }}>
+          <LoadingSpinner size={36} />
+        </div>
+      )}
+
+      {/* Cards grid */}
+      {!loading && visiblePicks.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16 }} className="grid-cols-1 md:grid-cols-2">
+          {visiblePicks.map((p, i) => {
+            const signal = deriveSignal(p.upside_pct)
+            const barPct = Math.min(100, (p.upside_pct / 40) * 100)
+            const barColor = SIGNAL_COLOR[signal]
+            return (
+              <div
+                key={i}
+                onClick={() => openDeepDive(p)}
+                className="card"
+                style={{ padding: 0, overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column', transition: 'box-shadow 0.15s' }}
+                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 24px rgba(44,110,106,.15)'}
+                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh)'}
+              >
+                {/* Card body */}
+                <div style={{ padding: '20px 20px 16px' }}>
+                  {/* Header: bubble + name + badges */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 11, background: tickerColor(p.ticker),
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 10, fontWeight: 800, color: 'white', flexShrink: 0, letterSpacing: '-.01em',
+                    }}>
+                      {p.ticker.slice(0, 4)}
                     </div>
-                  )}
-                  <WatchlistButton
-                    ticker={p.ticker} userId={userId}
-                    inWatchlist={watchlistSet.has(p.ticker)}
-                    inPortfolio={portfolioSet.has(p.ticker)}
-                    onAdded={t => setWatchlist(prev => [...prev, t])}
-                  />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
+                        <span style={{ fontWeight: 700, fontSize: 16 }}>{p.name}</span>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                          background: SIGNAL_BG[signal], color: SIGNAL_COLOR[signal],
+                        }}>{signal}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 600, color: 'var(--text3)' }}>{p.ticker}</span>
+                        <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text3)', display: 'inline-block' }} />
+                        <span style={{ fontSize: 12, color: 'var(--text3)' }}>{p.sector}</span>
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                      <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--primary)', lineHeight: 1 }}>+{p.upside_pct}%</div>
+                      <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>upside</div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.55, marginBottom: 16 }}>
+                    {p.reason}
+                  </p>
+
+                  {/* Metric boxes */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 4 }}>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                      <p style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Upside</p>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 15, fontWeight: 600, color: 'var(--primary)' }}>+{p.upside_pct}%</p>
+                    </div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                      <p style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Risk</p>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: riskColor(p.risk_level), display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: riskColor(p.risk_level), display: 'inline-block', flexShrink: 0 }} />
+                        {riskLabel(p.risk_level)}
+                      </p>
+                    </div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <p style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Rank</p>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>#{p.rank}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress bar + watchlist row */}
+                <div style={{ marginTop: 'auto' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 16px 12px' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <WatchlistButton
+                      ticker={p.ticker} userId={userId}
+                      inWatchlist={watchlistSet.has(p.ticker)}
+                      inPortfolio={portfolioSet.has(p.ticker)}
+                      onAdded={t => setWatchlist(prev => [...prev, t])}
+                    />
+                  </div>
+                  <div style={{ height: 4, background: 'var(--surface2)' }}>
+                    <div style={{ height: '100%', width: `${barPct}%`, background: barColor, transition: 'width 0.8s ease' }} />
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-
-          <div className="card hidden xl:block">
-            <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>Projected Returns</p>
-            <ResponsiveContainer width="100%" height={380}>
-              <BarChart data={picks} layout="vertical" margin={{ left: 0, right: 12 }}>
-                <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text2)' }} tickFormatter={v => `${v}%`} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="ticker" tick={{ fontSize: 11, fill: 'var(--text2)', fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} width={45} />
-                <Tooltip formatter={(v: any) => [`+${v}%`, 'Upside']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontFamily: 'DM Mono, monospace', fontSize: 12 }} />
-                <Bar dataKey="upside_pct" radius={[0, 4, 4, 0]}>
-                  {picks.map((_, i) => <Cell key={i} fill={`hsl(${140 + i * 10}, 80%, 50%)`} fillOpacity={0.85} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+            )
+          })}
         </div>
       )}
 
+      {/* Deep dive modal */}
       <Modal open={!!selected} onClose={() => setSelected(null)} title={selected ? `${selected.ticker} — Deep Dive` : ''} wide>
         {selected && (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 18 }}>{selected.ticker}</span>
-                <span style={{ fontSize: 13, color: 'var(--text2)', marginLeft: 8 }}>{selected.name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 11, background: tickerColor(selected.ticker), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: 'white' }}>
+                  {selected.ticker.slice(0, 4)}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 800, fontSize: 18 }}>{selected.name}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: SIGNAL_BG[deriveSignal(selected.upside_pct)], color: SIGNAL_COLOR[deriveSignal(selected.upside_pct)] }}>
+                      {deriveSignal(selected.upside_pct)}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>{selected.ticker} · {selected.sector}</span>
+                </div>
               </div>
               <WatchlistButton
                 ticker={selected.ticker} userId={userId} size="md"
@@ -196,9 +308,9 @@ export default function Top10Page() {
               />
             </div>
             {diving ? (
-              <div className="flex justify-center py-8"><LoadingSpinner size={32} /></div>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}><LoadingSpinner size={32} /></div>
             ) : deepDive ? (
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {[
                   { label: 'What happened', value: deepDive.what_happened },
                   { label: 'Why it matters', value: deepDive.why_it_matters },
@@ -206,13 +318,13 @@ export default function Top10Page() {
                   { label: 'Action suggestion', value: deepDive.action_suggestion },
                 ].map(s => s.value && (
                   <div key={s.label}>
-                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</p>
+                    <p style={{ fontWeight: 600, fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</p>
                     <p style={{ fontSize: 14, lineHeight: 1.7 }}>{s.value}</p>
                   </div>
                 ))}
                 {deepDive.what_to_watch && (
                   <div>
-                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Watch for</p>
+                    <p style={{ fontWeight: 600, fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Watch for</p>
                     <ul style={{ listStyle: 'disc', paddingLeft: 20 }}>
                       {deepDive.what_to_watch.map((w: string, i: number) => (
                         <li key={i} style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 2 }}>{w}</li>
