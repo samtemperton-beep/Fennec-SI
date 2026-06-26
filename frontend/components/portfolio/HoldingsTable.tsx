@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { SignalBadge } from '@/components/shared/SignalBadge'
 import { fmtCurrency, fmtPct, fmt } from '@/lib/utils'
-import { IconChevronUp, IconChevronDown, IconTrash, IconLoader, IconExternalLink } from '@tabler/icons-react'
+import { IconChevronUp, IconChevronDown, IconLoader, IconExternalLink } from '@tabler/icons-react'
 
 const BUBBLE_COLORS = ['#5B7CF0','#14B8A6','#22C55E','#F59E0B','#EF4444','#A855F7','#F97316','#0EA5E9','#EC4899','#6366F1']
 function tickerColor(t: string) {
@@ -87,7 +87,6 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
             {th('pl', 'Your gain')}
             {th('plpct', 'Return')}
             <th style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 12px', textAlign: 'center' }}>Signal</th>
-            <th style={{ padding: '10px 12px' }} />
           </tr>
         </thead>
         <tbody>
@@ -158,15 +157,6 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
                       Analyze
                     </button>
                   )}
-                </td>
-                <td style={{ padding: '12px' }}>
-                  <button
-                    onClick={() => onDelete(h.id)}
-                    className="p-1 rounded hover:bg-surface2 transition-colors"
-                    style={{ color: 'var(--text2)' }}
-                  >
-                    <IconTrash size={15} />
-                  </button>
                 </td>
               </tr>
             )

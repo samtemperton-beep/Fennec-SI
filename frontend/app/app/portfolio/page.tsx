@@ -289,7 +289,7 @@ export default function PortfolioPage() {
       {/* Summary card with ring chart */}
       {!loading && totalValue > 0 && (
         <div className="card" style={{ marginBottom: 20, padding: 28 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 32, alignItems: 'center' }} className="grid-cols-1 md:grid-cols-[auto_1fr]">
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 32, alignItems: 'flex-start' }} className="grid-cols-1 md:grid-cols-[auto_1fr]">
             {/* Ring chart */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
               <div style={{ position: 'relative', width: 170, height: 170 }}>
@@ -327,17 +327,17 @@ export default function PortfolioPage() {
             {/* Metrics + goal */}
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
-                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16 }}>
+                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, border: '1px solid var(--border)' }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Total gain</p>
                   <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 500, color: totalPL >= 0 ? 'var(--green)' : 'var(--red)' }}>{totalPL >= 0 ? '+' : ''}{fmtCurrency(totalPL)}</p>
                   <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>since you started</p>
                 </div>
-                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16 }}>
+                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, border: '1px solid var(--border)' }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Holdings</p>
                   <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 500 }}>{holdings.length}</p>
                   <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>{signals} with AI signals</p>
                 </div>
-                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16 }}>
+                <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, border: '1px solid var(--border)' }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>AI usage</p>
                   {aiUsage?.unlimited ? (
                     <>
@@ -356,7 +356,7 @@ export default function PortfolioPage() {
               </div>
 
               {/* Risk bar */}
-              <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
+              <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, marginBottom: 12, border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <IconShield size={14} style={{ color: RISK_COLOR(riskLevel) }} />
