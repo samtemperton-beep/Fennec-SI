@@ -51,19 +51,17 @@ export default function IPOPage() {
   })
 
   return (
-    <div style={{ padding: 24 }}>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>
-          <IconCalendar size={22} style={{ display: 'inline', color: 'var(--accent)', marginRight: 8 }} />
-          IPO Calendar
-        </h1>
-        <div className="flex gap-2">
-          {['All', 'Strong Buy', 'Watch', 'Skip'].map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: filter === f ? 'var(--accent)' : 'var(--surface)', color: filter === f ? 'white' : 'var(--text2)', border: filter === f ? 'none' : '1px solid var(--border)' }}>
-              {f}
-            </button>
-          ))}
-        </div>
+    <div style={{ padding: 28 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontWeight: 800, fontSize: 24, marginBottom: 4 }}>IPO Calendar</h1>
+        <p style={{ color: 'var(--text2)', fontSize: 13 }}>Upcoming listings with AI analysis across NZX, ASX &amp; US markets</p>
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+        {['All', 'Strong Buy', 'Watch', 'Skip'].map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={{ padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: filter === f ? 'var(--primary)' : 'var(--surface2)', color: filter === f ? 'white' : 'var(--text2)', border: filter === f ? 'none' : '1px solid var(--border)', transition: 'all 0.15s' }}>
+            {f}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -83,14 +81,14 @@ export default function IPOPage() {
                   <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 16 }}>{ipo.symbol || ipo.name}</span>
                   {ipo.symbol && <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{ipo.name}</p>}
                 </div>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{countdown(ipo.date)}</span>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>{countdown(ipo.date)}</span>
               </div>
               <div className="flex items-center gap-4">
                 {ipo.date && <div><p style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 2 }}>DATE</p><p style={{ fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{ipo.date}</p></div>}
                 {ipo.price && <div><p style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 2 }}>PRICE</p><p style={{ fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{ipo.price}</p></div>}
                 {ipo.exchange && <div><p style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 2 }}>EXCHANGE</p><p style={{ fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{ipo.exchange}</p></div>}
               </div>
-              <p style={{ fontSize: 12, color: 'var(--accent)', marginTop: 12, fontFamily: 'Syne, sans-serif' }}>Click for AI analysis →</p>
+              <p style={{ fontSize: 12, color: 'var(--primary)', marginTop: 12, fontFamily: 'Syne, sans-serif' }}>Click for AI analysis →</p>
             </div>
           ))}
         </div>

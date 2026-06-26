@@ -21,7 +21,7 @@ const SECTORS = ['All', 'Technology', 'Healthcare', 'Energy', 'Financials', 'Con
 const MARKETS = ['US', 'ASX', 'NZX', 'Global']
 const RISK_COLOR = (r: number) => r <= 3 ? 'var(--green)' : r <= 6 ? 'var(--amber)' : 'var(--red)'
 const RISK_LABEL = (r: number) => r <= 3 ? 'Low' : r <= 6 ? 'Med' : 'High'
-const CAP_COLOR = (c: string) => c === 'Small' ? 'var(--accent2)' : c === 'Mid' ? 'var(--amber)' : 'var(--text2)'
+const CAP_COLOR = (c: string) => c === 'Small' ? 'var(--primary)' : c === 'Mid' ? 'var(--amber)' : 'var(--text2)'
 const HORIZON_ICON = (h: string) => h === 'Short' ? '⚡' : h === 'Medium' ? '📈' : '🔭'
 
 const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
@@ -95,8 +95,7 @@ export default function OpportunitiesPage() {
           <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>Under-the-radar opportunities with specific catalysts — not your typical top-10 stocks</p>
         </div>
         <button onClick={generate} disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg"
-          style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, background: 'var(--primary)', color: 'white', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}
         >
           {loading ? <LoadingSpinner size={16} /> : <IconSearch size={16} />} Find Hidden Gems
         </button>
@@ -113,7 +112,7 @@ export default function OpportunitiesPage() {
                 <button key={m} onClick={() => setMarket(m)}
                   style={{
                     padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer',
-                    background: market === m ? 'var(--accent)' : 'var(--surface2)',
+                    background: market === m ? 'var(--primary)' : 'var(--surface2)',
                     color: market === m ? 'white' : 'var(--text2)',
                     border: market === m ? 'none' : '1px solid var(--border)',
                   }}
@@ -130,9 +129,9 @@ export default function OpportunitiesPage() {
                 <button key={s} onClick={() => setSector(s)}
                   style={{
                     padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer',
-                    background: sector === s ? 'rgba(91,106,255,0.2)' : 'var(--surface2)',
-                    color: sector === s ? 'var(--accent2)' : 'var(--text2)',
-                    border: sector === s ? '1px solid rgba(91,106,255,0.4)' : '1px solid var(--border)',
+                    background: sector === s ? 'var(--primary-light)' : 'var(--surface2)',
+                    color: sector === s ? 'var(--primary)' : 'var(--text2)',
+                    border: sector === s ? '1px solid var(--primary)' : '1px solid var(--border)',
                   }}
                 >{s}</button>
               ))}
@@ -145,7 +144,7 @@ export default function OpportunitiesPage() {
               Risk Tolerance — <span style={{ color: RISK_COLOR(riskLevel) }}>{RISK_LABEL(riskLevel)} ({riskLevel}/10)</span>
             </p>
             <input type="range" min={1} max={10} value={riskLevel} onChange={e => setRiskLevel(Number(e.target.value))}
-              style={{ width: 140, accentColor: 'var(--accent)' }} />
+              style={{ width: 140, accentColor: 'var(--primary)' }} />
           </div>
         </div>
       </div>
@@ -160,7 +159,7 @@ export default function OpportunitiesPage() {
           <IconBrain size={40} style={{ color: 'var(--text2)', margin: '0 auto 12px' }} />
           <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 18, marginBottom: 8 }}>No gems surfaced yet</p>
           <p style={{ color: 'var(--text2)', marginBottom: 20 }}>Set your filters above and click Find Hidden Gems</p>
-          <button onClick={generate} style={{ background: 'var(--accent)', color: 'white', padding: '10px 24px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+          <button onClick={generate} style={{ background: 'var(--primary)', color: 'white', padding: '10px 24px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
             Find Hidden Gems
           </button>
         </div>
@@ -180,7 +179,7 @@ export default function OpportunitiesPage() {
                   <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{o.name}</p>
                 </div>
                 <button onClick={() => addToWatchlist(o)} title="Add to Watchlist"
-                  style={{ padding: '6px 10px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}
+                  style={{ padding: '6px 10px', borderRadius: 8, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}
                 >
                   <IconPlus size={12} /> Watch
                 </button>
@@ -204,7 +203,7 @@ export default function OpportunitiesPage() {
               </div>
 
               {/* Theme */}
-              <div style={{ fontSize: 11, color: 'var(--accent2)', fontFamily: 'Syne, sans-serif', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              <div style={{ fontSize: 11, color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                 {o.theme}
               </div>
 
@@ -213,8 +212,8 @@ export default function OpportunitiesPage() {
 
               {/* Why under radar */}
               {o.why_under_radar && (
-                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(91,106,255,0.08)', border: '1px solid rgba(91,106,255,0.15)' }}>
-                  <p style={{ fontSize: 11, color: 'var(--accent2)', fontFamily: 'Syne, sans-serif', fontWeight: 700, marginBottom: 3 }}>WHY IT'S OVERLOOKED</p>
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--primary-light)', border: '1px solid rgba(44,110,106,0.25)' }}>
+                  <p style={{ fontSize: 11, color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 700, marginBottom: 3 }}>WHY IT'S OVERLOOKED</p>
                   <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{o.why_under_radar}</p>
                 </div>
               )}

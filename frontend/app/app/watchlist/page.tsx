@@ -275,21 +275,24 @@ export default function WatchlistPage() {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Watchlist</h1>
-        <div className="flex gap-2">
-          <button onClick={refreshPrices} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconRefresh size={14} /> Refresh
+    <div style={{ padding: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Watchlist</h1>
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Track stocks you're watching — get signals before you commit</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={refreshPrices} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--sh)' }}>
+            <IconRefresh size={13} /> Refresh
           </button>
-          <button onClick={() => items.forEach(i => analyzeItem(i))} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'rgba(91,106,255,0.15)', border: '1px solid rgba(91,106,255,0.3)', color: 'var(--accent2)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconBrain size={14} /> Analyze All
+          <button onClick={() => items.forEach(i => analyzeItem(i))} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <IconBrain size={13} /> Analyze All
           </button>
-          <button onClick={() => setScreenshotOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconCamera size={14} /> Import Screenshot
+          <button onClick={() => setScreenshotOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--sh)' }}>
+            <IconCamera size={13} /> Import
           </button>
-          <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconPlus size={14} /> Add
+          <button onClick={() => setAddOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+            <IconPlus size={13} /> Add Stock
           </button>
         </div>
       </div>
@@ -299,7 +302,7 @@ export default function WatchlistPage() {
         <div className="flex flex-wrap gap-2 mb-4 items-center">
           {/* Sector */}
           <select value={filterSector} onChange={e => setFilterSector(e.target.value)}
-            style={{ padding: '6px 10px', background: filterSector !== 'All' ? 'rgba(91,106,255,0.15)' : 'var(--surface)', border: `1px solid ${filterSector !== 'All' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: filterSector !== 'All' ? 'var(--accent)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
+            style={{ padding: '6px 10px', background: filterSector !== 'All' ? 'var(--primary-light)' : 'var(--surface2)', border: `1px solid ${filterSector !== 'All' ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 8, color: filterSector !== 'All' ? 'var(--primary)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
           >
             {sectors.map(s => <option key={s} value={s}>{s === 'All' ? 'All Sectors' : s}</option>)}
           </select>
@@ -307,7 +310,7 @@ export default function WatchlistPage() {
           {/* Market */}
           {markets.length > 2 && (
             <select value={filterMarket} onChange={e => setFilterMarket(e.target.value)}
-              style={{ padding: '6px 10px', background: filterMarket !== 'All' ? 'rgba(91,106,255,0.15)' : 'var(--surface)', border: `1px solid ${filterMarket !== 'All' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: filterMarket !== 'All' ? 'var(--accent)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
+              style={{ padding: '6px 10px', background: filterMarket !== 'All' ? 'var(--primary-light)' : 'var(--surface2)', border: `1px solid ${filterMarket !== 'All' ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 8, color: filterMarket !== 'All' ? 'var(--primary)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
             >
               {markets.map(m => <option key={m} value={m}>{m === 'All' ? 'All Markets' : m}</option>)}
             </select>
@@ -315,7 +318,7 @@ export default function WatchlistPage() {
 
           {/* Market cap */}
           <select value={filterMktCap} onChange={e => setFilterMktCap(e.target.value)}
-            style={{ padding: '6px 10px', background: filterMktCap !== 'All' ? 'rgba(91,106,255,0.15)' : 'var(--surface)', border: `1px solid ${filterMktCap !== 'All' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: filterMktCap !== 'All' ? 'var(--accent)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
+            style={{ padding: '6px 10px', background: filterMktCap !== 'All' ? 'var(--primary-light)' : 'var(--surface2)', border: `1px solid ${filterMktCap !== 'All' ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 8, color: filterMktCap !== 'All' ? 'var(--primary)' : 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, outline: 'none' }}
           >
             {['All', 'Small', 'Mid', 'Large'].map(c => <option key={c} value={c}>{c === 'All' ? 'All Cap Sizes' : `${c}-cap`}</option>)}
           </select>
@@ -323,11 +326,11 @@ export default function WatchlistPage() {
           {/* Price range */}
           <div className="flex items-center gap-1">
             <input type="number" placeholder="Min $" value={filterMinPrice} onChange={e => setFilterMinPrice(e.target.value)}
-              style={{ width: 72, padding: '6px 8px', background: 'var(--surface)', border: `1px solid ${filterMinPrice ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 12, outline: 'none' }}
+              style={{ width: 72, padding: '6px 8px', background: 'var(--surface)', border: `1px solid ${filterMinPrice ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 12, outline: 'none' }}
             />
             <span style={{ color: 'var(--text2)', fontSize: 12 }}>–</span>
             <input type="number" placeholder="Max $" value={filterMaxPrice} onChange={e => setFilterMaxPrice(e.target.value)}
-              style={{ width: 72, padding: '6px 8px', background: 'var(--surface)', border: `1px solid ${filterMaxPrice ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 12, outline: 'none' }}
+              style={{ width: 72, padding: '6px 8px', background: 'var(--surface)', border: `1px solid ${filterMaxPrice ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 12, outline: 'none' }}
             />
           </div>
 
@@ -351,7 +354,7 @@ export default function WatchlistPage() {
       ) : items.length === 0 ? (
         <div className="card text-center py-16">
           <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 18, marginBottom: 8 }}>Watchlist is empty</p>
-          <button onClick={() => setAddOpen(true)} style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Add Stock</button>
+          <button onClick={() => setAddOpen(true)} style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Add Stock</button>
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
@@ -365,7 +368,7 @@ export default function WatchlistPage() {
                     <th key={h}
                       onClick={sortable ? () => toggleSort(h) : undefined}
                       style={{
-                        padding: '10px 12px', color: active ? 'var(--accent)' : 'var(--text2)',
+                        padding: '10px 12px', color: active ? 'var(--primary)' : 'var(--text2)',
                         fontFamily: 'Syne, sans-serif', fontSize: 11, fontWeight: 600,
                         textTransform: 'uppercase', letterSpacing: '0.05em',
                         textAlign: h === 'Ticker' ? 'left' : 'center', whiteSpace: 'nowrap',
@@ -414,12 +417,12 @@ export default function WatchlistPage() {
                     ) : item.signal ? (
                       <SignalBadge signal={item.signal} />
                     ) : (
-                      <button onClick={() => analyzeItem(item)} style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'Syne, sans-serif', cursor: 'pointer' }}>Analyze</button>
+                      <button onClick={() => analyzeItem(item)} style={{ fontSize: 11, color: 'var(--primary)', fontFamily: 'Syne, sans-serif', cursor: 'pointer' }}>Analyze</button>
                     )}
                   </td>
                   <td style={{ padding: '12px' }}>
                     <div className="flex gap-1">
-                      <button onClick={() => addToPortfolio(item)} title="Add to Portfolio" style={{ color: 'var(--accent)', padding: 4 }}><IconArrowRight size={14} /></button>
+                      <button onClick={() => addToPortfolio(item)} title="Add to Portfolio" style={{ color: 'var(--primary)', padding: 4 }}><IconArrowRight size={14} /></button>
                       <button onClick={() => remove(item.id)} style={{ color: 'var(--text2)', padding: 4 }}><IconTrash size={14} /></button>
                     </div>
                   </td>
@@ -433,7 +436,7 @@ export default function WatchlistPage() {
       <Modal open={screenshotOpen} onClose={() => setScreenshotOpen(false)} title="Import from Screenshot">
         <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>Upload a screenshot of any watchlist or stock list — AI will extract the tickers.</p>
         <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '32px 16px', borderRadius: 8, cursor: importing ? 'not-allowed' : 'pointer', border: '2px dashed var(--border)', background: 'var(--surface2)', color: 'var(--text2)', fontSize: 13 }}>
-          <IconCamera size={24} style={{ color: 'var(--accent)' }} />
+          <IconCamera size={24} style={{ color: 'var(--primary)' }} />
           {importing ? <span>Analysing image...</span> : <span>Click to choose a screenshot (PNG, JPG)</span>}
           <input type="file" accept="image/*" style={{ display: 'none' }} disabled={importing}
             onChange={e => { const f = e.target.files?.[0]; if (f) importScreenshot(f) }}
@@ -493,7 +496,7 @@ export default function WatchlistPage() {
           {selectedResult && (
             <div style={{ background: 'rgba(91,106,255,0.1)', border: '1px solid rgba(91,106,255,0.3)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'var(--accent2)' }}>{selectedResult.ticker}</span>
+                <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'var(--primary)' }}>{selectedResult.ticker}</span>
                 <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 8 }}>{selectedResult.name}</span>
               </div>
               <button type="button" onClick={resetAddModal} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: 11 }}>Change</button>
@@ -525,7 +528,7 @@ export default function WatchlistPage() {
           <button
             type="submit"
             disabled={!ticker}
-            style={{ width: '100%', background: 'var(--accent)', color: 'white', padding: '10px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: ticker ? 1 : 0.5, cursor: ticker ? 'pointer' : 'default' }}
+            style={{ width: '100%', background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: ticker ? 1 : 0.5, cursor: ticker ? 'pointer' : 'default' }}
           >
             Add to Watchlist
           </button>

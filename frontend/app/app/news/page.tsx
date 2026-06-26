@@ -190,7 +190,7 @@ export default function NewsPage() {
           {/* Sentiment */}
           {['All', 'Positive', 'Negative'].map(f => (
             <button key={f} onClick={() => setSentFilter(f)}
-              style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: sentFilter === f ? 'var(--accent)' : 'var(--surface)', color: sentFilter === f ? 'white' : 'var(--text2)', border: sentFilter === f ? 'none' : '1px solid var(--border)' }}
+              style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: sentFilter === f ? 'var(--primary)' : 'var(--surface2)', color: sentFilter === f ? 'white' : 'var(--text2)', border: sentFilter === f ? 'none' : '1px solid var(--border)' }}
             >{f}</button>
           ))}
           <div style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
@@ -199,8 +199,8 @@ export default function NewsPage() {
             <button key={f} onClick={() => { setListFilter(f); setShowSaved(false) }}
               style={{
                 padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer',
-                background: !showSaved && listFilter === f ? (f === 'Portfolio' ? 'rgba(16,185,129,0.2)' : f === 'Watchlist' ? 'rgba(91,106,255,0.2)' : 'var(--accent)') : 'var(--surface)',
-                color: !showSaved && listFilter === f ? (f === 'Portfolio' ? 'var(--green)' : f === 'Watchlist' ? 'var(--accent2)' : 'white') : 'var(--text2)',
+                background: !showSaved && listFilter === f ? 'var(--primary)' : 'var(--surface2)',
+                color: !showSaved && listFilter === f ? 'white' : 'var(--text2)',
                 border: !showSaved && listFilter === f ? 'none' : '1px solid var(--border)',
               }}
             >{f === 'All' ? 'All News' : `My ${f}`}</button>

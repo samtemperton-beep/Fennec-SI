@@ -111,7 +111,10 @@ export default function CommunityPage() {
   return (
     <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1fr 260px', gap: 20 }} className="grid-cols-1 xl:grid-cols-[1fr_260px]">
       <div>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24, marginBottom: 20 }}>Community</h1>
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Community</h1>
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Share picks, milestones and market takes with other investors</p>
+        </div>
 
         {profile && <PostComposer username={profile.username} avatarColor={profile.avatar_color} avatarEmoji={profile.avatar_emoji} avatarUrl={profile.avatar_url} onPost={onPost} />}
 
@@ -122,7 +125,7 @@ export default function CommunityPage() {
               style={{
                 padding: '6px 14px', borderRadius: 20, fontSize: 13,
                 fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer',
-                background: filter === f ? 'var(--accent)' : 'var(--surface)',
+                background: filter === f ? 'var(--primary)' : 'var(--surface2)',
                 color: filter === f ? 'white' : 'var(--text2)',
                 border: filter === f ? 'none' : '1px solid var(--border)',
               }}
@@ -154,7 +157,7 @@ export default function CommunityPage() {
           {leaderboard.map((u, i) => (
             <div key={i} className="flex items-center gap-3 mb-3">
               <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: 'var(--text2)', width: 18, textAlign: 'right' }}>#{i + 1}</span>
-              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'white', fontWeight: 700 }}>
+              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'white', fontWeight: 700 }}>
                 {(u.username || 'U')[0].toUpperCase()}
               </div>
               <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, flex: 1 }}>{u.username}</span>
@@ -174,7 +177,7 @@ export default function CommunityPage() {
               <div key={t.ticker} className="flex items-center gap-2 mb-2">
                 <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 12, width: 50 }}>{t.ticker}</span>
                 <div style={{ flex: 1, height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 3, width: `${(t.count / trending[0].count) * 100}%` }} />
+                  <div style={{ height: '100%', background: 'var(--primary)', borderRadius: 3, width: `${(t.count / trending[0].count) * 100}%` }} />
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--text2)', width: 20, textAlign: 'right' }}>{t.count}</span>
               </div>

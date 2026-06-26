@@ -68,18 +68,18 @@ export default function AlertsPage() {
   const triggered = alerts.filter(a => a.triggered)
 
   return (
-    <div style={{ padding: 24 }}>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>
-          <IconBell size={22} style={{ display: 'inline', color: 'var(--amber)', marginRight: 8 }} />
-          Alerts
-        </h1>
-        <div className="flex gap-2">
-          <button onClick={checkNow} disabled={checking} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            {checking ? <LoadingSpinner size={14} /> : <IconCheck size={14} />} Check Now
+    <div style={{ padding: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Price Alerts</h1>
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Get notified when stocks hit your target prices</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={checkNow} disabled={checking} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--sh)' }}>
+            {checking ? <LoadingSpinner size={13} /> : <IconCheck size={13} />} Check Now
           </button>
-          <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            <IconPlus size={14} /> New Alert
+          <button onClick={() => setAddOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+            <IconPlus size={13} /> New Alert
           </button>
         </div>
       </div>
@@ -162,7 +162,7 @@ export default function AlertsPage() {
               />
             </div>
           )}
-          <button type="submit" style={{ width: '100%', background: 'var(--accent)', color: 'white', padding: '10px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+          <button type="submit" style={{ width: '100%', background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
             Create Alert
           </button>
         </form>

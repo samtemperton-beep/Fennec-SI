@@ -28,6 +28,7 @@ const SOURCES = [
   { id: 'nzx',         name: 'NZX Market Update',     color: '#004B87' },
   { id: 'commsec',     name: 'CommSec Daily',         color: '#FFCC00' },
   { id: 'moby',        name: 'Moby',                  color: '#6366f1' },
+  { id: 'asr',         name: 'Australian Stock Report', color: '#003366' },
 ]
 
 const CATEGORIES = ['All', 'Picks', 'Macro', 'Earnings']
@@ -75,14 +76,14 @@ export default function NewslettersPage() {
       {/* Main content */}
       <div>
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-          <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>
-            <IconMail size={22} style={{ display: 'inline', color: 'var(--accent)', marginRight: 8 }} />
-            Newsletters
-          </h1>
-          <div className="flex gap-2">
+          <div style={{ marginBottom: 4 }}>
+            <h1 style={{ fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Newsletters</h1>
+            <p style={{ color: 'var(--text2)', fontSize: 13 }}>AI-summarised digests from 20+ finance newsletters</p>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {CATEGORIES.map(c => (
               <button key={c} onClick={() => setCategory(c)}
-                style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: category === c ? 'var(--accent)' : 'var(--surface)', color: category === c ? 'white' : 'var(--text2)', border: category === c ? 'none' : '1px solid var(--border)' }}
+                style={{ padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: category === c ? 'var(--primary)' : 'var(--surface2)', color: category === c ? 'white' : 'var(--text2)', border: category === c ? 'none' : '1px solid var(--border)', transition: 'all 0.15s' }}
               >{c}</button>
             ))}
           </div>
@@ -152,7 +153,7 @@ export default function NewslettersPage() {
 
                     {/* Actionable tip — full width below everything */}
                     {d.actionable && (
-                      <div style={{ marginTop: 10, padding: '7px 12px', background: 'rgba(91,106,255,0.08)', border: '1px solid rgba(91,106,255,0.2)', borderRadius: 6, fontSize: 12 }}>
+                      <div style={{ marginTop: 10, padding: '7px 12px', background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 6, fontSize: 12, color: 'var(--primary)', opacity: 0.9 }}>
                         💡 {d.actionable}
                       </div>
                     )}
@@ -174,7 +175,7 @@ export default function NewslettersPage() {
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
                 <span style={{ fontSize: 12, fontFamily: 'Syne, sans-serif' }}>{s.name}</span>
               </div>
-              <button onClick={() => toggle(s.id)} style={{ color: enabled.has(s.id) ? 'var(--accent)' : 'var(--text2)', flexShrink: 0 }}>
+              <button onClick={() => toggle(s.id)} style={{ color: enabled.has(s.id) ? 'var(--primary)' : 'var(--text2)', flexShrink: 0 }}>
                 {enabled.has(s.id) ? <IconToggleRight size={20} /> : <IconToggleLeft size={20} />}
               </button>
             </div>
