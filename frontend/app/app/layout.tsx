@@ -7,7 +7,7 @@ import {
   IconChartBar, IconBrain, IconTrendingUp, IconStar, IconEye,
   IconNewSection, IconMail, IconCalendar, IconUsers, IconBell,
   IconSettings, IconMenu2, IconX, IconLogout, IconTrophy,
-  IconSun, IconMoon,
+  IconSun, IconMoon, IconShield,
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
 import { Avatar } from '@/components/shared/Avatar'
@@ -28,7 +28,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/app/news', label: 'News', icon: IconNewSection },
       { href: '/app/newsletters', label: 'Newsletters', icon: IconMail },
-      { href: '/app/ipo', label: 'IPO Calendar', icon: IconCalendar },
+      { href: '/app/ipo', label: 'Events', icon: IconCalendar },
     ],
   },
   {
@@ -48,6 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [isPremium, setIsPremium] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const supabase = createClient()
 
@@ -68,9 +69,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user)
       if (data.user) {
-        const { data: p } = await supabase.from('profiles').select('username, avatar_color, avatar_emoji, avatar_url, location, profession, is_premium').eq('id', data.user.id).single()
+        const { data: p } = await supabase.from('profiles').select('username, avatar_color, avatar_emoji, avatar_url, location, profession, is_premium, is_admin').eq('id', data.user.id).single()
         setProfile(p)
         if (p?.is_premium) setIsPremium(true)
+        if (p?.is_admin) setIsAdmin(true)
       }
     })
   }, [])
@@ -131,6 +133,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <IconSettings size={15} />
           Settings
         </Link>
+        {isAdmin && (
+          <Link href="/app/admin" className={`nav-link mb-1 ${pathname === '/app/admin' ? 'active' : ''}`} style={{ marginBottom: 2 }}>
+            <IconShield size={15} />
+            Admin
+          </Link>
+        )}
         <button onClick={toggleTheme} className="nav-link w-full mb-1" style={{ marginBottom: 2 }}>
           {theme === 'dark' ? <IconSun size={15} /> : <IconMoon size={15} />}
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}

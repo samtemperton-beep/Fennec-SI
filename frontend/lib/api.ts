@@ -52,6 +52,9 @@ export const api = {
   getAnalystRecommendations: (tickers: string[]) =>
     apiFetch(`/api/news/analyst?tickers=${tickers.join(',')}`),
 
+  getASXAnnouncements: (tickers: string[]) =>
+    apiFetch(`/api/news/asx-announcements?tickers=${tickers.join(',')}`),
+
   analyzeStock: (ticker: string, data: any, riskLevel?: number) =>
     apiFetch('/api/ai/analyze', { method: 'POST', body: JSON.stringify({ ticker, data, riskLevel }) }),
 

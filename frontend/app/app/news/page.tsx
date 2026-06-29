@@ -7,7 +7,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
 import { WatchlistButton } from '@/components/shared/WatchlistButton'
 import { timeAgo } from '@/lib/utils'
-import { IconExternalLink, IconBookmark, IconBookmarkFilled, IconShare, IconSend, IconBrain, IconCalendar, IconFileText, IconTrendingUp } from '@tabler/icons-react'
+import { IconExternalLink, IconBookmark, IconBookmarkFilled, IconShare, IconSend, IconBrain, IconFileText } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { loadPrefs, recordInteraction, personalBoost } from '@/lib/newsPrefs'
 
@@ -47,9 +47,7 @@ export default function NewsPage() {
   const [shareBody, setShareBody] = useState('')
   const [sharing, setSharing] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
-  const [earnings, setEarnings] = useState<any[]>([])
   const [filings, setFilings] = useState<any[]>([])
-  const [analyst, setAnalyst] = useState<any[]>([])
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -73,17 +71,13 @@ export default function NewsPage() {
     setLoading(true)
     try {
       const allTickers = [...new Set([...portfolioTickers, ...watchlistTickers])].slice(0, 12)
-      const [data, earningsData, filingsData, analystData] = await Promise.allSettled([
+      const [data, filingsData] = await Promise.allSettled([
         api.getNews(allTickers),
-        allTickers.length ? api.getEarningsCalendar(allTickers) : Promise.resolve([]),
         allTickers.length ? api.getRecentFilings(allTickers) : Promise.resolve([]),
-        allTickers.length ? api.getAnalystRecommendations(allTickers) : Promise.resolve([]),
       ])
       const newsItems = data.status === 'fulfilled' ? data.value : []
       setNews(newsItems)
-      if (earningsData.status === 'fulfilled') setEarnings(earningsData.value || [])
       if (filingsData.status === 'fulfilled') setFilings(filingsData.value || [])
-      if (analystData.status === 'fulfilled') setAnalyst(analystData.value || [])
       if (newsItems.length > 0) {
         const headlines = newsItems.map((n: NewsItem) => n.headline)
         const d = await api.getNewsDigest(headlines, portfolioTickers)
@@ -96,6 +90,11 @@ export default function NewsPage() {
   }
 
   async function openDeepDive(item: NewsItem) {
+    // SEC filings have no article body — just open the SEC page directly
+    if (item.source === 'SEC Filing') {
+      window.open(item.url, '_blank', 'noopener,noreferrer')
+      return
+    }
     setSelected(item)
     setDeepDive(null)
     setDiving(true)
@@ -314,84 +313,7 @@ export default function NewsPage() {
             </div>
           )}
 
-            {/* Earnings calendar */}
-          {earnings.length > 0 && (
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                <IconCalendar size={14} style={{ color: 'var(--accent)' }} />
-                <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Upcoming Earnings</p>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {earnings.slice(0, 6).map((e, i) => {
-                  const daysUntil = Math.ceil((new Date(e.date).getTime() - Date.now()) / 86400000)
-                  const urgency = daysUntil <= 3 ? 'var(--red)' : daysUntil <= 7 ? 'var(--amber)' : 'var(--text2)'
-                  const timeLabel = e.hour === 'bmo' ? 'Before open' : e.hour === 'amc' ? 'After close' : 'During hours'
-                  return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>{e.symbol}</span>
-                          <span style={{ fontSize: 10, color: 'var(--text2)' }}>Q{e.quarter} {e.year}</span>
-                        </div>
-                        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{timeLabel}</p>
-                        {e.epsEstimate != null && (
-                          <p style={{ fontSize: 10, color: 'var(--text2)' }}>EPS est. ${e.epsEstimate.toFixed(2)}</p>
-                        )}
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: urgency }}>{daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil}d`}</p>
-                        <p style={{ fontSize: 10, color: 'var(--text2)' }}>{new Date(e.date).toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' })}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Analyst consensus */}
-          {analyst.length > 0 && (
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                <IconTrendingUp size={14} style={{ color: 'var(--accent)' }} />
-                <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Analyst Consensus</p>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {analyst.slice(0, 5).map((a, i) => (
-                  <div key={i}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>{a.symbol}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {a.targetMean && (
-                          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text2)' }}>
-                            PT ${a.targetMean.toFixed(0)}
-                          </span>
-                        )}
-                        {a.consensus && (
-                          <span style={{
-                            fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif',
-                            padding: '2px 7px', borderRadius: 6,
-                            background: a.consensus === 'BUY' ? 'rgba(16,185,129,.12)' : a.consensus === 'SELL' ? 'rgba(239,68,68,.12)' : 'rgba(245,158,11,.12)',
-                            color: a.consensus === 'BUY' ? 'var(--green)' : a.consensus === 'SELL' ? 'var(--red)' : 'var(--amber)',
-                          }}>{a.consensus}</span>
-                        )}
-                      </div>
-                    </div>
-                    {a.total > 0 && (
-                      <div style={{ display: 'flex', gap: 2, height: 5, borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ flex: (a.strongBuy || 0) + (a.buy || 0), background: 'var(--green)', minWidth: 2 }} title={`Buy: ${(a.strongBuy || 0) + (a.buy || 0)}`} />
-                        <div style={{ flex: a.hold || 0, background: 'var(--amber)', minWidth: 2 }} title={`Hold: ${a.hold || 0}`} />
-                        <div style={{ flex: (a.sell || 0) + (a.strongSell || 0), background: 'var(--red)', minWidth: 2 }} title={`Sell: ${(a.sell || 0) + (a.strongSell || 0)}`} />
-                      </div>
-                    )}
-                    <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 3 }}>{a.total} analysts · {a.bullPct}% bullish</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Sentiment summary */}
+            {/* Sentiment summary */}
           {news.length > 0 && (() => {
             const pos = news.filter(n => n.sentiment === 'positive').length
             const neg = news.filter(n => n.sentiment === 'negative').length

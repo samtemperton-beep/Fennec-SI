@@ -137,6 +137,34 @@ export async function fetchAnalystRecommendations(tickers: string[]) {
   return results;
 }
 
+/** ASX company announcements for a list of tickers. */
+export async function fetchASXAnnouncements(tickers: string[]) {
+  const results: any[] = [];
+  for (const raw of tickers.slice(0, 15)) {
+    const symbol = raw.replace(/\.(AX|ASX)$/i, '').toUpperCase();
+    try {
+      const { data } = await axios.get(
+        `https://www.asx.com.au/asx/1/company/${symbol}/announcements?count=20`,
+        { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } }
+      );
+      const items = ((data?.data || data) as any[])
+        .slice(0, 8)
+        .map((a: any) => ({
+          symbol: raw,
+          title: a.header || a.title || a.headline,
+          date: a.document_date || a.date_posted || a.released_at,
+          category: a.document_type || a.type,
+          url: a.url
+            || (a.id ? `https://www.asx.com.au/asxpdf/${String(a.document_date||'').replace(/-/g,'').slice(0,8)}/${a.id}.pdf` : null)
+            || `https://www.asx.com.au/asx/1/company/${symbol}/announcements`,
+          sensitive: a.sensitive_announcement || false,
+        }));
+      results.push(...items.filter(i => i.title));
+    } catch {}
+  }
+  return results.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+}
+
 function normalizeNews(n: any) {
   return {
     id: n.id,
