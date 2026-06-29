@@ -7,7 +7,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
 import { WatchlistButton } from '@/components/shared/WatchlistButton'
 import { timeAgo } from '@/lib/utils'
-import { IconExternalLink, IconBookmark, IconBookmarkFilled, IconShare, IconSend, IconBrain } from '@tabler/icons-react'
+import { IconExternalLink, IconBookmark, IconBookmarkFilled, IconShare, IconSend, IconBrain, IconCalendar, IconFileText, IconTrendingUp } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { loadPrefs, recordInteraction, personalBoost } from '@/lib/newsPrefs'
 
@@ -28,7 +28,7 @@ function tickerColor(t: string) {
 }
 
 type SentFilter = 'All' | 'Positive' | 'Negative'
-type ListFilter = 'All' | 'Portfolio' | 'Watchlist'
+type ListFilter = 'All' | 'Portfolio' | 'Watchlist' | 'Filings'
 
 export default function NewsPage() {
   const [news, setNews] = useState<NewsItem[]>([])
@@ -47,6 +47,9 @@ export default function NewsPage() {
   const [shareBody, setShareBody] = useState('')
   const [sharing, setSharing] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
+  const [earnings, setEarnings] = useState<any[]>([])
+  const [filings, setFilings] = useState<any[]>([])
+  const [analyst, setAnalyst] = useState<any[]>([])
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -70,10 +73,19 @@ export default function NewsPage() {
     setLoading(true)
     try {
       const allTickers = [...new Set([...portfolioTickers, ...watchlistTickers])].slice(0, 12)
-      const data = await api.getNews(allTickers)
-      setNews(data)
-      if (data.length > 0) {
-        const headlines = data.map((n: NewsItem) => n.headline)
+      const [data, earningsData, filingsData, analystData] = await Promise.allSettled([
+        api.getNews(allTickers),
+        allTickers.length ? api.getEarningsCalendar(allTickers) : Promise.resolve([]),
+        allTickers.length ? api.getRecentFilings(allTickers) : Promise.resolve([]),
+        allTickers.length ? api.getAnalystRecommendations(allTickers) : Promise.resolve([]),
+      ])
+      const newsItems = data.status === 'fulfilled' ? data.value : []
+      setNews(newsItems)
+      if (earningsData.status === 'fulfilled') setEarnings(earningsData.value || [])
+      if (filingsData.status === 'fulfilled') setFilings(filingsData.value || [])
+      if (analystData.status === 'fulfilled') setAnalyst(analystData.value || [])
+      if (newsItems.length > 0) {
+        const headlines = newsItems.map((n: NewsItem) => n.headline)
         const d = await api.getNewsDigest(headlines, portfolioTickers)
         setDigest(d)
       }
@@ -132,12 +144,28 @@ export default function NewsPage() {
   const watchlistSet = new Set(watchlist)
   const prefs = userId ? loadPrefs(userId) : { tickers: {}, sectors: {}, sources: {} }
 
-  const filtered = news
+  // Inject SEC filings as synthetic news items
+  const filingNewsItems: NewsItem[] = filings.map((f, i) => ({
+    id: -1000 - i,
+    headline: `${f.symbol} filed ${f.form} — ${f.description}`,
+    summary: `Filed ${f.filedDate}. Click to view on SEC EDGAR.`,
+    source: 'SEC Filing',
+    url: f.url,
+    datetime: new Date(f.filedDate).getTime(),
+    sentiment: 'neutral' as const,
+    ticker: f.symbol,
+    relevance: 90,
+  }))
+
+  const allItems = [...news, ...filingNewsItems]
+
+  const filtered = allItems
     .filter(n => {
       if (showSaved) return savedIds.has(n.id)
       if (sentFilter !== 'All' && n.sentiment !== sentFilter.toLowerCase()) return false
       if (listFilter === 'Portfolio') return n.ticker && portfolioSet.has(n.ticker)
       if (listFilter === 'Watchlist') return n.ticker && watchlistSet.has(n.ticker)
+      if (listFilter === 'Filings') return n.source === 'SEC Filing'
       return true
     })
     .map(n => ({ ...n, _score: (n.relevance || 50) + personalBoost(prefs, n) }))
@@ -165,10 +193,17 @@ export default function NewsPage() {
         ))}
         <div style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
         {(['Portfolio', 'Watchlist'] as ListFilter[]).map(f => (
-          <button key={f} onClick={() => { setListFilter(f); setSentFilter('All'); setShowSaved(false) }}
-            style={{ padding: '7px 16px', borderRadius: 20, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: !showSaved && listFilter === f ? 'var(--primary)' : 'var(--surface)', color: !showSaved && listFilter === f ? 'white' : 'var(--text2)', border: !showSaved && listFilter === f ? 'none' : '1px solid var(--border)' }}
+          <button key={f} onClick={() => { setListFilter(f === listFilter ? 'All' : f); setSentFilter('All'); setShowSaved(false) }}
+            style={{ padding: '7px 16px', borderRadius: 20, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: !showSaved && listFilter === f ? 'var(--accent)' : 'var(--surface)', color: !showSaved && listFilter === f ? 'white' : 'var(--text2)', border: !showSaved && listFilter === f ? 'none' : '1px solid var(--border)' }}
           >My {f}</button>
         ))}
+        {filings.length > 0 && (
+          <button onClick={() => { setListFilter(listFilter === 'Filings' ? 'All' : 'Filings'); setSentFilter('All'); setShowSaved(false) }}
+            style={{ padding: '7px 16px', borderRadius: 20, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, background: !showSaved && listFilter === 'Filings' ? 'rgba(91,106,255,0.15)' : 'var(--surface)', color: !showSaved && listFilter === 'Filings' ? 'var(--accent2)' : 'var(--text2)', border: !showSaved && listFilter === 'Filings' ? '1px solid rgba(91,106,255,0.4)' : '1px solid var(--border)' }}
+          >
+            <IconFileText size={12} /> SEC Filings <span style={{ fontSize: 10, background: 'rgba(91,106,255,0.2)', color: 'var(--accent2)', padding: '1px 5px', borderRadius: 8 }}>{filings.length}</span>
+          </button>
+        )}
         <button onClick={() => setShowSaved(s => !s)}
           style={{ padding: '7px 16px', borderRadius: 20, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', background: showSaved ? 'rgba(245,158,11,0.15)' : 'var(--surface)', color: showSaved ? 'var(--amber)' : 'var(--text2)', border: showSaved ? '1px solid rgba(245,158,11,0.4)' : '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 5 }}
         >
@@ -276,6 +311,83 @@ export default function NewsPage() {
                   💡 {digest.action}
                 </div>
               )}
+            </div>
+          )}
+
+            {/* Earnings calendar */}
+          {earnings.length > 0 && (
+            <div className="card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                <IconCalendar size={14} style={{ color: 'var(--accent)' }} />
+                <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Upcoming Earnings</p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {earnings.slice(0, 6).map((e, i) => {
+                  const daysUntil = Math.ceil((new Date(e.date).getTime() - Date.now()) / 86400000)
+                  const urgency = daysUntil <= 3 ? 'var(--red)' : daysUntil <= 7 ? 'var(--amber)' : 'var(--text2)'
+                  const timeLabel = e.hour === 'bmo' ? 'Before open' : e.hour === 'amc' ? 'After close' : 'During hours'
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>{e.symbol}</span>
+                          <span style={{ fontSize: 10, color: 'var(--text2)' }}>Q{e.quarter} {e.year}</span>
+                        </div>
+                        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{timeLabel}</p>
+                        {e.epsEstimate != null && (
+                          <p style={{ fontSize: 10, color: 'var(--text2)' }}>EPS est. ${e.epsEstimate.toFixed(2)}</p>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: urgency }}>{daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil}d`}</p>
+                        <p style={{ fontSize: 10, color: 'var(--text2)' }}>{new Date(e.date).toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' })}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Analyst consensus */}
+          {analyst.length > 0 && (
+            <div className="card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                <IconTrendingUp size={14} style={{ color: 'var(--accent)' }} />
+                <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Analyst Consensus</p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {analyst.slice(0, 5).map((a, i) => (
+                  <div key={i}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>{a.symbol}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {a.targetMean && (
+                          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text2)' }}>
+                            PT ${a.targetMean.toFixed(0)}
+                          </span>
+                        )}
+                        {a.consensus && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif',
+                            padding: '2px 7px', borderRadius: 6,
+                            background: a.consensus === 'BUY' ? 'rgba(16,185,129,.12)' : a.consensus === 'SELL' ? 'rgba(239,68,68,.12)' : 'rgba(245,158,11,.12)',
+                            color: a.consensus === 'BUY' ? 'var(--green)' : a.consensus === 'SELL' ? 'var(--red)' : 'var(--amber)',
+                          }}>{a.consensus}</span>
+                        )}
+                      </div>
+                    </div>
+                    {a.total > 0 && (
+                      <div style={{ display: 'flex', gap: 2, height: 5, borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ flex: (a.strongBuy || 0) + (a.buy || 0), background: 'var(--green)', minWidth: 2 }} title={`Buy: ${(a.strongBuy || 0) + (a.buy || 0)}`} />
+                        <div style={{ flex: a.hold || 0, background: 'var(--amber)', minWidth: 2 }} title={`Hold: ${a.hold || 0}`} />
+                        <div style={{ flex: (a.sell || 0) + (a.strongSell || 0), background: 'var(--red)', minWidth: 2 }} title={`Sell: ${(a.sell || 0) + (a.strongSell || 0)}`} />
+                      </div>
+                    )}
+                    <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 3 }}>{a.total} analysts · {a.bullPct}% bullish</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

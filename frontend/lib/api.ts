@@ -43,6 +43,15 @@ export const api = {
 
   getIPOs: () => apiFetch('/api/news/ipo'),
 
+  getEarningsCalendar: (tickers: string[]) =>
+    apiFetch(`/api/news/earnings?tickers=${tickers.join(',')}`),
+
+  getRecentFilings: (tickers: string[]) =>
+    apiFetch(`/api/news/filings?tickers=${tickers.join(',')}`),
+
+  getAnalystRecommendations: (tickers: string[]) =>
+    apiFetch(`/api/news/analyst?tickers=${tickers.join(',')}`),
+
   analyzeStock: (ticker: string, data: any, riskLevel?: number) =>
     apiFetch('/api/ai/analyze', { method: 'POST', body: JSON.stringify({ ticker, data, riskLevel }) }),
 
