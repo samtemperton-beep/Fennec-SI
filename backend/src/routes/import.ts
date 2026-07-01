@@ -1,6 +1,16 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!,
+  { realtime: { transport: ws as any } }
+);
 
 const router = Router();
 
@@ -80,6 +90,59 @@ router.post('/csv', requireAuth, async (req, res) => {
   else holdings = parseGeneric(rows);
 
   res.json({ holdings, format, count: holdings.length });
+});
+
+// POST /api/import/sync — full portfolio sync from CSV: upsert existing, add new, remove sold
+router.post('/sync', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  const { csv } = req.body;
+  if (!csv) return res.status(400).json({ error: 'No CSV data' });
+
+  const rows = csv.split('\n').map((line: string) => {
+    const cells: string[] = [];
+    let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cells.push(cur.trim());
+    return cells;
+  }).filter((r: string[]) => r.some((c: string) => c));
+
+  const format = detectFormat(rows);
+  let parsed: Holding[];
+  if (format === 'hatch') parsed = parseHatch(rows);
+  else if (format === 'sharesies') parsed = parseSharesies(rows);
+  else if (format === 'ibkr') parsed = parseIBKR(rows);
+  else parsed = parseGeneric(rows);
+
+  if (parsed.length === 0) return res.status(400).json({ error: 'Could not extract any holdings from the CSV.' });
+
+  const { data: existing } = await supabase.from('holdings').select('id, ticker').eq('user_id', user.id);
+  const existingMap = new Map((existing || []).map((h: any) => [h.ticker.toUpperCase(), h.id]));
+  const csvSet = new Set(parsed.map(h => h.ticker));
+
+  const added: string[] = [], updated: string[] = [], removed: string[] = [];
+
+  for (const h of parsed) {
+    if (existingMap.has(h.ticker)) {
+      await supabase.from('holdings').update({ shares: h.shares, buy_price: h.buyPrice || 0 }).eq('id', existingMap.get(h.ticker));
+      updated.push(h.ticker);
+    } else {
+      await supabase.from('holdings').insert({ user_id: user.id, ticker: h.ticker, shares: h.shares, buy_price: h.buyPrice || 0, current_price: h.buyPrice || 0, market: h.market });
+      added.push(h.ticker);
+    }
+  }
+
+  for (const [ticker, id] of existingMap) {
+    if (!csvSet.has(ticker)) {
+      await supabase.from('holdings').delete().eq('id', id);
+      removed.push(ticker);
+    }
+  }
+
+  res.json({ format, added, updated, removed });
 });
 
 router.post('/screenshot', requireAuth, async (req, res) => {

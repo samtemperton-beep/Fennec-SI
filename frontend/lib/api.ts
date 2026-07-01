@@ -79,6 +79,9 @@ export const api = {
   importCSV: (csv: string) =>
     apiFetch('/api/import/csv', { method: 'POST', body: JSON.stringify({ csv }) }),
 
+  syncCSV: (csv: string) =>
+    apiFetch('/api/import/sync', { method: 'POST', body: JSON.stringify({ csv }) }),
+
   importScreenshot: (imageBase64: string, mediaType?: string) =>
     apiFetch('/api/import/screenshot', { method: 'POST', body: JSON.stringify({ imageBase64, mediaType }) }),
 
