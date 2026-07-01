@@ -1,10 +1,13 @@
 'use client'
 import { useState } from 'react'
+import { createClient } from '@/lib/supabase'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { api } from '@/lib/api'
-import { IconUpload, IconCheck, IconX, IconShieldCheck, IconCamera, IconChevronDown, IconChevronUp } from '@tabler/icons-react'
+import { IconUpload, IconCheck, IconX, IconShieldCheck, IconCamera, IconMail, IconFileSpreadsheet, IconChevronDown, IconChevronUp } from '@tabler/icons-react'
 import { toast } from 'sonner'
+
+type Method = 'csv' | 'screenshot' | 'email'
 
 interface Props {
   open: boolean
@@ -12,75 +15,83 @@ interface Props {
   onVerified: (tickers: string[]) => void
 }
 
-const BROKER_GUIDES: Record<string, { steps: string[]; tip?: string }> = {
+const CSV_GUIDES: Record<string, { label: string; steps: string[] }> = {
   hatch: {
+    label: 'Hatch',
     steps: [
-      'Open the Hatch app on your phone',
-      'Tap the Portfolio tab at the bottom',
-      'You\'ll see a list of your holdings — scroll down to show all of them',
-      'Take a screenshot (hold Power + Volume Down on Android, or Power + Home/Side button on iPhone)',
-      'Upload that screenshot below',
+      'Go to app.hatchinvest.nz and sign in',
+      'Click your name / avatar in the top right',
+      'Select "Statements" from the dropdown',
+      'Under "Portfolio export", click Download CSV',
+      'Upload that file below',
     ],
-    tip: 'If you have many holdings, take multiple screenshots and upload one at a time.',
   },
   sharesies: {
+    label: 'Sharesies',
     steps: [
-      'Open the Sharesies app or website',
-      'Go to Portfolio in the navigation',
-      'You\'ll see your investments listed with names and amounts',
-      'Take a screenshot showing all your holdings',
-      'Upload that screenshot below',
-    ],
-  },
-  investnow: {
-    steps: [
-      'Log in to InvestNow at investnow.co.nz',
-      'Click on My Portfolio',
-      'Take a screenshot of your holdings',
-      'Upload that screenshot below',
-    ],
-  },
-  commsec: {
-    steps: [
-      'Log in to CommSec online or the app',
-      'Go to Portfolio → Holdings',
-      'Take a screenshot showing your stock positions',
-      'Upload that screenshot below',
-    ],
-  },
-  selfwealth: {
-    steps: [
-      'Log in to SelfWealth',
-      'Go to My Portfolio',
-      'Take a screenshot of your holdings page',
-      'Upload that screenshot below',
+      'Log in to Sharesies at sharesies.com',
+      'Go to Account → Reports',
+      'Select "Portfolio" report and choose CSV',
+      'Download and upload below',
     ],
   },
   ibkr: {
+    label: 'IBKR',
     steps: [
-      'Log in to Interactive Brokers (Trader Workstation or the app)',
-      'Go to Portfolio → Positions',
-      'Take a screenshot or export as PDF',
-      'Upload it below',
+      'Log in to Interactive Brokers',
+      'Go to Reports → Flex Queries or Statements',
+      'Download your Positions report as CSV',
+      'Upload below',
+    ],
+  },
+  other: {
+    label: 'Other brokers',
+    steps: [
+      'Find the Portfolio, Holdings, or Positions section in your broker',
+      'Look for an Export or Download option (usually CSV or Excel)',
+      'Download and upload below — we\'ll match your tickers automatically',
     ],
   },
 }
 
-const DEFAULT_GUIDE = {
-  steps: [
-    'Open your broker app or website',
-    'Navigate to your Portfolio or Holdings section',
-    'Take a screenshot showing your stock holdings (names and amounts)',
-    'Upload that screenshot below — a phone photo works too',
-  ],
+const SCREENSHOT_GUIDES: Record<string, { label: string; steps: string[] }> = {
+  hatch: {
+    label: 'Hatch',
+    steps: [
+      'Open the Hatch app on your phone',
+      'Tap Portfolio at the bottom',
+      'Scroll down to see all your holdings',
+      'Take a screenshot (Power + Volume Down on Android; Side + Volume Up on iPhone)',
+      'If you have many holdings, upload one screenshot at a time',
+    ],
+  },
+  sharesies: {
+    label: 'Sharesies',
+    steps: [
+      'Open the Sharesies app or website',
+      'Go to Portfolio',
+      'Take a screenshot of your holdings list',
+    ],
+  },
+  other: {
+    label: 'Other brokers',
+    steps: [
+      'Navigate to your Portfolio or Holdings page',
+      'Take a clear screenshot showing stock names and amounts',
+      'Upload below — Claude AI will read it',
+    ],
+  },
 }
 
 export function VerifyPortfolioModal({ open, onClose, onVerified }: Props) {
+  const [method, setMethod] = useState<Method>('csv')
+  const [broker, setBroker] = useState('hatch')
+  const [guideOpen, setGuideOpen] = useState(true)
   const [file, setFile] = useState<File | null>(null)
+  const [brokerEmail, setBrokerEmail] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [result, setResult] = useState<{ verified_tickers: string[]; claude_notes: string; status: string } | null>(null)
-  const [selectedBroker, setSelectedBroker] = useState<string>('hatch')
-  const [guideOpen, setGuideOpen] = useState(true)
+  const supabase = createClient()
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -100,12 +111,22 @@ export function VerifyPortfolioModal({ open, onClose, onVerified }: Props) {
   }
 
   async function verify() {
-    if (!file) return
     setVerifying(true)
     try {
-      const base64 = await fileToBase64(file)
-      const mediaType = file.type || 'image/jpeg'
-      const { verification, newBadges } = await api.verifyPortfolio(base64, mediaType)
+      let res: any
+      if (method === 'csv') {
+        if (!file) return
+        const text = await file.text()
+        res = await api.verifyPortfolioCSV(text)
+      } else if (method === 'screenshot') {
+        if (!file) return
+        const base64 = await fileToBase64(file)
+        res = await api.verifyPortfolio(base64, file.type || 'image/jpeg')
+      } else {
+        if (!brokerEmail.trim()) return
+        res = await api.verifyPortfolioEmail(brokerEmail.trim())
+      }
+      const { verification, newBadges } = res
       setResult(verification)
       if (verification.status === 'verified') {
         onVerified(verification.verified_tickers)
@@ -120,125 +141,153 @@ export function VerifyPortfolioModal({ open, onClose, onVerified }: Props) {
   function reset() {
     setFile(null)
     setResult(null)
+    setBrokerEmail('')
   }
 
-  const guide = BROKER_GUIDES[selectedBroker] || DEFAULT_GUIDE
+  const canSubmit = method === 'email' ? brokerEmail.trim().includes('@') : !!file
+
+  const csvGuide = CSV_GUIDES[broker] || CSV_GUIDES.other
+  const ssGuide = SCREENSHOT_GUIDES[broker] || SCREENSHOT_GUIDES.other
+  const activeGuide = method === 'csv' ? csvGuide : ssGuide
 
   const BROKERS = [
     { id: 'hatch', label: 'Hatch' },
     { id: 'sharesies', label: 'Sharesies' },
-    { id: 'investnow', label: 'InvestNow' },
-    { id: 'commsec', label: 'CommSec' },
-    { id: 'selfwealth', label: 'SelfWealth' },
     { id: 'ibkr', label: 'IBKR' },
     { id: 'other', label: 'Other' },
+  ]
+
+  const METHODS: { id: Method; icon: typeof IconFileSpreadsheet; label: string; sub: string }[] = [
+    { id: 'csv', icon: IconFileSpreadsheet, label: 'CSV Export', sub: 'Best for large portfolios' },
+    { id: 'screenshot', icon: IconCamera, label: 'Screenshot', sub: 'Quick for small portfolios' },
+    { id: 'email', icon: IconMail, label: 'Email Match', sub: 'Fastest — no file needed' },
   ]
 
   return (
     <Modal open={open} onClose={() => { reset(); onClose() }} title="Verify Portfolio">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
         {!result ? (
           <>
-            {/* What you need */}
-            <div style={{ background: 'rgba(44,110,106,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <IconCamera size={18} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 1 }} />
-              <div>
-                <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, marginBottom: 3 }}>All you need is a screenshot</p>
-                <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.55 }}>Just take a screenshot of your holdings in your broker app. No downloads or logins required — Claude AI reads the image and matches your stocks.</p>
-              </div>
-            </div>
-
-            {/* Broker selector */}
-            <div>
-              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>Which broker are you using?</p>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {BROKERS.map(b => (
-                  <button key={b.id} onClick={() => { setSelectedBroker(b.id); setGuideOpen(true) }}
-                    style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', border: selectedBroker === b.id ? 'none' : '1px solid var(--border)', background: selectedBroker === b.id ? 'var(--primary)' : 'var(--surface2)', color: selectedBroker === b.id ? 'white' : 'var(--text2)', transition: 'all 0.15s' }}>
-                    {b.label}
+            {/* Method selector */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {METHODS.map(m => {
+                const Icon = m.icon
+                const active = method === m.id
+                return (
+                  <button key={m.id} onClick={() => { setMethod(m.id); setFile(null); setResult(null) }}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 8px', borderRadius: 10, border: active ? '2px solid var(--primary)' : '1px solid var(--border)', background: active ? 'var(--primary-light)' : 'var(--surface2)', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    <Icon size={20} style={{ color: active ? 'var(--primary)' : 'var(--text2)' }} />
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 12, color: active ? 'var(--primary)' : 'var(--text)' }}>{m.label}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.3 }}>{m.sub}</span>
                   </button>
-                ))}
-              </div>
+                )
+              })}
             </div>
 
-            {/* Step-by-step guide */}
-            <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-              <button onClick={() => setGuideOpen(o => !o)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface2)', border: 'none', cursor: 'pointer', color: 'var(--text)' }}>
-                <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>
-                  How to get your {BROKERS.find(b => b.id === selectedBroker)?.label || 'broker'} screenshot
-                </span>
-                {guideOpen ? <IconChevronUp size={15} style={{ color: 'var(--text2)' }} /> : <IconChevronDown size={15} style={{ color: 'var(--text2)' }} />}
-              </button>
-              {guideOpen && (
-                <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {guide.steps.map((step, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--primary)', color: 'white', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                        {i + 1}
-                      </div>
-                      <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text)', paddingTop: 2 }}>{step}</p>
-                    </div>
+            {/* CSV method */}
+            {method === 'csv' && (
+              <>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {BROKERS.map(b => (
+                    <button key={b.id} onClick={() => setBroker(b.id)}
+                      style={{ padding: '5px 13px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', border: broker === b.id ? 'none' : '1px solid var(--border)', background: broker === b.id ? 'var(--primary)' : 'var(--surface2)', color: broker === b.id ? 'white' : 'var(--text2)', transition: 'all 0.15s' }}>
+                      {b.label}
+                    </button>
                   ))}
-                  {guide.tip && (
-                    <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4, padding: '6px 10px', background: 'var(--surface2)', borderRadius: 6 }}>
-                      💡 {guide.tip}
-                    </p>
+                </div>
+
+                <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <button onClick={() => setGuideOpen(o => !o)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface2)', border: 'none', cursor: 'pointer', color: 'var(--text)' }}>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>How to export from {csvGuide.label}</span>
+                    {guideOpen ? <IconChevronUp size={14} style={{ color: 'var(--text2)' }} /> : <IconChevronDown size={14} style={{ color: 'var(--text2)' }} />}
+                  </button>
+                  {guideOpen && (
+                    <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {csvGuide.steps.map((step, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--primary)', color: 'white', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>{i + 1}</div>
+                          <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text)', paddingTop: 1 }}>{step}</p>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Upload area */}
-            <label
-              onDragOver={e => e.preventDefault()}
-              onDrop={handleDrop}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 8, padding: '28px 16px', borderRadius: 10, cursor: 'pointer',
-                border: `2px dashed ${file ? 'var(--primary)' : 'var(--border)'}`,
-                background: file ? 'rgba(44,110,106,0.06)' : 'var(--surface2)',
-                color: 'var(--text2)', fontSize: 13, transition: 'all 0.15s',
-              }}
+                <FileDropZone file={file} accept=".csv,text/csv" hint="Drag & drop your CSV or click to browse" onFile={f => { setFile(f); setResult(null) }} onDrop={handleDrop} onChange={handleFile} />
+              </>
+            )}
+
+            {/* Screenshot method */}
+            {method === 'screenshot' && (
+              <>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {BROKERS.map(b => (
+                    <button key={b.id} onClick={() => setBroker(b.id)}
+                      style={{ padding: '5px 13px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', border: broker === b.id ? 'none' : '1px solid var(--border)', background: broker === b.id ? 'var(--primary)' : 'var(--surface2)', color: broker === b.id ? 'white' : 'var(--text2)', transition: 'all 0.15s' }}>
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <button onClick={() => setGuideOpen(o => !o)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface2)', border: 'none', cursor: 'pointer', color: 'var(--text)' }}>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>How to screenshot {ssGuide.label}</span>
+                    {guideOpen ? <IconChevronUp size={14} style={{ color: 'var(--text2)' }} /> : <IconChevronDown size={14} style={{ color: 'var(--text2)' }} />}
+                  </button>
+                  {guideOpen && (
+                    <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {ssGuide.steps.map((step, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--primary)', color: 'white', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>{i + 1}</div>
+                          <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text)', paddingTop: 1 }}>{step}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <FileDropZone file={file} accept="image/*,.pdf" hint="Drag & drop your screenshot or click to browse" onFile={f => { setFile(f); setResult(null) }} onDrop={handleDrop} onChange={handleFile} />
+              </>
+            )}
+
+            {/* Email match method */}
+            {method === 'email' && (
+              <>
+                <div style={{ background: 'rgba(44,110,106,0.08)', borderRadius: 10, padding: '12px 14px', fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>
+                  <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>How this works</p>
+                  Enter the email address you used to sign up with your broker (e.g. Hatch, Sharesies). If it matches your Fennec account email, we'll verify your portfolio instantly — no uploads needed.
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Your broker account email</label>
+                  <input
+                    type="email"
+                    value={brokerEmail}
+                    onChange={e => { setBrokerEmail(e.target.value); setResult(null) }}
+                    placeholder="e.g. sam@gmail.com"
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, fontFamily: 'DM Mono, monospace', outline: 'none', boxSizing: 'border-box' }}
+                    onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+                    onBlur={e => (e.target.style.borderColor = '')}
+                  />
+                  <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>This must match the email you signed up to Fennec SI with. We never contact your broker — this is just a self-confirmation.</p>
+                </div>
+              </>
+            )}
+
+            <button
+              onClick={verify}
+              disabled={!canSubmit || verifying}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '12px', borderRadius: 8, border: 'none', cursor: canSubmit && !verifying ? 'pointer' : 'not-allowed', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14, opacity: canSubmit && !verifying ? 1 : 0.45, transition: 'opacity 0.15s' }}
             >
-              <IconUpload size={22} style={{ color: file ? 'var(--primary)' : 'var(--text2)' }} />
-              {file
-                ? <span style={{ color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>{file.name}</span>
-                : <>
-                    <span style={{ color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Upload your screenshot here</span>
-                    <span style={{ fontSize: 11 }}>Drag &amp; drop or click to browse · PNG, JPG, or PDF · Max 10MB</span>
-                  </>
+              {verifying
+                ? <><LoadingSpinner size={14} /> {method === 'screenshot' ? 'Reading with Claude AI…' : 'Verifying…'}</>
+                : <><IconShieldCheck size={15} /> Verify my portfolio</>
               }
-              <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleFile} />
-            </label>
+            </button>
 
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={verify}
-                disabled={!file || verifying}
-                style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '12px', borderRadius: 8, border: 'none',
-                  cursor: file && !verifying ? 'pointer' : 'not-allowed',
-                  background: 'var(--primary)', color: 'white',
-                  fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14,
-                  opacity: file && !verifying ? 1 : 0.5,
-                }}
-              >
-                {verifying ? <><LoadingSpinner size={14} /> Verifying with Claude AI…</> : <><IconShieldCheck size={15} /> Verify my portfolio</>}
-              </button>
-              {file && !verifying && (
-                <button onClick={reset} style={{ padding: '12px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer' }}>
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {/* Direct linking note */}
             <p style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.5 }}>
-              🔒 We never access your broker account — screenshots stay private and are only used to match your holdings.
-              {' '}<span style={{ color: 'var(--text3)' }}>Direct account linking (no screenshot needed) is coming soon as brokers open up API access.</span>
+              🔒 We never access your broker account. Files are only used to match your holdings and are not stored.
             </p>
           </>
         ) : (
@@ -249,9 +298,11 @@ export function VerifyPortfolioModal({ open, onClose, onVerified }: Props) {
                   <IconCheck size={18} style={{ color: 'var(--green)' }} />
                   <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--green)' }}>Portfolio Verified</span>
                 </div>
-                <p style={{ fontSize: 13, marginBottom: 8, lineHeight: 1.6 }}>
-                  Matched holdings: <strong>{result.verified_tickers.join(', ')}</strong>
-                </p>
+                {result.verified_tickers?.length > 0 && (
+                  <p style={{ fontSize: 13, marginBottom: 8, lineHeight: 1.6 }}>
+                    Matched: <strong>{result.verified_tickers.join(', ')}</strong>
+                  </p>
+                )}
                 <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.55 }}>{result.claude_notes}</p>
               </div>
             ) : (
@@ -261,21 +312,27 @@ export function VerifyPortfolioModal({ open, onClose, onVerified }: Props) {
                   <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--red)' }}>Couldn't verify</span>
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 10 }}>{result.claude_notes}</p>
-                <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-                  <strong style={{ color: 'var(--text)' }}>Tips for a better screenshot:</strong>
-                  <ul style={{ listStyle: 'disc', paddingLeft: 18, marginTop: 4 }}>
-                    <li>Make sure stock names and ticker symbols are visible</li>
-                    <li>Scroll to show all holdings — don't crop them</li>
-                    <li>Ensure the image is clear and not blurry</li>
-                    <li>Include the full portfolio page, not just a summary</li>
-                  </ul>
-                </div>
+                {method !== 'email' && (
+                  <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                    <strong style={{ color: 'var(--text)' }}>Tips:</strong>
+                    <ul style={{ listStyle: 'disc', paddingLeft: 18, marginTop: 4 }}>
+                      {method === 'csv'
+                        ? <>
+                            <li>Make sure you're downloading a <strong>holdings/portfolio</strong> export, not a transaction history</li>
+                            <li>Check that the ticker symbols in your broker match what you entered in Fennec</li>
+                          </>
+                        : <>
+                            <li>Make sure ticker names and symbols are clearly visible</li>
+                            <li>Scroll to show all holdings — don't crop the list</li>
+                          </>
+                      }
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
-            <button
-              onClick={reset}
-              style={{ marginTop: 12, width: '100%', padding: '11px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}
-            >
+            <button onClick={reset}
+              style={{ marginTop: 12, width: '100%', padding: '11px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
               Try Again
             </button>
           </div>
@@ -285,13 +342,33 @@ export function VerifyPortfolioModal({ open, onClose, onVerified }: Props) {
   )
 }
 
+function FileDropZone({ file, accept, hint, onFile, onDrop, onChange }: {
+  file: File | null; accept: string; hint: string
+  onFile: (f: File) => void; onDrop: (e: React.DragEvent) => void; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+}) {
+  return (
+    <label
+      onDragOver={e => e.preventDefault()}
+      onDrop={onDrop}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '28px 16px', borderRadius: 10, cursor: 'pointer', border: `2px dashed ${file ? 'var(--primary)' : 'var(--border)'}`, background: file ? 'rgba(44,110,106,0.06)' : 'var(--surface2)', color: 'var(--text2)', fontSize: 13, transition: 'all 0.15s' }}
+    >
+      <IconUpload size={22} style={{ color: file ? 'var(--primary)' : 'var(--text2)' }} />
+      {file
+        ? <span style={{ color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>{file.name}</span>
+        : <>
+            <span style={{ color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>{hint}</span>
+            <span style={{ fontSize: 11 }}>Max 10MB</span>
+          </>
+      }
+      <input type="file" accept={accept} style={{ display: 'none' }} onChange={onChange} />
+    </label>
+  )
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      resolve(result.split(',')[1])
-    }
+    reader.onload = () => resolve((reader.result as string).split(',')[1])
     reader.onerror = reject
     reader.readAsDataURL(file)
   })

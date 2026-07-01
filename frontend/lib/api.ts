@@ -94,6 +94,12 @@ export const api = {
   verifyPortfolio: (documentBase64: string, mediaType: string) =>
     apiFetch('/api/premium/verify', { method: 'POST', body: JSON.stringify({ documentBase64, mediaType }) }),
 
+  verifyPortfolioCSV: (csv: string) =>
+    apiFetch('/api/premium/verify-csv', { method: 'POST', body: JSON.stringify({ csv }) }),
+
+  verifyPortfolioEmail: (brokerEmail: string) =>
+    apiFetch('/api/premium/verify-email', { method: 'POST', body: JSON.stringify({ brokerEmail }) }),
+
   evaluateBadges: () =>
     apiFetch('/api/premium/evaluate-badges', { method: 'POST' }),
 
