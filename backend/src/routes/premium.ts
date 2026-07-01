@@ -201,7 +201,7 @@ If the document does not appear to be a broker statement, return an empty verifi
 });
 
 // POST /api/premium/verify-csv — verify portfolio by uploading a broker CSV export (Hatch, Sharesies, IBKR)
-// No AI needed — pure ticker cross-match against the user's declared holdings
+// Imports any missing holdings from the CSV into Fennec, then marks all CSV tickers as verified.
 router.post('/verify-csv', requireAuth, async (req, res) => {
   const user = (req as any).user;
   const { csv } = req.body;
@@ -220,54 +220,74 @@ router.post('/verify-csv', requireAuth, async (req, res) => {
     return cells;
   }).filter((r: string[]) => r.some((c: string) => c));
 
-  // Detect broker format and extract tickers
   const header = (rows[0] || []).join(',').toLowerCase();
-  let csvTickers: string[] = [];
+
+  // Parse full holding details (ticker, shares, buyPrice) from the CSV
+  interface CsvHolding { ticker: string; shares: number; buyPrice: number; market: string }
+  let csvHoldings: CsvHolding[] = [];
+
   if (header.includes('average cost (usd)') || header.includes('average cost (nzd)')) {
-    // Hatch: Ticker,Name,Portion,Shares,...
-    csvTickers = rows.slice(1).map(r => (r[0] || '').trim().toUpperCase()).filter(t => t && !t.startsWith('AN FX'));
-  } else if (header.includes('portfolio name') || rows[1]?.[1]) {
-    // Sharesies: index, ticker in col 1
-    csvTickers = rows.slice(1).map(r => (r[1] || '').trim().toUpperCase()).filter(Boolean);
+    // Hatch: Ticker,Name,Portion,Shares,Average cost (USD),...
+    csvHoldings = rows.slice(1)
+      .filter(r => r.length > 4 && r[0] && !r[0].startsWith('An FX'))
+      .map(r => ({ ticker: r[0].trim().toUpperCase(), shares: parseFloat(r[3] || '0'), buyPrice: parseFloat(r[4] || '0'), market: 'US' }))
+      .filter(h => h.ticker && h.shares > 0);
+  } else if (header.includes('sharesies') || header.includes('portfolio name')) {
+    csvHoldings = rows.slice(1)
+      .map(r => ({ ticker: (r[1] || '').trim().toUpperCase(), shares: parseFloat(r[3] || '0'), buyPrice: parseFloat(r[4] || '0'), market: r[2]?.includes('NZ') ? 'NZX' : r[2]?.includes('AU') ? 'ASX' : 'US' }))
+      .filter(h => h.ticker && h.shares > 0);
   } else if (rows.some(r => r[0] === 'Data' && r[1] === 'Trades')) {
-    // IBKR: Data rows
-    csvTickers = rows.filter(r => r[0] === 'Data').map(r => (r[2] || '').trim().toUpperCase()).filter(Boolean);
+    csvHoldings = rows.filter(r => r[0] === 'Data')
+      .map(r => ({ ticker: (r[2] || '').trim().toUpperCase(), shares: parseFloat(r[5] || '0'), buyPrice: parseFloat(r[7] || '0'), market: 'US' }))
+      .filter(h => h.ticker && h.shares > 0);
   } else {
-    // Generic: ticker in first column
-    csvTickers = rows.slice(1).map(r => (r[0] || '').trim().toUpperCase()).filter(t => t && /^[A-Z]{1,6}/.test(t));
+    csvHoldings = rows.slice(1)
+      .map(r => ({ ticker: (r[0] || '').trim().toUpperCase(), shares: parseFloat(r[1] || '0'), buyPrice: parseFloat(r[2] || '0'), market: 'US' }))
+      .filter(h => h.ticker && h.shares > 0 && /^[A-Z]{1,6}/.test(h.ticker));
   }
 
-  if (csvTickers.length === 0) return res.status(400).json({ error: 'Could not extract any tickers from the CSV. Make sure you are uploading a holdings or portfolio export.' });
+  if (csvHoldings.length === 0) return res.status(400).json({ error: 'Could not extract any holdings from the CSV. Make sure you are uploading a holdings or portfolio export.' });
 
-  // Get user's Fennec holdings
-  const { data: holdings } = await supabase.from('holdings').select('ticker').eq('user_id', user.id);
+  const csvTickers = csvHoldings.map(h => h.ticker);
 
-  const fennecSet = new Set((holdings || []).map((h: any) => h.ticker.toUpperCase()));
-  const verifiedTickers = csvTickers.filter(t => fennecSet.has(t));
-  const unmatched = csvTickers.filter(t => !fennecSet.has(t));
-  const notes = verifiedTickers.length > 0
-    ? `Matched ${verifiedTickers.length} of your holdings from the CSV export.${unmatched.length > 0 ? ` CSV also contained: ${unmatched.slice(0, 5).join(', ')}${unmatched.length > 5 ? ' and more' : ''} (not in your Fennec portfolio).` : ''}`
-    : fennecSet.size === 0
-      ? `Your Fennec portfolio appears empty — make sure you are logged in and have added your holdings before verifying. CSV contained: ${csvTickers.slice(0, 8).join(', ')}.`
-      : `CSV contained: ${csvTickers.slice(0, 8).join(', ')} — none matched your Fennec holdings. Make sure your portfolio tickers are entered the same way as in your broker.`;
+  // Get existing Fennec holdings so we only insert missing ones
+  const { data: existingHoldings } = await supabase.from('holdings').select('ticker').eq('user_id', user.id);
+  const fennecSet = new Set((existingHoldings || []).map((h: any) => h.ticker.toUpperCase()));
+  const toInsert = csvHoldings.filter(h => !fennecSet.has(h.ticker));
+
+  // Insert missing holdings (shares + buy_price from CSV; current_price defaults to buy_price)
+  if (toInsert.length > 0) {
+    await supabase.from('holdings').insert(
+      toInsert.map(h => ({
+        user_id: user.id,
+        ticker: h.ticker,
+        shares: h.shares,
+        buy_price: h.buyPrice || 0,
+        current_price: h.buyPrice || 0,
+        market: h.market,
+        is_verified: true,
+      }))
+    );
+  }
+
+  // Mark all CSV tickers (including pre-existing ones) as verified
+  await supabase.from('holdings').update({ is_verified: true }).eq('user_id', user.id).in('ticker', csvTickers);
+
+  const notes = `Verified ${csvTickers.length} holdings from your broker CSV.${toInsert.length > 0 ? ` Added ${toInsert.length} new holding${toInsert.length > 1 ? 's' : ''} to your Fennec portfolio: ${toInsert.map(h => h.ticker).join(', ')}.` : ''}`;
 
   const { data: verification, error } = await saveVerification(user.id, {
-    status: verifiedTickers.length > 0 ? 'verified' : 'rejected',
-    verified_tickers: verifiedTickers,
+    status: 'verified',
+    verified_tickers: csvTickers,
     claude_notes: notes,
-    verified_at: verifiedTickers.length > 0 ? new Date().toISOString() : null,
+    verified_at: new Date().toISOString(),
   });
 
   if (error) return res.status(500).json({ error: error.message });
 
-  if (verifiedTickers.length > 0) {
-    await supabase.from('holdings').update({ is_verified: true }).eq('user_id', user.id).in('ticker', verifiedTickers);
-  }
-
   const { data: allHoldings } = await supabase.from('holdings').select('ticker, shares, buy_price, current_price, sector, is_verified').eq('user_id', user.id);
-  const newBadges = await evaluateAndAwardBadges(user.id, allHoldings || [], verifiedTickers.length > 0);
+  const newBadges = await evaluateAndAwardBadges(user.id, allHoldings || [], true);
 
-  res.json({ verification, newBadges });
+  res.json({ verification, newBadges, imported: toInsert.map(h => h.ticker) });
 });
 
 // POST /api/premium/verify-email — lightweight: check user's Fennec email matches their broker email claim
