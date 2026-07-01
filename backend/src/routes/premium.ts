@@ -94,11 +94,7 @@ router.post('/verify', requireAuth, async (req, res) => {
     .select('ticker, shares, buy_price')
     .eq('user_id', user.id);
 
-  if (!holdings || holdings.length === 0) {
-    return res.status(400).json({ error: 'Add holdings to your portfolio before verifying' });
-  }
-
-  const tickers = holdings.map((h: any) => h.ticker).join(', ');
+  const tickers = holdings?.map((h: any) => h.ticker).join(', ') || '';
 
   const anthropicKey = user.user_metadata?.anthropic_key;
   const client = new Anthropic({ apiKey: anthropicKey || process.env.ANTHROPIC_API_KEY });
@@ -224,14 +220,15 @@ router.post('/verify-csv', requireAuth, async (req, res) => {
 
   // Get user's Fennec holdings
   const { data: holdings } = await supabase.from('holdings').select('ticker').eq('user_id', user.id);
-  if (!holdings || holdings.length === 0) return res.status(400).json({ error: 'Add holdings to your portfolio before verifying' });
 
-  const fennecSet = new Set(holdings.map((h: any) => h.ticker.toUpperCase()));
+  const fennecSet = new Set((holdings || []).map((h: any) => h.ticker.toUpperCase()));
   const verifiedTickers = csvTickers.filter(t => fennecSet.has(t));
   const unmatched = csvTickers.filter(t => !fennecSet.has(t));
   const notes = verifiedTickers.length > 0
     ? `Matched ${verifiedTickers.length} of your holdings from the CSV export.${unmatched.length > 0 ? ` CSV also contained: ${unmatched.slice(0, 5).join(', ')}${unmatched.length > 5 ? ' and more' : ''} (not in your Fennec portfolio).` : ''}`
-    : `CSV contained: ${csvTickers.slice(0, 8).join(', ')} — none matched your Fennec holdings. Make sure your portfolio tickers are entered the same way as in your broker.`;
+    : fennecSet.size === 0
+      ? `Your Fennec portfolio appears empty — make sure you are logged in and have added your holdings before verifying. CSV contained: ${csvTickers.slice(0, 8).join(', ')}.`
+      : `CSV contained: ${csvTickers.slice(0, 8).join(', ')} — none matched your Fennec holdings. Make sure your portfolio tickers are entered the same way as in your broker.`;
 
   const { data: verification, error } = await supabase
     .from('portfolio_verifications')
