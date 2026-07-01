@@ -15,6 +15,32 @@ const supabase = createClient(
   { realtime: { transport: ws as any } }
 );
 
+// Helper: insert or update portfolio_verifications (table has no unique constraint on user_id)
+async function saveVerification(userId: string, payload: Record<string, any>) {
+  const { data: existing } = await supabase
+    .from('portfolio_verifications')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from('portfolio_verifications')
+      .update(payload)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    return { data, error };
+  } else {
+    const { data, error } = await supabase
+      .from('portfolio_verifications')
+      .insert({ user_id: userId, ...payload })
+      .select()
+      .single();
+    return { data, error };
+  }
+}
+
 // GET /api/premium/status — returns tier + badges for current user
 router.get('/status', requireAuth, async (req, res) => {
   const user = (req as any).user;
@@ -140,18 +166,13 @@ If the document does not appear to be a broker statement, return an empty verifi
     return res.status(500).json({ error: 'AI verification failed: ' + e.message });
   }
 
-  // Upsert verification record
-  const { data: verification, error } = await supabase
-    .from('portfolio_verifications')
-    .upsert({
-      user_id: user.id,
-      status: claudeResult.verified_tickers.length > 0 ? 'verified' : 'rejected',
-      verified_tickers: claudeResult.verified_tickers,
-      claude_notes: claudeResult.notes,
-      verified_at: claudeResult.verified_tickers.length > 0 ? new Date().toISOString() : null,
-    }, { onConflict: 'user_id' })
-    .select()
-    .single();
+  // Save verification record
+  const { data: verification, error } = await saveVerification(user.id, {
+    status: claudeResult.verified_tickers.length > 0 ? 'verified' : 'rejected',
+    verified_tickers: claudeResult.verified_tickers,
+    claude_notes: claudeResult.notes,
+    verified_at: claudeResult.verified_tickers.length > 0 ? new Date().toISOString() : null,
+  });
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -230,15 +251,12 @@ router.post('/verify-csv', requireAuth, async (req, res) => {
       ? `Your Fennec portfolio appears empty — make sure you are logged in and have added your holdings before verifying. CSV contained: ${csvTickers.slice(0, 8).join(', ')}.`
       : `CSV contained: ${csvTickers.slice(0, 8).join(', ')} — none matched your Fennec holdings. Make sure your portfolio tickers are entered the same way as in your broker.`;
 
-  const { data: verification, error } = await supabase
-    .from('portfolio_verifications')
-    .upsert({
-      user_id: user.id,
-      status: verifiedTickers.length > 0 ? 'verified' : 'rejected',
-      verified_tickers: verifiedTickers,
-      claude_notes: notes,
-      verified_at: verifiedTickers.length > 0 ? new Date().toISOString() : null,
-    }, { onConflict: 'user_id' })
+  const { data: verification, error } = await saveVerification(user.id, {
+    status: verifiedTickers.length > 0 ? 'verified' : 'rejected',
+    verified_tickers: verifiedTickers,
+    claude_notes: notes,
+    verified_at: verifiedTickers.length > 0 ? new Date().toISOString() : null,
+  })
     .select().single();
 
   if (error) return res.status(500).json({ error: error.message });
@@ -270,15 +288,12 @@ router.post('/verify-email', requireAuth, async (req, res) => {
     ? `Email ${claimed} matches your Fennec account — broker account linked.`
     : `Email ${claimed} does not match your Fennec account email. Make sure you enter the same email you used to sign up for your broker.`;
 
-  const { data: verification, error } = await supabase
-    .from('portfolio_verifications')
-    .upsert({
-      user_id: user.id,
-      status: matched ? 'verified' : 'rejected',
-      verified_tickers: verifiedTickers,
-      claude_notes: notes,
-      verified_at: matched ? new Date().toISOString() : null,
-    }, { onConflict: 'user_id' })
+  const { data: verification, error } = await saveVerification(user.id, {
+    status: matched ? 'verified' : 'rejected',
+    verified_tickers: verifiedTickers,
+    claude_notes: notes,
+    verified_at: matched ? new Date().toISOString() : null,
+  })
     .select().single();
 
   if (error) return res.status(500).json({ error: error.message });
