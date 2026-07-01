@@ -240,6 +240,7 @@ export default function PortfolioPage() {
       if (result.updated?.length) parts.push(`${result.updated.length} updated`)
       if (result.removed?.length) parts.push(`${result.removed.length} removed`)
       toast.success(`Portfolio synced — ${parts.join(', ') || 'no changes'}`)
+      if (result.failed?.length) toast.error(`Could not import: ${result.failed.join(', ')} — these may use unsupported ticker formats`)
       loadHoldings(userId)
     } catch (e: any) {
       toast.error('Sync failed: ' + e.message)

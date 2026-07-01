@@ -23,12 +23,16 @@ interface Holding {
 
 function parseHatch(rows: string[][]): Holding[] {
   // Hatch columns: Ticker,Name,Portion,Shares,Average cost (USD),Average cost (NZD),...
-  return rows.slice(1).filter(r => r.length > 5 && r[0] && !r[0].startsWith('"An FX')).map(r => ({
-    ticker: (r[0] || '').trim().toUpperCase(),
-    shares: parseFloat(r[3] || '0'),
-    buyPrice: parseFloat(r[4] || '0'),
-    market: 'US',
-  })).filter(h => h.ticker && h.shares > 0 && !isNaN(h.buyPrice));
+  // Allow buyPrice = 0 for private securities (e.g. SpaceX) that have no listed market price
+  return rows.slice(1)
+    .filter(r => r.length > 3 && r[0] && !r[0].replace(/^"/, '').startsWith('An FX'))
+    .map(r => ({
+      ticker: (r[0] || '').trim().toUpperCase(),
+      shares: parseFloat(r[3] || '0'),
+      buyPrice: parseFloat(r[4] || '0') || 0,
+      market: 'US',
+    }))
+    .filter(h => h.ticker && /^[A-Z0-9]{1,10}$/.test(h.ticker) && h.shares > 0);
 }
 
 function parseSharesies(rows: string[][]): Holding[] {
@@ -136,22 +140,27 @@ router.post('/sync', requireAuth, async (req, res) => {
     return res.json({ format, preview: true, toAdd, toUpdate, toRemove, total: parsed.length });
   }
 
-  // Apply sync
+  // Apply sync: delete ALL existing holdings then re-insert from CSV
+  // This avoids duplicate rows from partial previous syncs and handles removals cleanly
+  await supabase.from('holdings').delete().eq('user_id', user.id);
+
+  const failed: string[] = [];
   for (const h of parsed) {
-    if (existingMap.has(h.ticker)) {
-      await supabase.from('holdings').update({ shares: h.shares, buy_price: h.buyPrice || 0 }).eq('user_id', user.id).eq('ticker', h.ticker);
-    } else {
-      await supabase.from('holdings').insert({ user_id: user.id, ticker: h.ticker, shares: h.shares, buy_price: h.buyPrice || 0, current_price: h.buyPrice || 0, market: h.market });
-    }
+    const existing_row = existingMap.get(h.ticker);
+    const { error } = await supabase.from('holdings').insert({
+      user_id: user.id,
+      ticker: h.ticker,
+      shares: h.shares,
+      buy_price: h.buyPrice || 0,
+      // Preserve existing current_price if we have it, otherwise use buyPrice
+      current_price: existing_row?.current_price || h.buyPrice || 0,
+      market: h.market,
+      is_verified: true,
+    });
+    if (error) failed.push(h.ticker);
   }
 
-  for (const h of (existing || [])) {
-    if (!csvSet.has(h.ticker.toUpperCase())) {
-      await supabase.from('holdings').delete().eq('user_id', user.id).eq('ticker', h.ticker);
-    }
-  }
-
-  res.json({ format, added: toAdd, updated: toUpdate, removed: toRemove });
+  res.json({ format, added: toAdd, updated: toUpdate, removed: toRemove, failed });
 });
 
 router.post('/screenshot', requireAuth, async (req, res) => {

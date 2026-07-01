@@ -17,33 +17,28 @@ const supabase = createClient(
 
 // Helper: full sync of holdings from a parsed CSV — upserts existing, inserts new, removes sold
 async function syncHoldingsFromCSV(userId: string, csvHoldings: { ticker: string; shares: number; buyPrice: number; market: string }[]) {
-  const { data: existing } = await supabase.from('holdings').select('id, ticker').eq('user_id', userId);
-  const existingMap = new Map((existing || []).map((h: any) => [h.ticker.toUpperCase(), h.id]));
-  const csvSet = new Set(csvHoldings.map(h => h.ticker));
+  const { data: existing } = await supabase.from('holdings').select('ticker, current_price').eq('user_id', userId);
+  const existingPrices = new Map((existing || []).map((h: any) => [h.ticker.toUpperCase(), h.current_price]));
 
-  const added: string[] = [];
-  const updated: string[] = [];
-  const removed: string[] = [];
+  const toAdd = csvHoldings.filter(h => !existingPrices.has(h.ticker)).map(h => h.ticker);
+  const toUpdate = csvHoldings.filter(h => existingPrices.has(h.ticker)).map(h => h.ticker);
+  const removed = (existing || []).filter((h: any) => !csvHoldings.some(c => c.ticker === h.ticker.toUpperCase())).map((h: any) => h.ticker);
 
+  // Delete all and reinsert — prevents duplicate rows from partial previous syncs
+  await supabase.from('holdings').delete().eq('user_id', userId);
   for (const h of csvHoldings) {
-    if (existingMap.has(h.ticker)) {
-      await supabase.from('holdings').update({ shares: h.shares, buy_price: h.buyPrice || 0, is_verified: true }).eq('id', existingMap.get(h.ticker));
-      updated.push(h.ticker);
-    } else {
-      await supabase.from('holdings').insert({ user_id: userId, ticker: h.ticker, shares: h.shares, buy_price: h.buyPrice || 0, current_price: h.buyPrice || 0, market: h.market, is_verified: true });
-      added.push(h.ticker);
-    }
+    await supabase.from('holdings').insert({
+      user_id: userId,
+      ticker: h.ticker,
+      shares: h.shares,
+      buy_price: h.buyPrice || 0,
+      current_price: existingPrices.get(h.ticker) || h.buyPrice || 0,
+      market: h.market,
+      is_verified: true,
+    });
   }
 
-  // Remove holdings no longer in CSV (sold positions)
-  for (const [ticker, id] of existingMap) {
-    if (!csvSet.has(ticker)) {
-      await supabase.from('holdings').delete().eq('id', id);
-      removed.push(ticker);
-    }
-  }
-
-  return { added, updated, removed };
+  return { added: toAdd, updated: toUpdate, removed };
 }
 
 // Helper: insert or update portfolio_verifications (table has no unique constraint on user_id)
