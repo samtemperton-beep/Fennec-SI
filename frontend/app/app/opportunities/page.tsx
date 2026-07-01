@@ -275,7 +275,7 @@ export default function DiscoverPage() {
                     <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>AI Analysis</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {[
-                        { label: 'What's the play', value: diveAnalysis.what_happened },
+                        { label: "What's the play", value: diveAnalysis.what_happened },
                         { label: 'Why it matters', value: diveAnalysis.why_it_matters },
                         { label: 'Portfolio fit', value: diveAnalysis.portfolio_impact },
                         { label: 'Suggested action', value: diveAnalysis.action_suggestion },
