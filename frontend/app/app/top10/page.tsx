@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { WatchlistButton } from '@/components/shared/WatchlistButton'
-import { IconRefresh } from '@tabler/icons-react'
+import { IconRefresh, IconExternalLink } from '@tabler/icons-react'
+import { timeAgo } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const BUBBLE_COLORS = ['#5B7CF0','#14B8A6','#22C55E','#F59E0B','#EF4444','#A855F7','#F97316','#0EA5E9','#EC4899','#6366F1']
@@ -61,6 +62,7 @@ export default function Top10Page() {
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Pick | null>(null)
   const [deepDive, setDeepDive] = useState<any>(null)
+  const [diveNews, setDiveNews] = useState<any[]>([])
   const [diving, setDiving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [watchlist, setWatchlist] = useState<string[]>([])
@@ -95,11 +97,14 @@ export default function Top10Page() {
   async function openDeepDive(p: Pick) {
     setSelected(p)
     setDeepDive(null)
+    setDiveNews([])
     setDiving(true)
-    try {
-      const d = await api.deepDive(p.ticker, `Sector: ${p.sector}, Upside: ${p.upside_pct}%, ${p.reason}`)
-      setDeepDive(d)
-    } catch {}
+    const [analysisResult, newsResult] = await Promise.allSettled([
+      api.deepDive(p.ticker, `Sector: ${p.sector}, Upside: ${p.upside_pct}%, ${p.reason}`),
+      api.getNews([p.ticker]),
+    ])
+    if (analysisResult.status === 'fulfilled') setDeepDive(analysisResult.value)
+    if (newsResult.status === 'fulfilled') setDiveNews((newsResult.value || []).slice(0, 5))
     setDiving(false)
   }
 
@@ -189,7 +194,7 @@ export default function Top10Page() {
 
       {/* Cards grid */}
       {!loading && visiblePicks.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16 }} className="grid-cols-1 md:grid-cols-2">
+        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16 }}>
           {visiblePicks.map((p, i) => {
             const signal = deriveSignal(p.upside_pct)
             const barPct = Math.min(100, (p.upside_pct / 40) * 100)
@@ -330,6 +335,26 @@ export default function Top10Page() {
                         <li key={i} style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 2 }}>{w}</li>
                       ))}
                     </ul>
+                  </div>
+                )}
+                {diveNews.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <p style={{ fontWeight: 600, fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Related News</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {diveNews.map((n: any, i: number) => (
+                        <a key={i} href={n.url} target="_blank" rel="noopener noreferrer"
+                          style={{ textDecoration: 'none', display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', transition: 'border-color 0.15s' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--primary)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.borderColor = ''}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, color: 'var(--text)', lineHeight: 1.45, marginBottom: 4 }}>{n.headline}</p>
+                            <p style={{ fontSize: 11, color: 'var(--text2)' }}>{n.source} · {timeAgo(n.datetime)}</p>
+                          </div>
+                          <IconExternalLink size={13} style={{ color: 'var(--text2)', flexShrink: 0, marginTop: 2 }} />
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
