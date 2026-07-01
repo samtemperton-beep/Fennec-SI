@@ -100,6 +100,9 @@ export const api = {
   verifyPortfolioEmail: (brokerEmail: string) =>
     apiFetch('/api/premium/verify-email', { method: 'POST', body: JSON.stringify({ brokerEmail }) }),
 
+  verifyBrokerAccount: (imageBase64: string, mediaType: string) =>
+    apiFetch('/api/premium/verify-account', { method: 'POST', body: JSON.stringify({ imageBase64, mediaType }) }),
+
   evaluateBadges: () =>
     apiFetch('/api/premium/evaluate-badges', { method: 'POST' }),
 

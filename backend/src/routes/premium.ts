@@ -33,6 +33,53 @@ router.get('/status', requireAuth, async (req, res) => {
   });
 });
 
+// POST /api/premium/verify-account — Step 1: screenshot of broker account/settings page
+// Claude reads the email address visible in the screenshot and compares to the user's Fennec email
+router.post('/verify-account', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  const { imageBase64, mediaType = 'image/jpeg' } = req.body;
+  if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+
+  const client = new Anthropic({ apiKey: user.user_metadata?.anthropic_key || process.env.ANTHROPIC_API_KEY });
+
+  try {
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+          { type: 'text', text: 'This is a screenshot of a brokerage or investment account profile/settings page. Extract the email address shown. Return JSON only: { "email": "user@example.com", "broker": "Hatch/Sharesies/IBKR/other", "found": true }. If no email address is visible, return { "found": false, "reason": "brief explanation" }.' },
+        ],
+      }],
+    });
+
+    const text = (msg.content[0] as any).text;
+    const match = text.match(/\{[\s\S]*\}/);
+    const extracted = match ? JSON.parse(match[0]) : { found: false, reason: 'Could not parse response' };
+
+    if (!extracted.found) {
+      return res.json({ matched: false, reason: extracted.reason || 'No email address found in screenshot' });
+    }
+
+    const fennecEmail = (user.email || '').toLowerCase().trim();
+    const foundEmail = (extracted.email || '').toLowerCase().trim();
+    const matched = fennecEmail === foundEmail;
+
+    res.json({
+      matched,
+      foundEmail: extracted.email,
+      broker: extracted.broker,
+      reason: matched
+        ? `Found ${extracted.email} in your ${extracted.broker} account — matches your Fennec account.`
+        : `Found ${extracted.email} in the screenshot, but your Fennec account uses a different email. Make sure you screenshot the account registered with the same email as Fennec.`,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/premium/verify — submit a broker document for Claude to verify
 // Accepts base64-encoded PDF or image of a broker statement
 router.post('/verify', requireAuth, async (req, res) => {
