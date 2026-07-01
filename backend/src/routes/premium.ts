@@ -256,8 +256,7 @@ router.post('/verify-csv', requireAuth, async (req, res) => {
     verified_tickers: verifiedTickers,
     claude_notes: notes,
     verified_at: verifiedTickers.length > 0 ? new Date().toISOString() : null,
-  })
-    .select().single();
+  });
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -293,8 +292,7 @@ router.post('/verify-email', requireAuth, async (req, res) => {
     verified_tickers: verifiedTickers,
     claude_notes: notes,
     verified_at: matched ? new Date().toISOString() : null,
-  })
-    .select().single();
+  });
 
   if (error) return res.status(500).json({ error: error.message });
 
