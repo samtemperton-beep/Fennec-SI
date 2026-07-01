@@ -92,12 +92,7 @@ router.post('/csv', requireAuth, async (req, res) => {
   res.json({ holdings, format, count: holdings.length });
 });
 
-// POST /api/import/sync — full portfolio sync from CSV: upsert existing, add new, remove sold
-router.post('/sync', requireAuth, async (req, res) => {
-  const user = (req as any).user;
-  const { csv } = req.body;
-  if (!csv) return res.status(400).json({ error: 'No CSV data' });
-
+function parseCSV(csv: string) {
   const rows = csv.split('\n').map((line: string) => {
     const cells: string[] = [];
     let cur = '', inQ = false;
@@ -109,40 +104,54 @@ router.post('/sync', requireAuth, async (req, res) => {
     cells.push(cur.trim());
     return cells;
   }).filter((r: string[]) => r.some((c: string) => c));
-
   const format = detectFormat(rows);
   let parsed: Holding[];
   if (format === 'hatch') parsed = parseHatch(rows);
   else if (format === 'sharesies') parsed = parseSharesies(rows);
   else if (format === 'ibkr') parsed = parseIBKR(rows);
   else parsed = parseGeneric(rows);
+  return { format, parsed };
+}
 
-  if (parsed.length === 0) return res.status(400).json({ error: 'Could not extract any holdings from the CSV.' });
+// POST /api/import/sync — preview or full sync from CSV
+// ?preview=true returns what would change without writing; omit to apply
+router.post('/sync', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  const { csv, preview } = req.body;
+  if (!csv) return res.status(400).json({ error: 'No CSV data' });
 
-  const { data: existing } = await supabase.from('holdings').select('id, ticker').eq('user_id', user.id);
-  const existingMap = new Map((existing || []).map((h: any) => [h.ticker.toUpperCase(), h.id]));
+  const { format, parsed } = parseCSV(csv);
+  if (parsed.length === 0) return res.status(400).json({ error: 'Could not extract any holdings from the CSV. Make sure you are uploading a holdings or portfolio export.' });
+
+  const { data: existing } = await supabase.from('holdings').select('id, ticker, shares, buy_price').eq('user_id', user.id);
+  const existingMap = new Map((existing || []).map((h: any) => [h.ticker.toUpperCase(), h]));
   const csvSet = new Set(parsed.map(h => h.ticker));
 
-  const added: string[] = [], updated: string[] = [], removed: string[] = [];
+  const toAdd = parsed.filter(h => !existingMap.has(h.ticker)).map(h => h.ticker);
+  const toUpdate = parsed.filter(h => existingMap.has(h.ticker)).map(h => h.ticker);
+  const toRemove = (existing || []).filter((h: any) => !csvSet.has(h.ticker.toUpperCase())).map((h: any) => h.ticker);
 
+  // Preview mode: return what would change without writing
+  if (preview) {
+    return res.json({ format, preview: true, toAdd, toUpdate, toRemove, total: parsed.length });
+  }
+
+  // Apply sync
   for (const h of parsed) {
     if (existingMap.has(h.ticker)) {
-      await supabase.from('holdings').update({ shares: h.shares, buy_price: h.buyPrice || 0 }).eq('id', existingMap.get(h.ticker));
-      updated.push(h.ticker);
+      await supabase.from('holdings').update({ shares: h.shares, buy_price: h.buyPrice || 0 }).eq('user_id', user.id).eq('ticker', h.ticker);
     } else {
       await supabase.from('holdings').insert({ user_id: user.id, ticker: h.ticker, shares: h.shares, buy_price: h.buyPrice || 0, current_price: h.buyPrice || 0, market: h.market });
-      added.push(h.ticker);
     }
   }
 
-  for (const [ticker, id] of existingMap) {
-    if (!csvSet.has(ticker)) {
-      await supabase.from('holdings').delete().eq('id', id);
-      removed.push(ticker);
+  for (const h of (existing || [])) {
+    if (!csvSet.has(h.ticker.toUpperCase())) {
+      await supabase.from('holdings').delete().eq('user_id', user.id).eq('ticker', h.ticker);
     }
   }
 
-  res.json({ format, added, updated, removed });
+  res.json({ format, added: toAdd, updated: toUpdate, removed: toRemove });
 });
 
 router.post('/screenshot', requireAuth, async (req, res) => {

@@ -70,7 +70,6 @@ export default function PortfolioPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [analyzingSet, setAnalyzingSet] = useState(new Set<number>())
   const [addOpen, setAddOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [riskLevel, setRiskLevel] = useState(5)
@@ -84,6 +83,8 @@ export default function PortfolioPage() {
   const [csvText, setCsvText] = useState('')
   const [syncOpen, setSyncOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [syncPreview, setSyncPreview] = useState<{ format: string; toAdd: string[]; toUpdate: string[]; toRemove: string[]; total: number } | null>(null)
+  const [previewing, setPreviewing] = useState(false)
   const supabase = createClient()
 
   const userIdRef = useCallback((uid: string) => {
@@ -214,26 +215,16 @@ export default function PortfolioPage() {
     toast.success(`${form.ticker.toUpperCase()} added`)
   }
 
-  async function importCSV() {
-    if (!csvText.trim() || !userId) return
-    if (!isPremium && holdings.length >= 10) {
-      toast.error('Free plan limit: 10 holdings. Upgrade to Premium for unlimited.')
-      return
-    }
+  async function previewSync() {
+    if (!csvText.trim()) return
+    setPreviewing(true)
     try {
-      const { holdings: imported } = await api.importCSV(csvText)
-      for (const h of imported) {
-        const { data } = await supabase.from('holdings').insert({
-          user_id: userId, ticker: h.ticker, shares: h.shares,
-          buy_price: h.buyPrice, current_price: h.buyPrice, market: h.market,
-        }).select().single()
-        if (data) setHoldings(prev => [data, ...prev])
-      }
-      setImportOpen(false)
-      toast.success(`Imported ${imported.length} holdings`)
+      const result = await api.syncCSVPreview(csvText)
+      setSyncPreview(result)
     } catch (e: any) {
-      toast.error('Import failed: ' + e.message)
+      toast.error('Could not read CSV: ' + e.message)
     }
+    setPreviewing(false)
   }
 
   async function syncCSV() {
@@ -242,6 +233,7 @@ export default function PortfolioPage() {
     try {
       const result = await api.syncCSV(csvText)
       setSyncOpen(false)
+      setSyncPreview(null)
       setCsvText('')
       const parts = []
       if (result.added?.length) parts.push(`${result.added.length} added`)
@@ -292,9 +284,6 @@ export default function PortfolioPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={refreshPrices} disabled={refreshing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--sh)' }}>
             {refreshing ? <LoadingSpinner size={13} /> : <IconRefresh size={13} />} Refresh
-          </button>
-          <button onClick={() => { setCsvText(''); setSyncOpen(true) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--sh)' }}>
-            <IconUpload size={13} /> Sync CSV
           </button>
           {isPremium && (
             <button onClick={() => setVerifyOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: verification?.status === 'verified' ? 'var(--green-light)' : 'var(--surface)', border: `1px solid ${verification?.status === 'verified' ? 'var(--green)' : 'var(--border)'}`, color: verification?.status === 'verified' ? 'var(--green)' : 'var(--text)', boxShadow: 'var(--sh)' }}>
@@ -418,7 +407,7 @@ export default function PortfolioPage() {
           <p style={{ color: 'var(--text2)', marginBottom: 24 }}>Add stocks manually or import from your broker</p>
           <div className="flex items-center justify-center gap-3">
             <button onClick={() => setAddOpen(true)} style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 10, fontWeight: 700, border: 'none', cursor: 'pointer' }}>Add Stock</button>
-            <button onClick={() => setImportOpen(true)} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Import CSV</button>
+            <button onClick={() => { setCsvText(''); setSyncPreview(null); setSyncOpen(true) }} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Sync CSV</button>
           </div>
         </div>
       ) : (
@@ -430,8 +419,8 @@ export default function PortfolioPage() {
                   <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 1 }}>Holdings</p>
                   <p style={{ fontSize: 12, color: 'var(--text2)' }}>Click Analyse to get AI signals</p>
                 </div>
-                <button onClick={() => setImportOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'none', border: '1px solid var(--border)', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: 'var(--text2)' }}>
-                  <IconUpload size={12} /> Import
+                <button onClick={() => { setCsvText(''); setSyncPreview(null); setSyncOpen(true) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'none', border: '1px solid var(--border)', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: 'var(--text2)' }}>
+                  <IconUpload size={12} /> Sync CSV
                 </button>
               </div>
               <HoldingsTable holdings={holdings} analyzingSet={analyzingSet} onDelete={deleteHolding} onAnalyze={analyzeHolding} broker={broker} />
@@ -488,71 +477,60 @@ export default function PortfolioPage() {
         }}
       />
 
-      {/* Sync Modal */}
-      <Modal open={syncOpen} onClose={() => { setSyncOpen(false); setCsvText('') }} title="Sync from CSV" wide>
-        <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 4 }}>
-          Upload your latest broker CSV to keep Fennec in sync. This will:
-        </p>
-        <ul style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16, paddingLeft: 20, lineHeight: 1.8 }}>
-          <li>Update share counts and prices for existing holdings</li>
-          <li>Add any new positions you have opened</li>
-          <li>Remove positions you have sold</li>
-        </ul>
-        <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '32px 16px', borderRadius: 8, cursor: 'pointer', border: '2px dashed var(--border)', background: 'var(--surface2)', color: 'var(--text2)', fontSize: 13 }}>
-          <IconUpload size={24} style={{ color: 'var(--primary)' }} />
-          {csvText ? <span style={{ color: 'var(--text)', fontWeight: 600 }}>CSV loaded — ready to sync</span> : <span>Click to choose a CSV file (Hatch, Sharesies, IBKR)</span>}
-          <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => {
-            const file = e.target.files?.[0]
-            if (!file) return
-            const reader = new FileReader()
-            reader.onload = ev => setCsvText(ev.target?.result as string)
-            reader.readAsText(file)
-          }} />
-        </label>
-        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-          <button onClick={syncCSV} disabled={!csvText || syncing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, border: 'none', cursor: csvText && !syncing ? 'pointer' : 'not-allowed', opacity: csvText && !syncing ? 1 : 0.5 }}>
-            {syncing ? <><LoadingSpinner size={13} /> Syncing…</> : <><IconUpload size={13} /> Sync Portfolio</>}
-          </button>
-          <button onClick={() => { setSyncOpen(false); setCsvText('') }} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
-            Cancel
-          </button>
-        </div>
-      </Modal>
-
-      {/* Import Modal */}
-      <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import Portfolio" wide>
-        <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>Upload a CSV from Hatch, Sharesies, or IBKR — we auto-detect the format.</p>
-        <label
-          style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: '32px 16px', borderRadius: 8, cursor: 'pointer',
-            border: '2px dashed var(--border)', background: 'var(--surface2)',
-            color: 'var(--text2)', fontSize: 13,
-          }}
-        >
-          <IconUpload size={24} style={{ color: 'var(--primary)' }} />
-          {csvText ? <span style={{ color: 'var(--text)' }}>File loaded — ready to import</span> : <span>Click to choose a CSV file</span>}
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            style={{ display: 'none' }}
-            onChange={e => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              const reader = new FileReader()
-              reader.onload = ev => setCsvText(ev.target?.result as string)
-              reader.readAsText(file)
-            }}
-          />
-        </label>
-        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-          <button onClick={importCSV} disabled={!csvText} style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, opacity: csvText ? 1 : 0.5 }}>
-            Import
-          </button>
-          <button onClick={() => { setImportOpen(false); setCsvText('') }} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-            Cancel
-          </button>
-        </div>
+      {/* Sync CSV Modal — two-step: upload → preview → confirm */}
+      <Modal open={syncOpen} onClose={() => { setSyncOpen(false); setCsvText(''); setSyncPreview(null) }} title="Sync Portfolio from CSV" wide>
+        {!syncPreview ? (
+          <>
+            <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
+              Upload your latest CSV from Hatch, Sharesies, or IBKR. We will show you exactly what will change before applying anything.
+            </p>
+            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '32px 16px', borderRadius: 8, cursor: 'pointer', border: '2px dashed var(--border)', background: 'var(--surface2)', color: 'var(--text2)', fontSize: 13 }}>
+              <IconUpload size={24} style={{ color: 'var(--primary)' }} />
+              {csvText
+                ? <span style={{ color: 'var(--text)', fontWeight: 600 }}>CSV loaded — click Preview to continue</span>
+                : <span>Click to choose a CSV file (Hatch, Sharesies, IBKR)</span>}
+              <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setSyncPreview(null)
+                const reader = new FileReader()
+                reader.onload = ev => setCsvText(ev.target?.result as string)
+                reader.readAsText(file)
+              }} />
+            </label>
+            <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+              <button onClick={previewSync} disabled={!csvText || previewing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 8, fontWeight: 600, border: 'none', cursor: csvText && !previewing ? 'pointer' : 'not-allowed', opacity: csvText && !previewing ? 1 : 0.5 }}>
+                {previewing ? <><LoadingSpinner size={13} /> Reading…</> : 'Preview changes'}
+              </button>
+              <button onClick={() => { setSyncOpen(false); setCsvText('') }} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
+              Detected format: <strong style={{ color: 'var(--text)' }}>{syncPreview.format}</strong> · {syncPreview.total} holdings in CSV
+            </p>
+            {[
+              { label: 'New positions to add', tickers: syncPreview.toAdd, color: 'var(--green)' },
+              { label: 'Existing positions to update (shares & price)', tickers: syncPreview.toUpdate, color: 'var(--primary)' },
+              { label: 'Positions to remove (sold)', tickers: syncPreview.toRemove, color: 'var(--red)' },
+            ].map(({ label, tickers, color }) => tickers.length > 0 && (
+              <div key={label} style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 6 }}>{label} ({tickers.length})</p>
+                <p style={{ fontSize: 12, color: 'var(--text)', fontFamily: 'DM Mono, monospace' }}>{tickers.join(', ')}</p>
+              </div>
+            ))}
+            {syncPreview.toAdd.length === 0 && syncPreview.toUpdate.length === 0 && syncPreview.toRemove.length === 0 && (
+              <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 12 }}>No changes detected — your Fennec portfolio already matches the CSV.</p>
+            )}
+            <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+              <button onClick={syncCSV} disabled={syncing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 8, fontWeight: 600, border: 'none', cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.6 : 1 }}>
+                {syncing ? <><LoadingSpinner size={13} /> Syncing…</> : 'Apply sync'}
+              </button>
+              <button onClick={() => setSyncPreview(null)} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Back</button>
+            </div>
+          </>
+        )}
       </Modal>
     </div>
   )
