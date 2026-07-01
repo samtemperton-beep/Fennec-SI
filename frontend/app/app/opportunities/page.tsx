@@ -5,7 +5,9 @@ import { api } from '@/lib/api'
 import { createClient } from '@/lib/supabase'
 import { loadPrefs, topInterests } from '@/lib/newsPrefs'
 import { LoadingSpinner, SkeletonCard } from '@/components/shared/LoadingSpinner'
-import { IconBrain, IconRefresh, IconPlus } from '@tabler/icons-react'
+import { Modal } from '@/components/shared/Modal'
+import { IconBrain, IconRefresh, IconPlus, IconExternalLink, IconArrowRight } from '@tabler/icons-react'
+import { timeAgo } from '@/lib/utils'
 import { toast } from 'sonner'
 
 interface Opp {
@@ -49,8 +51,6 @@ function applyFilter(opps: Opp[], filter: FilterKey): Opp[] {
   return opps
 }
 
-const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
-
 export default function DiscoverPage() {
   const [opps, setOpps] = useState<Opp[]>([])
   const [loading, setLoading] = useState(false)
@@ -59,14 +59,21 @@ export default function DiscoverPage() {
   const [holdings, setHoldings] = useState<string[]>([])
   const [userId, setUserId] = useState<string | null>(null)
   const [limited, setLimited] = useState(false)
+  const [adding, setAdding] = useState<string | null>(null)
+  const [diveOpp, setDiveOpp] = useState<Opp | null>(null)
+  const [diveAnalysis, setDiveAnalysis] = useState<any>(null)
+  const [diveNews, setDiveNews] = useState<any[]>([])
+  const [diving, setDiving] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
-      const uid = data.user?.id ?? DEV_USER_ID
+      const uid = data.user?.id ?? null
       setUserId(uid)
-      const { data: h } = await supabase.from('holdings').select('ticker').eq('user_id', uid)
-      if (h) setHoldings(h.map((x: any) => x.ticker))
+      if (uid) {
+        const { data: h } = await supabase.from('holdings').select('ticker').eq('user_id', uid)
+        if (h) setHoldings(h.map((x: any) => x.ticker))
+      }
     })
   }, [])
 
@@ -97,13 +104,33 @@ export default function DiscoverPage() {
   }
 
   async function addToWatchlist(o: Opp) {
-    if (!userId) return
+    if (!userId) return toast.error('Please sign in to add to watchlist')
     const t = o.ticker.toUpperCase()
-    const { data: existing } = await supabase.from('watchlist').select('id').eq('user_id', userId).eq('ticker', t)
-    if (existing && existing.length > 0) return toast.error(`${t} is already in your watchlist`)
-    const { error } = await supabase.from('watchlist').insert({ user_id: userId, ticker: t, market: o.market || 'US' })
-    if (error) return toast.error(error.message)
-    toast.success(`${t} added to watchlist`)
+    setAdding(t)
+    try {
+      const { data: existing } = await supabase.from('watchlist').select('id').eq('user_id', userId).eq('ticker', t)
+      if (existing && existing.length > 0) { toast.error(`${t} is already in your watchlist`); return }
+      const { error } = await supabase.from('watchlist').insert({ user_id: userId, ticker: t, market: o.market || 'US' })
+      if (error) toast.error(error.message)
+      else toast.success(`${t} added to watchlist ✓`)
+    } finally {
+      setAdding(null)
+    }
+  }
+
+  async function openDive(o: Opp) {
+    setDiveOpp(o)
+    setDiveAnalysis(null)
+    setDiveNews([])
+    setDiving(true)
+    const context = `${o.name} (${o.ticker}) — ${o.reason}. Catalyst: ${o.catalyst}. Theme: ${o.theme}.`
+    const [analysisResult, newsResult] = await Promise.allSettled([
+      api.deepDive(o.ticker, context),
+      api.getNews([o.ticker]),
+    ])
+    if (analysisResult.status === 'fulfilled') setDiveAnalysis(analysisResult.value)
+    if (newsResult.status === 'fulfilled') setDiveNews((newsResult.value || []).slice(0, 5))
+    setDiving(false)
   }
 
   const visible = applyFilter(opps, filter)
@@ -139,7 +166,7 @@ export default function DiscoverPage() {
 
       {/* Results */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : opps.length === 0 ? (
@@ -156,7 +183,7 @@ export default function DiscoverPage() {
           <p style={{ color: 'var(--text2)', fontSize: 14 }}>No picks match this filter — try a different category.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {visible.map((o, i) => {
             const signal = deriveSignal(o.upside_min_pct)
             const color = tickerColor(o.ticker)
@@ -199,17 +226,99 @@ export default function DiscoverPage() {
                   ))}
                 </div>
 
-                {/* Add to watchlist */}
-                <button onClick={() => addToWatchlist(o)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 8, background: 'var(--accent)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer' }}
-                >
-                  <IconPlus size={14} /> Add to watchlist
-                </button>
+                {/* Footer row: signal hint + watchlist button */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                    {o.market && o.market !== 'US' ? o.market : 'US'} · {o.market_cap_category}-cap
+                  </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => openDive(o)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      <IconBrain size={13} /> Deep Dive
+                    </button>
+                    <button onClick={() => addToWatchlist(o)} disabled={adding === o.ticker.toUpperCase()}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 8, background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, border: 'none', cursor: adding === o.ticker.toUpperCase() ? 'default' : 'pointer', opacity: adding === o.ticker.toUpperCase() ? 0.6 : 1, flexShrink: 0 }}
+                    >
+                      <IconPlus size={13} /> {adding === o.ticker.toUpperCase() ? 'Adding…' : 'Watchlist'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )
           })}
         </div>
       )}
+
+      {/* Deep Dive Modal */}
+      <Modal open={!!diveOpp} onClose={() => setDiveOpp(null)} title={diveOpp ? `${diveOpp.ticker} — Deep Dive` : ''} wide>
+        {diveOpp && (
+          <div>
+            {/* Stock header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: tickerColor(diveOpp.ticker), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: Math.max(8, 13 - Math.max(0, diveOpp.ticker.length - 3)), color: 'white' }}>{diveOpp.ticker.slice(0, 5)}</span>
+              </div>
+              <div>
+                <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>{diveOpp.name}</p>
+                <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>{diveOpp.market} · {diveOpp.sector} · {diveOpp.market_cap_category}-cap</p>
+              </div>
+            </div>
+
+            {diving ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}><LoadingSpinner size={32} /></div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {/* AI Analysis */}
+                {diveAnalysis && (
+                  <div>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>AI Analysis</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {[
+                        { label: 'What's the play', value: diveAnalysis.what_happened },
+                        { label: 'Why it matters', value: diveAnalysis.why_it_matters },
+                        { label: 'Portfolio fit', value: diveAnalysis.portfolio_impact },
+                        { label: 'Suggested action', value: diveAnalysis.action_suggestion },
+                      ].map(s => s.value && (
+                        <div key={s.label}>
+                          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</p>
+                          <p style={{ fontSize: 14, lineHeight: 1.7 }}>{s.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Related news */}
+                {diveNews.length > 0 && (
+                  <div>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Related News</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {diveNews.map((n: any, i: number) => (
+                        <a key={i} href={n.url} target="_blank" rel="noopener noreferrer"
+                          style={{ textDecoration: 'none', display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', transition: 'border-color 0.15s' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--primary)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.borderColor = ''}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, color: 'var(--text)', lineHeight: 1.45, marginBottom: 4 }}>{n.headline}</p>
+                            <p style={{ fontSize: 11, color: 'var(--text2)' }}>{n.source} · {timeAgo(n.datetime)}</p>
+                          </div>
+                          <IconExternalLink size={13} style={{ color: 'var(--text2)', flexShrink: 0, marginTop: 2 }} />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!diveAnalysis && diveNews.length === 0 && (
+                  <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', padding: '24px 0' }}>No data available right now — try again shortly.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Premium teaser */}
       {limited && opps.length > 0 && (
