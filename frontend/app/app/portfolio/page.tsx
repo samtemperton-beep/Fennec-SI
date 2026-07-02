@@ -280,7 +280,14 @@ export default function PortfolioPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontWeight: 800, fontSize: 22, marginBottom: 2 }}>{greeting}, {displayName} 👋</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 13 }}>{todayStr}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+            <p style={{ color: 'var(--text2)', fontSize: 13 }}>{todayStr}</p>
+            {!loading && holdings.length > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 20, padding: '2px 8px' }}>
+                {holdings.length} holding{holdings.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={refreshPrices} disabled={refreshing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--sh)' }}>
