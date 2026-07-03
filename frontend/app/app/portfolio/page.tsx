@@ -415,7 +415,7 @@ export default function PortfolioPage() {
           <p style={{ color: 'var(--text2)', marginBottom: 24 }}>Add stocks manually or import from your broker</p>
           <div className="flex items-center justify-center gap-3">
             <button onClick={() => setAddOpen(true)} style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 10, fontWeight: 700, border: 'none', cursor: 'pointer' }}>Add Stock</button>
-            <button onClick={() => { setCsvText(''); setSyncPreview(null); setSyncOpen(true) }} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Sync CSV</button>
+            <button onClick={() => { setCsvText(''); setSyncPreview(null); setSyncOpen(true) }} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 10, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Import Holdings</button>
           </div>
         </div>
       ) : (
@@ -428,7 +428,7 @@ export default function PortfolioPage() {
                   <p style={{ fontSize: 12, color: 'var(--text2)' }}>Click Analyse to get AI signals</p>
                 </div>
                 <button onClick={() => { setCsvText(''); setSyncPreview(null); setSyncOpen(true) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'none', border: '1px solid var(--border)', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: 'var(--text2)' }}>
-                  <IconUpload size={12} /> Sync CSV
+                  <IconUpload size={12} /> {holdings.length === 0 ? 'Import Holdings' : 'Sync Holdings'}
                 </button>
               </div>
               <HoldingsTable holdings={holdings} analyzingSet={analyzingSet} onDelete={deleteHolding} onAnalyze={analyzeHolding} broker={broker} />
@@ -485,12 +485,14 @@ export default function PortfolioPage() {
         }}
       />
 
-      {/* Sync CSV Modal — two-step: upload → preview → confirm */}
-      <Modal open={syncOpen} onClose={() => { setSyncOpen(false); setCsvText(''); setSyncPreview(null) }} title="Sync Portfolio from CSV" wide>
+      {/* Import/Sync Holdings Modal — two-step: upload → preview → confirm */}
+      <Modal open={syncOpen} onClose={() => { setSyncOpen(false); setCsvText(''); setSyncPreview(null) }} title={holdings.length === 0 ? 'Import Holdings' : 'Sync Holdings'} wide>
         {!syncPreview ? (
           <>
             <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
-              Upload your latest CSV from Hatch, Sharesies, or IBKR. We will show you exactly what will change before applying anything.
+              {holdings.length === 0
+                ? 'Upload a CSV export from your broker to import your holdings into Fennec.'
+                : 'Upload your latest CSV export to sync your holdings — new positions will be added, updated shares applied, and sold positions removed.'}
             </p>
             <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '32px 16px', borderRadius: 8, cursor: 'pointer', border: '2px dashed var(--border)', background: 'var(--surface2)', color: 'var(--text2)', fontSize: 13 }}>
               <IconUpload size={24} style={{ color: 'var(--primary)' }} />
@@ -533,7 +535,7 @@ export default function PortfolioPage() {
             )}
             <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
               <button onClick={syncCSV} disabled={syncing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: 8, fontWeight: 600, border: 'none', cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.6 : 1 }}>
-                {syncing ? <><LoadingSpinner size={13} /> Syncing…</> : 'Apply sync'}
+                {syncing ? <><LoadingSpinner size={13} /> {holdings.length === 0 ? 'Importing…' : 'Syncing…'}</> : (holdings.length === 0 ? 'Import Holdings' : 'Apply Sync')}
               </button>
               <button onClick={() => setSyncPreview(null)} style={{ background: 'var(--surface2)', color: 'var(--text)', padding: '10px 20px', borderRadius: 8, border: '1px solid var(--border)', fontWeight: 600, cursor: 'pointer' }}>Back</button>
             </div>

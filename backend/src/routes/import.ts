@@ -127,7 +127,11 @@ router.post('/sync', requireAuth, async (req, res) => {
   const { format, parsed } = parseCSV(csv);
   if (parsed.length === 0) return res.status(400).json({ error: 'Could not extract any holdings from the CSV. Make sure you are uploading a holdings or portfolio export.' });
 
-  const { data: existing } = await supabase.from('holdings').select('id, ticker, shares, buy_price').eq('user_id', user.id);
+  // Fetch all existing holdings — preserve current_price, signal, sector, name etc.
+  const { data: existing } = await supabase
+    .from('holdings')
+    .select('id, ticker, current_price, signal, signal_reason, sector, name')
+    .eq('user_id', user.id);
   const existingMap = new Map((existing || []).map((h: any) => [h.ticker.toUpperCase(), h]));
   const csvSet = new Set(parsed.map(h => h.ticker));
 
@@ -140,26 +144,40 @@ router.post('/sync', requireAuth, async (req, res) => {
     return res.json({ format, preview: true, toAdd, toUpdate, toRemove, total: parsed.length });
   }
 
-  // Apply sync: delete ALL existing holdings then re-insert from CSV
-  // This avoids duplicate rows from partial previous syncs and handles removals cleanly
-  await supabase.from('holdings').delete().eq('user_id', user.id);
-
+  // Apply sync
   const failed: string[] = [];
+
+  // 1. Update existing holdings (shares + buy_price from CSV; keep current_price, signal, sector)
   for (const h of parsed) {
     const existing_row = existingMap.get(h.ticker);
-    const { error } = await supabase.from('holdings').insert({
-      user_id: user.id,
-      ticker: h.ticker,
-      shares: h.shares,
-      buy_price: h.buyPrice || 0,
-      // Preserve existing current_price if we have it, otherwise use buyPrice
-      current_price: existing_row?.current_price || h.buyPrice || 0,
-      market: h.market,
-      is_verified: true,
-    });
-    if (error) failed.push(h.ticker);
+    if (existing_row) {
+      const { error } = await supabase.from('holdings')
+        .update({ shares: h.shares, buy_price: h.buyPrice || 0, is_verified: true })
+        .eq('id', existing_row.id);
+      if (error) failed.push(`update:${h.ticker}(${error.message})`);
+    } else {
+      const { error } = await supabase.from('holdings').insert({
+        user_id: user.id,
+        ticker: h.ticker,
+        shares: h.shares,
+        buy_price: h.buyPrice || 0,
+        current_price: h.buyPrice || 0,
+        market: h.market,
+        is_verified: true,
+      });
+      if (error) failed.push(`insert:${h.ticker}(${error.message})`);
+    }
   }
 
+  // 2. Delete holdings no longer in CSV (sold positions)
+  for (const h of (existing || [])) {
+    if (!csvSet.has(h.ticker.toUpperCase())) {
+      const { error } = await supabase.from('holdings').delete().eq('id', h.id);
+      if (error) failed.push(`delete:${h.ticker}(${error.message})`);
+    }
+  }
+
+  if (failed.length > 0) console.error('[sync] failures:', failed);
   res.json({ format, added: toAdd, updated: toUpdate, removed: toRemove, failed });
 });
 
