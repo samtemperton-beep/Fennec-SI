@@ -4,6 +4,7 @@ import ws from 'ws';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../middleware/auth';
 import { evaluateAndAwardBadges } from '../services/badges';
+import { parseCSV } from './import';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -329,6 +330,60 @@ router.post('/verify-email', requireAuth, async (req, res) => {
   const newBadges = await evaluateAndAwardBadges(user.id, allHoldings || [], matched);
 
   res.json({ verification, newBadges, matched });
+});
+
+// POST /api/premium/sync — preview or full sync of holdings from broker CSV
+router.post('/sync', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  const { csv, preview } = req.body;
+  if (!csv) return res.status(400).json({ error: 'No CSV data' });
+
+  const { format, parsed } = parseCSV(csv);
+  if (parsed.length === 0) return res.status(400).json({ error: 'Could not extract any holdings from the CSV. Make sure you are uploading a holdings or portfolio export.' });
+
+  const { data: existing } = await supabase
+    .from('holdings')
+    .select('id, ticker, current_price, signal, signal_reason, sector, name')
+    .eq('user_id', user.id);
+  const existingMap = new Map((existing || []).map((h: any) => [h.ticker.toUpperCase(), h]));
+  const csvSet = new Set(parsed.map(h => h.ticker));
+
+  const toAdd = parsed.filter(h => !existingMap.has(h.ticker)).map(h => h.ticker);
+  const toUpdate = parsed.filter(h => existingMap.has(h.ticker)).map(h => h.ticker);
+  const toRemove = (existing || []).filter((h: any) => !csvSet.has(h.ticker.toUpperCase())).map((h: any) => h.ticker);
+
+  if (preview) {
+    return res.json({ format, preview: true, toAdd, toUpdate, toRemove, total: parsed.length });
+  }
+
+  const failed: string[] = [];
+
+  for (const h of parsed) {
+    const existing_row = existingMap.get(h.ticker);
+    if (existing_row) {
+      const { error } = await supabase.from('holdings')
+        .update({ shares: h.shares, buy_price: h.buyPrice || 0, is_verified: true })
+        .eq('id', existing_row.id);
+      if (error) failed.push(`update:${h.ticker}(${error.message})`);
+    } else {
+      const { error } = await supabase.from('holdings').insert({
+        user_id: user.id, ticker: h.ticker, shares: h.shares,
+        buy_price: h.buyPrice || 0, current_price: h.buyPrice || 0,
+        market: h.market, is_verified: true,
+      });
+      if (error) failed.push(`insert:${h.ticker}(${error.message})`);
+    }
+  }
+
+  for (const h of (existing || [])) {
+    if (!csvSet.has(h.ticker.toUpperCase())) {
+      const { error } = await supabase.from('holdings').delete().eq('id', h.id);
+      if (error) failed.push(`delete:${h.ticker}(${error.message})`);
+    }
+  }
+
+  if (failed.length > 0) console.error('[sync] failures:', failed);
+  res.json({ format, added: toAdd, updated: toUpdate, removed: toRemove, failed });
 });
 
 // POST /api/premium/evaluate-badges — re-run badge evaluation (call after price refresh)

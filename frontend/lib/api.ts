@@ -80,10 +80,10 @@ export const api = {
     apiFetch('/api/import/csv', { method: 'POST', body: JSON.stringify({ csv }) }),
 
   syncCSVPreview: (csv: string) =>
-    apiFetch('/api/import/sync', { method: 'POST', body: JSON.stringify({ csv, preview: true }) }),
+    apiFetch('/api/premium/sync', { method: 'POST', body: JSON.stringify({ csv, preview: true }) }),
 
   syncCSV: (csv: string) =>
-    apiFetch('/api/import/sync', { method: 'POST', body: JSON.stringify({ csv }) }),
+    apiFetch('/api/premium/sync', { method: 'POST', body: JSON.stringify({ csv }) }),
 
   importScreenshot: (imageBase64: string, mediaType?: string) =>
     apiFetch('/api/import/screenshot', { method: 'POST', body: JSON.stringify({ imageBase64, mediaType }) }),
