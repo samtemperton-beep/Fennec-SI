@@ -29,6 +29,8 @@ const SOURCES = [
   { id: 'commsec',     name: 'CommSec Daily',         color: '#FFCC00' },
   { id: 'moby',        name: 'Moby',                  color: '#6366f1' },
   { id: 'asr',         name: 'Australian Stock Report', color: '#003366' },
+  { id: 'sharechat',  name: 'ShareChat',               color: '#00a86b' },
+  { id: 'asb-nz',    name: 'ASB Markets',             color: '#e31837' },
 ]
 
 const CATEGORIES = ['All', 'Picks', 'Macro', 'Earnings']
