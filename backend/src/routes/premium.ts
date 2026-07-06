@@ -356,30 +356,28 @@ router.post('/sync', requireAuth, async (req, res) => {
     return res.json({ format, preview: true, toAdd, toUpdate, toRemove, total: parsed.length });
   }
 
-  const failed: string[] = [];
+  // Delete all existing holdings then reinsert from CSV — clean slate prevents duplicates
+  const { error: deleteError } = await supabase.from('holdings').delete().eq('user_id', user.id);
+  if (deleteError) return res.status(500).json({ error: 'Failed to clear existing holdings: ' + deleteError.message });
 
+  const failed: string[] = [];
   for (const h of parsed) {
     const existing_row = existingMap.get(h.ticker);
-    if (existing_row) {
-      const { error } = await supabase.from('holdings')
-        .update({ shares: h.shares, buy_price: h.buyPrice || 0, is_verified: true })
-        .eq('id', existing_row.id);
-      if (error) failed.push(`update:${h.ticker}(${error.message})`);
-    } else {
-      const { error } = await supabase.from('holdings').insert({
-        user_id: user.id, ticker: h.ticker, shares: h.shares,
-        buy_price: h.buyPrice || 0, current_price: h.buyPrice || 0,
-        market: h.market, is_verified: true,
-      });
-      if (error) failed.push(`insert:${h.ticker}(${error.message})`);
-    }
-  }
-
-  for (const h of (existing || [])) {
-    if (!csvSet.has(h.ticker.toUpperCase())) {
-      const { error } = await supabase.from('holdings').delete().eq('id', h.id);
-      if (error) failed.push(`delete:${h.ticker}(${error.message})`);
-    }
+    const { error } = await supabase.from('holdings').insert({
+      user_id: user.id,
+      ticker: h.ticker,
+      shares: h.shares,
+      buy_price: h.buyPrice || 0,
+      current_price: existing_row?.current_price || h.buyPrice || 0,
+      market: h.market,
+      is_verified: true,
+      // Preserve AI signals if they exist
+      signal: existing_row?.signal || null,
+      signal_reason: existing_row?.signal_reason || null,
+      sector: existing_row?.sector || null,
+      name: existing_row?.name || null,
+    });
+    if (error) failed.push(`${h.ticker}(${error.message})`);
   }
 
   if (failed.length > 0) console.error('[sync] failures:', failed);
