@@ -3,13 +3,15 @@ import { useEffect, useState, useRef } from 'react'
 import { api } from '@/lib/api'
 
 const INDICES = [
-  { ticker: 'SPY',  label: 'S&P 500' },
-  { ticker: 'QQQ',  label: 'Nasdaq' },
-  { ticker: 'DIA',  label: 'Dow 30' },
-  { ticker: 'IWM',  label: 'Russell 2000' },
-  { ticker: 'GLD',  label: 'Gold' },
-  { ticker: 'TLT',  label: '20Y Bond' },
-  { ticker: 'USO',  label: 'Oil' },
+  { ticker: 'SPY',     label: 'S&P 500' },
+  { ticker: 'QQQ',     label: 'Nasdaq' },
+  { ticker: 'DIA',     label: 'Dow 30' },
+  { ticker: 'IWM',     label: 'Russell 2000' },
+  { ticker: '^AXJO',   label: 'ASX 200' },
+  { ticker: '^NZ50',   label: 'NZX 50' },
+  { ticker: 'GLD',     label: 'Gold' },
+  { ticker: 'TLT',     label: '20Y Bond' },
+  { ticker: 'USO',     label: 'Oil' },
   { ticker: 'BTC-USD', label: 'Bitcoin' },
 ]
 
