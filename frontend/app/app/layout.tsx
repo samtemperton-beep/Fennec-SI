@@ -10,6 +10,7 @@ import {
   IconSun, IconMoon, IconShield,
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
+import { MarketTicker } from '@/components/shared/MarketTicker'
 import { Avatar } from '@/components/shared/Avatar'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 
@@ -196,6 +197,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           {!open && <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>}
         </div>
+        <MarketTicker />
         <div style={{ flex: 1, overflow: 'auto' }}>
           {children}
         </div>
