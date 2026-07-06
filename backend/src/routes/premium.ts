@@ -371,11 +371,9 @@ router.post('/sync', requireAuth, async (req, res) => {
       current_price: existing_row?.current_price || h.buyPrice || 0,
       market: h.market,
       is_verified: true,
-      // Preserve AI signals if they exist
       signal: existing_row?.signal || null,
       signal_reason: existing_row?.signal_reason || null,
       sector: existing_row?.sector || null,
-      name: existing_row?.name || null,
     });
     if (error) failed.push(`${h.ticker}(${error.message})`);
   }
