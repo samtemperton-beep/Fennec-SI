@@ -37,7 +37,7 @@ export default function LeaderboardPage() {
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Leaderboard</h1>
       </div>
       <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 24 }}>
-        Top verified portfolios ranked by overall gain. Only portfolios with a verified broker statement appear here.
+        Top verified portfolios ranked by overall gain. Only broker-synced holdings count toward your rank — manually added stocks are excluded to keep the leaderboard fair.
       </p>
 
       {loading ? (

@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { SignalBadge } from '@/components/shared/SignalBadge'
 import { fmtCurrency, fmtPct } from '@/lib/utils'
-import { IconChevronUp, IconChevronDown, IconLoader, IconExternalLink } from '@tabler/icons-react'
+import { IconChevronUp, IconChevronDown, IconLoader, IconExternalLink, IconShieldCheck, IconShield } from '@tabler/icons-react'
 import { type Broker, getStockUrl } from '@/lib/brokers'
 
 const BUBBLE_COLORS = ['#5B7CF0','#14B8A6','#22C55E','#F59E0B','#EF4444','#A855F7','#F97316','#0EA5E9','#EC4899','#6366F1']
@@ -23,6 +23,7 @@ export interface Holding {
   signal?: string | null
   signal_reason?: string | null
   sector?: string | null
+  is_verified?: boolean
 }
 
 type SortKey = 'ticker' | 'shares' | 'buy_price' | 'current_price' | 'pl' | 'plpct'
@@ -120,6 +121,10 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
                         {h.market !== 'US' && (
                           <span style={{ fontSize: 9, color: 'var(--text3)', background: 'var(--surface2)', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>{h.market}</span>
                         )}
+                        {h.is_verified
+                          ? <IconShieldCheck size={11} style={{ color: 'var(--green)', flexShrink: 0 }} title="Verified via broker sync" />
+                          : <IconShield size={11} style={{ color: 'var(--text3)', flexShrink: 0 }} title="Not verified — sync from your broker to verify" />
+                        }
                         <IconExternalLink size={11} style={{ color: 'var(--primary)', opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s', flexShrink: 0 }} />
                       </div>
                       <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>

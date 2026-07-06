@@ -416,10 +416,10 @@ router.get('/leaderboard', requireAuth, async (_req, res) => {
 
   const userIds = verifiedUsers.map((v: any) => v.user_id);
 
-  // Get their profiles and holdings
+  // Get their profiles and VERIFIED holdings only — unverified holdings cannot affect rank
   const [profilesRes, holdingsRes] = await Promise.all([
     supabase.from('profiles').select('id, username, avatar_color, avatar_emoji, avatar_url').in('id', userIds),
-    supabase.from('holdings').select('user_id, shares, buy_price, current_price').in('user_id', userIds),
+    supabase.from('holdings').select('user_id, shares, buy_price, current_price').in('user_id', userIds).eq('is_verified', true),
   ]);
 
   const profileMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
