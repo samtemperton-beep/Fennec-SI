@@ -7,7 +7,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
 import { WatchlistButton } from '@/components/shared/WatchlistButton'
 import { timeAgo } from '@/lib/utils'
-import { IconExternalLink, IconBookmark, IconBookmarkFilled, IconShare, IconSend, IconBrain, IconFileText } from '@tabler/icons-react'
+import { IconExternalLink, IconBookmark, IconBookmarkFilled, IconShare, IconSend, IconBrain, IconFileText, IconFlame, IconUsers } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { loadPrefs, recordInteraction, personalBoost } from '@/lib/newsPrefs'
 
@@ -48,6 +48,7 @@ export default function NewsPage() {
   const [sharing, setSharing] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
   const [filings, setFilings] = useState<any[]>([])
+  const [socialBuzz, setSocialBuzz] = useState<Record<string, any>>({})
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -68,6 +69,18 @@ export default function NewsPage() {
       const saved = JSON.parse(localStorage.getItem(`saved_news_${uid}`) || '[]')
       setSavedIds(new Set(saved))
     } catch {}
+    // Fetch StockTwits sentiment for top portfolio tickers in background
+    const buzzTickers = [...new Set([...portfolioTickers, ...watchlistTickers])].slice(0, 5)
+    if (buzzTickers.length) {
+      const API = process.env.NEXT_PUBLIC_API_URL || ''
+      Promise.allSettled(buzzTickers.map(t => fetch(`${API}/api/social/sentiment/${t}`).then(r => r.json())))
+        .then(results => {
+          const buzz: Record<string, any> = {}
+          results.forEach((r, i) => { if (r.status === 'fulfilled' && !r.value?.error) buzz[buzzTickers[i]] = r.value })
+          setSocialBuzz(buzz)
+        })
+    }
+
     setLoading(true)
     try {
       const allTickers = [...new Set([...portfolioTickers, ...watchlistTickers])].slice(0, 12)
@@ -310,6 +323,50 @@ export default function NewsPage() {
                   💡 {digest.action}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* StockTwits Social Buzz */}
+          {Object.keys(socialBuzz).length > 0 && (
+            <div className="card">
+              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <IconFlame size={14} style={{ color: 'var(--accent)' }} /> Social Buzz
+                <span style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 400, marginLeft: 2 }}>via StockTwits</span>
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {Object.entries(socialBuzz).map(([ticker, d]) => {
+                  const total = d.bullish + d.bearish
+                  const bullPct = total > 0 ? Math.round((d.bullish / total) * 100) : 50
+                  return (
+                    <div key={ticker}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 24, height: 24, borderRadius: 6, background: tickerColor(ticker), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 7, color: 'white' }}>{ticker.slice(0, 4)}</span>
+                          </div>
+                          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 12 }}>{ticker}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          {d.watchlist_count != null && (
+                            <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <IconUsers size={10} />{d.watchlist_count.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Bull/bear bar */}
+                      <div style={{ height: 5, borderRadius: 3, background: 'var(--surface2)', overflow: 'hidden', display: 'flex' }}>
+                        <div style={{ width: `${bullPct}%`, background: 'var(--green)', transition: 'width 0.4s' }} />
+                        <div style={{ flex: 1, background: 'var(--red)' }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+                        <span style={{ fontSize: 10, color: 'var(--green)', fontFamily: 'DM Mono, monospace' }}>▲ {d.bullish} bull</span>
+                        <span style={{ fontSize: 10, color: 'var(--red)', fontFamily: 'DM Mono, monospace' }}>{d.bearish} bear ▼</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 

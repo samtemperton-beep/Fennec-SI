@@ -12,7 +12,7 @@ export interface Broker {
 export const BROKERS: Broker[] = [
   // ── New Zealand ──
   { id: 'sharesies',  name: 'Sharesies',       flag: '🇳🇿', region: 'NZ',     url: 'https://app.sharesies.nz/',                                                                          markets: ['NZX', 'ASX', 'US'] },
-  { id: 'hatch',      name: 'Hatch',            flag: '🇳🇿', region: 'NZ',     url: 'https://app.hatchinvest.nz/',    tradeUrl: 'https://app.hatchinvest.nz/shares/{ticker}',             markets: ['US'] },
+  { id: 'hatch',      name: 'Hatch',            flag: '🇳🇿', region: 'NZ',     url: 'https://app.hatchinvest.nz/',                                                                        markets: ['US'] },
   { id: 'investnow',  name: 'InvestNow',        flag: '🇳🇿', region: 'NZ',     url: 'https://www.investnow.co.nz/',                                                                       markets: ['NZX', 'ASX'] },
   { id: 'asb',        name: 'ASB Securities',   flag: '🇳🇿', region: 'NZ',     url: 'https://www.asb.co.nz/securities',                                                                   markets: ['NZX', 'ASX'] },
   { id: 'anz-nz',     name: 'ANZ Securities',   flag: '🇳🇿', region: 'NZ',     url: 'https://www.anz.co.nz/personal/investments/share-trading/',                                          markets: ['NZX', 'ASX'] },

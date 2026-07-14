@@ -34,6 +34,24 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 export const FREE_DAILY_AI_LIMIT = 10;
 export const FREE_MAX_HOLDINGS = 10;
 
+// In-memory cache for platform settings (refreshes every 60s)
+let settingsCache: Record<string, string> = {};
+let settingsCacheAt = 0;
+
+export async function getPlatformSettings(): Promise<Record<string, string>> {
+  if (Date.now() - settingsCacheAt < 60_000) return settingsCache;
+  const { data } = await supabase.from('platform_settings').select('key, value');
+  if (data && data.length > 0) {
+    settingsCache = Object.fromEntries(data.map((r: any) => [r.key, r.value]));
+    settingsCacheAt = Date.now();
+  }
+  return settingsCache;
+}
+
+export function invalidateSettingsCache() {
+  settingsCacheAt = 0;
+}
+
 // Checks daily AI quota for free users and increments the counter.
 // Returns false (and sends a 429) if the free limit is hit.
 export async function checkAndIncrementUsage(req: Request, res: Response): Promise<boolean> {
@@ -44,15 +62,18 @@ export async function checkAndIncrementUsage(req: Request, res: Response): Promi
   let count: number = (req as any).usageCount ?? 0;
   const lastReset: string = (req as any).lastUsageReset ?? '';
 
+  const settings = await getPlatformSettings();
+  const dailyLimit = parseInt(settings['free_daily_ai_limit'] ?? String(FREE_DAILY_AI_LIMIT), 10);
+
   // Reset counter if it's a new day
   if (lastReset !== today) {
     count = 0;
     await supabase.from('profiles').update({ usage_count: 0, last_usage_reset: today }).eq('id', user.id);
   }
 
-  if (count >= FREE_DAILY_AI_LIMIT) {
+  if (count >= dailyLimit) {
     res.status(429).json({
-      error: `Free plan limit reached — ${FREE_DAILY_AI_LIMIT} AI calls per day. Upgrade to Premium for unlimited access.`,
+      error: `Free plan limit reached — ${dailyLimit} AI calls per day. Upgrade to Premium for unlimited access.`,
       limitReached: true,
     });
     return false;

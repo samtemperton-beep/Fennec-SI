@@ -50,6 +50,7 @@ const DEV_USER_ID = '851a4abb-27f2-4c32-9fb3-28ef4c22af49'
 interface Pick {
   rank: number; ticker: string; name: string; sector: string
   upside_pct: number; reason: string; risk_level: number; market?: string
+  trending_score?: number
 }
 
 type ActiveFilter = 'All markets' | 'NZX' | 'ASX' | 'US' | 'Low risk' | 'High upside'
@@ -239,13 +240,21 @@ export default function Top10Page() {
                     </div>
                   </div>
 
+                  {/* Trending badge */}
+                  {p.trending_score != null && p.trending_score >= 7 && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 8, padding: '3px 8px', borderRadius: 20, background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)' }}>
+                      <span style={{ fontSize: 10 }}>🔥</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', letterSpacing: '.04em' }}>TRENDING</span>
+                    </div>
+                  )}
+
                   {/* Description */}
                   <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.55, marginBottom: 16 }}>
                     {p.reason}
                   </p>
 
                   {/* Metric boxes */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 4 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 4 }}>
                     <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
                       <p style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Upside</p>
                       <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 15, fontWeight: 600, color: 'var(--primary)' }}>+{p.upside_pct}%</p>
@@ -255,6 +264,12 @@ export default function Top10Page() {
                       <p style={{ fontSize: 13, fontWeight: 700, color: riskColor(p.risk_level), display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: riskColor(p.risk_level), display: 'inline-block', flexShrink: 0 }} />
                         {riskLabel(p.risk_level)}
+                      </p>
+                    </div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                      <p style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Buzz</p>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 15, fontWeight: 700, color: p.trending_score && p.trending_score >= 7 ? '#f59e0b' : 'var(--text)' }}>
+                        {p.trending_score ?? '—'}<span style={{ fontSize: 10, color: 'var(--text3)' }}>/10</span>
                       </p>
                     </div>
                     <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>

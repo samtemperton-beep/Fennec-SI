@@ -25,15 +25,51 @@ Provide a JSON response with: signal (BUY/HOLD/SELL), confidence (1-10), reason 
   }
 }
 
-export async function generateTop10(market: string, timeframe: string, apiKey?: string, newsContext?: string) {
+export async function generateTop10(market: string, timeframe: string, apiKey?: string, newsContext?: string, rotationSeed?: number) {
   const client = getClient(apiKey);
-  const newsSection = newsContext
-    ? `\n\nLatest market news (use this to make picks timely and relevant):\n${newsContext}`
-    : '';
-  const prompt = `You are a stock analyst. Generate the top 10 stock picks for the ${market} market with a ${timeframe} timeframe.${newsSection}
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-Return a JSON array of 10 objects with: rank, ticker, name, sector, upside_pct, reason (2 sentences — reference specific news/catalysts where relevant), risk_level (1-10).
-Focus on real, well-known stocks. Be specific and actionable.`;
+  const marketGuide = market === 'NZX'
+    ? 'Only include stocks listed on the New Zealand Exchange (NZX). Use NZX tickers (e.g. FPH, AIR, ATM, MFT, SPK, SKT, ERD, MEL, CEN, VCT, SCL, SKO).'
+    : market === 'ASX'
+    ? 'Only include stocks listed on the Australian Securities Exchange (ASX). Append .AX to tickers (e.g. CBA.AX, BHP.AX, CSL.AX, WES.AX, NAB.AX, ANZ.AX, WBC.AX, MQG.AX, RIO.AX, TCL.AX).'
+    : 'Focus on US-listed stocks (NYSE / NASDAQ). Mix of large-cap leaders and mid-cap momentum names.';
+
+  const newsSection = newsContext
+    ? `\n\nLATEST MARKET NEWS — weight picks heavily toward companies with active news catalysts:\n${newsContext}`
+    : '';
+
+  // Rotation seed drives sector emphasis so each press produces different results
+  const seed = rotationSeed ?? 0;
+  const SECTOR_ROTATIONS = [
+    'Lean toward Technology, Healthcare, and Consumer Discretionary this cycle.',
+    'Lean toward Energy, Financials, and Industrials this cycle.',
+    'Lean toward Materials, Real Estate, and Consumer Staples this cycle.',
+    'Lean toward Communications, Utilities, and Biotech this cycle.',
+  ];
+  const sectorHint = SECTOR_ROTATIONS[seed % SECTOR_ROTATIONS.length];
+
+  const prompt = `You are a momentum-aware stock analyst generating today's top 10 picks. Date: ${today}.
+
+MARKET: ${market}. ${marketGuide}
+TIMEFRAME: ${timeframe} holding period.${newsSection}
+
+SELECTION CRITERIA — rank these signals in order of importance:
+1. TRENDING & SOCIAL MOMENTUM — stocks generating significant chatter on Reddit (r/wallstreetbets, r/investing, r/stocks), Twitter/X finance communities, and Stocktwits RIGHT NOW. These should feel like what traders are actually talking about today.
+2. NEWS CATALYST — earnings beats, product launches, M&A rumours, regulatory wins, analyst upgrades published in the last 48 hours.
+3. TECHNICAL SETUP — stocks near breakout levels, recent golden crosses, or high relative strength vs their sector.
+4. FUNDAMENTAL VALUE — reasonable P/E or growth-adjusted valuation; not purely speculative.
+
+DIVERSITY RULES:
+- Maximum 2 picks from the same sector.
+- ${sectorHint}
+- Mix at least one speculative/high-momentum name (risk_level 7-9) with several safer names (risk_level 2-5).
+- Do NOT default to the usual mega-caps (Apple, Microsoft, Google, Amazon) unless they have a specific active catalyst this week that makes them genuinely the best pick RIGHT NOW.
+
+Return a JSON array of exactly 10 objects:
+{ rank, ticker, name, sector, upside_pct (integer), reason (2 punchy sentences mentioning the specific catalyst or social momentum driving this pick), risk_level (1-10), trending_score (1-10, how hot this is on social/news) }
+
+Be specific. Mention company names, products, events. Make each reason feel like it was written today, not a year ago.`;
 
   const msg = await client.messages.create({
     model: MODEL,

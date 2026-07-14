@@ -7,6 +7,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState<'google' | 'magic' | null>(null)
+  const [agreed, setAgreed] = useState(false)
   const supabase = createClient()
 
   async function signInGoogle() {
@@ -129,11 +130,27 @@ export default function LoginPage() {
             </div>
           ) : (
             <>
+              {/* Terms agreement */}
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={e => setAgreed(e.target.checked)}
+                  style={{ marginTop: 2, width: 16, height: 16, accentColor: 'var(--primary)', flexShrink: 0, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                  I have read and agree to the{' '}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>Terms of Service</a>
+                  {' '}and{' '}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>Privacy Policy</a>
+                </span>
+              </label>
+
               {/* Google */}
               <button
                 onClick={signInGoogle}
-                disabled={!!loading}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 16, opacity: loading === 'google' ? 0.7 : 1 }}
+                disabled={!!loading || !agreed}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: agreed ? 'pointer' : 'not-allowed', marginBottom: 16, opacity: loading === 'google' || !agreed ? 0.5 : 1, transition: 'opacity 0.15s' }}
               >
                 {loading === 'google' ? <IconLoader size={18} className="animate-spin" /> : (
                   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -170,8 +187,8 @@ export default function LoginPage() {
                 />
                 <button
                   type="submit"
-                  disabled={!!loading || !email}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: 'pointer', opacity: loading === 'magic' || !email ? 0.7 : 1 }}
+                  disabled={!!loading || !email || !agreed}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: agreed && email ? 'pointer' : 'not-allowed', opacity: loading === 'magic' || !email || !agreed ? 0.5 : 1, transition: 'opacity 0.15s' }}
                 >
                   {loading === 'magic' ? <IconLoader size={16} className="animate-spin" /> : <IconMail size={16} />}
                   Send magic link
@@ -179,13 +196,6 @@ export default function LoginPage() {
               </form>
             </>
           )}
-
-          <p style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, marginTop: 20, lineHeight: 1.6 }}>
-            By signing in you agree to our{' '}
-            <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Terms of Service</a>
-            {' '}and{' '}
-            <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Privacy Policy</a>
-          </p>
 
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 24, paddingTop: 20, textAlign: 'center' }}>
             <p style={{ color: 'var(--text2)', fontSize: 13 }}>

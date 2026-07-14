@@ -3,14 +3,21 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { createClient } from '@/lib/supabase'
-import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { IconCalendar, IconChartBar, IconFileText, IconTrendingUp, IconExternalLink } from '@tabler/icons-react'
+import { IconCalendar, IconChartBar, IconFileText, IconTrendingUp, IconExternalLink, IconBrain } from '@tabler/icons-react'
 
 type Tab = 'ipos' | 'earnings' | 'asx' | 'analyst'
 
-const REC_COLOR: Record<string, string> = {
-  STRONG_BUY: 'var(--green)', WATCH: 'var(--amber)', SKIP: 'var(--red)',
+const BUBBLE_COLORS = ['#5B7CF0','#14B8A6','#22C55E','#F59E0B','#EF4444','#A855F7','#F97316','#0EA5E9','#EC4899','#6366F1']
+function tickerColor(t: string) {
+  let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0
+  return BUBBLE_COLORS[h % BUBBLE_COLORS.length]
+}
+
+const REC_STYLE: Record<string, { bg: string; color: string; border: string }> = {
+  STRONG_BUY: { bg: 'rgba(34,197,94,0.15)',  color: 'var(--green)',   border: 'rgba(34,197,94,0.3)' },
+  WATCH:      { bg: 'rgba(245,158,11,0.15)',  color: 'var(--amber)',   border: 'rgba(245,158,11,0.3)' },
+  SKIP:       { bg: 'rgba(239,68,68,0.15)',   color: 'var(--red)',     border: 'rgba(239,68,68,0.3)' },
 }
 
 interface IPO {
@@ -56,9 +63,8 @@ export default function EventsPage() {
   const [asxAnnouncements, setAsxAnnouncements] = useState<any[]>([])
   const [analyst, setAnalyst] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<IPO | null>(null)
-  const [analysis, setAnalysis] = useState<any>(null)
-  const [analyzing, setAnalyzing] = useState(false)
+  const [analyses, setAnalyses] = useState<Record<string, any>>({})
+  const [analyzing, setAnalyzing] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -93,13 +99,15 @@ export default function EventsPage() {
     setLoading(false)
   }
 
-  async function openAnalysis(ipo: IPO) {
-    setSelected(ipo); setAnalysis(null); setAnalyzing(true)
+  async function fetchAnalysis(ipo: IPO) {
+    const key = ipo.symbol || ipo.name || ''
+    if (analyses[key] || analyzing === key) return
+    setAnalyzing(key)
     try {
       const { data } = await api.analyzeIPO(ipo)
-      setAnalysis(data)
+      setAnalyses(prev => ({ ...prev, [key]: data }))
     } catch {}
-    setAnalyzing(false)
+    setAnalyzing(null)
   }
 
   return (
@@ -134,27 +142,82 @@ export default function EventsPage() {
             ipos.length === 0 ? (
               <EmptyState icon={<IconCalendar size={40} />} title="No upcoming IPOs" sub="Check back later for new listings" />
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-                {ipos.map((ipo, i) => (
-                  <div key={i} onClick={() => openAnalysis(ipo)} className="card" style={{ cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = ''}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <div>
-                        <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 16 }}>{ipo.symbol || ipo.name}</span>
-                        {ipo.symbol && <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{ipo.name}</p>}
+              <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16 }}>
+                {ipos.map((ipo, i) => {
+                  const key = ipo.symbol || ipo.name || ''
+                  const ticker = ipo.symbol || (ipo.name || '').slice(0, 4).toUpperCase()
+                  const color = tickerColor(ticker)
+                  const analysis = analyses[key]
+                  const isAnalyzing = analyzing === key
+                  const rec = analysis?.recommendation
+                  const recStyle = rec ? REC_STYLE[rec] : null
+                  const cd = countdown(ipo.date)
+                  const cdColor = cd === 'Today' ? 'var(--red)' : cd === 'Listed' ? 'var(--text3)' : cd.includes('d') && parseInt(cd) <= 7 ? 'var(--amber)' : 'var(--primary)'
+
+                  return (
+                    <div key={i} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 20 }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 44, height: 44, borderRadius: 10, background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span style={{ fontWeight: 800, fontSize: Math.max(8, 13 - Math.max(0, ticker.length - 3)), color: 'white', letterSpacing: -0.5 }}>
+                              {ticker.slice(0, 5)}
+                            </span>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 15 }}>{ipo.name || ipo.symbol}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
+                              {ipo.exchange || 'IPO'}{ipo.symbol ? ` · ${ipo.symbol}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                        {/* Badge: AI rating if loaded, else countdown */}
+                        {recStyle ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 6, background: recStyle.bg, color: recStyle.color, border: `1px solid ${recStyle.border}`, whiteSpace: 'nowrap' }}>
+                            {rec.replace('_', ' ')} · {analysis.score}/10
+                          </span>
+                        ) : (
+                          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, color: cdColor, background: 'var(--surface2)', padding: '4px 9px', borderRadius: 6, border: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                            {cd}
+                          </span>
+                        )}
                       </div>
-                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>{countdown(ipo.date)}</span>
+
+                      {/* AI summary if loaded */}
+                      {analysis?.business_model && (
+                        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.65 }}>
+                          {analysis.business_model.slice(0, 160)}{analysis.business_model.length > 160 ? '…' : ''}
+                        </p>
+                      )}
+
+                      {/* Metric boxes */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                        {[
+                          { label: 'Date', value: ipo.date || '—' },
+                          { label: 'Price', value: ipo.price || '—' },
+                          { label: 'Exchange', value: ipo.exchange?.replace('NASDAQ Global Select', 'NASDAQ').replace('New York Stock Exchange', 'NYSE') || '—' },
+                        ].map(m => (
+                          <div key={m.label} style={{ background: 'var(--surface2)', borderRadius: 8, padding: '8px 10px', border: '1px solid var(--border)' }}>
+                            <p style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>{m.label}</p>
+                            <p style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>{m.value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Footer: action button */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                          {ipo.status === 'priced' ? 'Priced' : 'Expected listing'}
+                        </span>
+                        <button onClick={() => fetchAnalysis(ipo)} disabled={isAnalyzing || !!analysis}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 8, background: analysis ? 'var(--surface2)' : 'var(--primary)', color: analysis ? 'var(--text2)' : 'white', fontWeight: 600, fontSize: 12, border: analysis ? '1px solid var(--border)' : 'none', cursor: analysis ? 'default' : 'pointer', flexShrink: 0 }}>
+                          {isAnalyzing ? <LoadingSpinner size={12} /> : <IconBrain size={13} />}
+                          {isAnalyzing ? 'Analysing…' : analysis ? 'Analysed ✓' : 'AI Analysis'}
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                      {ipo.date && <MetaField label="DATE" value={ipo.date} />}
-                      {ipo.price && <MetaField label="PRICE" value={ipo.price} />}
-                      {ipo.exchange && <MetaField label="EXCHANGE" value={ipo.exchange} />}
-                    </div>
-                    <p style={{ fontSize: 12, color: 'var(--primary)', marginTop: 12, fontFamily: 'Syne, sans-serif' }}>Click for AI analysis →</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )
           )}
@@ -276,43 +339,6 @@ export default function EventsPage() {
         </>
       )}
 
-      {/* IPO Analysis Modal */}
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected ? `${selected.symbol || selected.name} — IPO Analysis` : ''} wide>
-        {analyzing ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}><LoadingSpinner size={32} /></div>
-        ) : analysis ? (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-              <div style={{ padding: '6px 16px', borderRadius: 8, background: `${REC_COLOR[analysis.recommendation] || 'var(--text2)'}20`, color: REC_COLOR[analysis.recommendation] || 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>
-                {analysis.recommendation?.replace('_', ' ')}
-              </div>
-              <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 700 }}>{analysis.score}/10</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {[
-                { label: 'Business Model', value: analysis.business_model },
-                { label: 'Valuation', value: analysis.valuation_analysis },
-                { label: 'Action', value: analysis.action },
-              ].map(s => s.value && (
-                <div key={s.label}>
-                  <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</p>
-                  <p style={{ fontSize: 14, lineHeight: 1.7 }}>{s.value}</p>
-                </div>
-              ))}
-              {analysis.risks && (
-                <div>
-                  <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Risks</p>
-                  <ul style={{ listStyle: 'disc', paddingLeft: 20 }}>
-                    {analysis.risks.map((r: string, i: number) => (
-                      <li key={i} style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--red)', marginBottom: 2 }}>{r}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </Modal>
     </div>
   )
 }

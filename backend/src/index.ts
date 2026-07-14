@@ -12,6 +12,7 @@ import importRouter from './routes/import';
 import alertsRouter from './routes/alerts';
 import adminRouter from './routes/admin';
 import premiumRouter from './routes/premium';
+import socialRouter from './routes/social';
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use('/api/import', importRouter);
 app.use('/api/alerts', alertsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/premium', premiumRouter);
+app.use('/api/social', socialRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));
 

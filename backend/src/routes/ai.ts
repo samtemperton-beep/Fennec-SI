@@ -87,7 +87,11 @@ router.post('/chat', requireAuth, async (req, res) => {
 // Top 10: free users see results but it counts toward their daily quota (cached so rarely hits)
 router.post('/top10', requireAuth, async (req, res) => {
   const { market = 'US', timeframe = '12mo', newsContext } = req.body;
-  const cacheKey = `top10:${market}:${timeframe}:${newsContext ? 'news' : 'base'}`;
+  // Rotation seed: changes every 2 hours so regenerate always produces a fresh sector emphasis
+  const today = new Date().toISOString().slice(0, 10);
+  const hourBucket = Math.floor(new Date().getUTCHours() / 2);
+  const rotationSeed = hourBucket; // 0-11, cycles sector rotation
+  const cacheKey = `top10:${market}:${timeframe}:${today}:${hourBucket}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
@@ -95,8 +99,8 @@ router.post('/top10', requireAuth, async (req, res) => {
 
   const user = (req as any).user;
   try {
-    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key, newsContext);
-    await setCached(cacheKey, data, newsContext ? 4 : 6);
+    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key, newsContext, rotationSeed);
+    await setCached(cacheKey, data, 2); // 2h TTL — resets with each hour bucket
     res.json({ data, cached: false });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
