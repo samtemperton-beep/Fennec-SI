@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
+import { api } from '@/lib/api'
 
 interface TickerItem {
   ticker: string
@@ -52,9 +53,8 @@ export function MarketTicker() {
 
   async function load() {
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL || ''
-      const res = await fetch(`${base}/api/prices/market-ticker`)
-      if (res.ok) setItems(await res.json())
+      const data = await api.getMarketTicker()
+      setItems(data)
     } catch {}
   }
 

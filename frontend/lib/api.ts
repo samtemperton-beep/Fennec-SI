@@ -38,6 +38,9 @@ export const api = {
   getChart: (ticker: string, range = '1y') =>
     apiFetch(`/api/prices/chart/${ticker}?range=${range}`),
 
+  getMarketTicker: () =>
+    apiFetch('/api/prices/market-ticker'),
+
   getNews: (tickers: string[] = []) =>
     apiFetch(`/api/news${tickers.length ? `?tickers=${tickers.join(',')}` : ''}`),
 
