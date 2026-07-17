@@ -66,26 +66,27 @@ export async function searchSymbols(query: string): Promise<{ ticker: string; na
 }
 
 export async function fetchChart(ticker: string, range = '1y'): Promise<any[]> {
-  const now = Math.floor(Date.now() / 1000);
-  const fromMap: Record<string, number> = {
-    '1d': 86400, '5d': 432000, '1mo': 2592000, '6mo': 15552000, '1y': 31536000, '5y': 157680000,
+  // Yahoo Finance v8 — supports stocks, ETFs, indices, crypto
+  const intervalMap: Record<string, string> = {
+    '1d': '5m', '5d': '15m', '1mo': '1h', '6mo': '1d', '1y': '1d', '5y': '1wk',
   };
-  const resMap: Record<string, string> = {
-    '1d': '5', '5d': '15', '1mo': '60', '6mo': 'D', '1y': 'W', '5y': 'M',
-  };
-  const from = now - (fromMap[range] || 31536000);
-  const resolution = resMap[range] || 'W';
+  const interval = intervalMap[range] || '1d';
   const { data } = await axios.get(
-    `${FINNHUB}/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${now}&token=${key()}`,
-    { timeout: 15000 }
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`,
+    { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } }
   );
-  if (data.s !== 'ok') return [];
-  return (data.t || []).map((ts: number, i: number) => ({
-    t: ts * 1000,
-    o: data.o?.[i],
-    h: data.h?.[i],
-    l: data.l?.[i],
-    c: data.c?.[i],
-    v: data.v?.[i],
-  }));
+  const result = data?.chart?.result?.[0];
+  if (!result) return [];
+  const timestamps: number[] = result.timestamp || [];
+  const quotes = result.indicators?.quote?.[0] || {};
+  return timestamps
+    .map((ts: number, i: number) => ({
+      t: ts * 1000,
+      o: quotes.open?.[i] ?? null,
+      h: quotes.high?.[i] ?? null,
+      l: quotes.low?.[i] ?? null,
+      c: quotes.close?.[i] ?? null,
+      v: quotes.volume?.[i] ?? null,
+    }))
+    .filter(p => p.c != null);
 }
