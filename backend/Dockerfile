@@ -6,7 +6,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN ./node_modules/.bin/tsc
+RUN npx tsc
 
 EXPOSE 4000
 
