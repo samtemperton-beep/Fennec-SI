@@ -8,8 +8,29 @@ const MODEL = 'claude-haiku-4-5-20251001';
 
 export async function analyzeStock(ticker: string, data: any, apiKey?: string) {
   const client = getClient(apiKey);
-  const prompt = `You are a stock analyst. Analyze ${ticker} with this data: ${JSON.stringify(data)}.
-Provide a JSON response with: signal (BUY/HOLD/SELL), confidence (1-10), reason (2 sentences), upside_pct (estimated % upside), risks (array of 2 short strings).`;
+  const d = data || {};
+  const context = [
+    d.price != null ? `Price: $${d.price}` : '',
+    d.changePctToday != null ? `Today: ${d.changePctToday > 0 ? '+' : ''}${d.changePctToday?.toFixed(2)}%` : '',
+    d.pctFrom52Hi != null ? `vs 52w High: ${d.pctFrom52Hi?.toFixed(1)}%` : '',
+    d.pctFrom52Lo != null ? `vs 52w Low: +${d.pctFrom52Lo?.toFixed(1)}%` : '',
+    d.pe != null ? `P/E: ${d.pe?.toFixed(1)}` : '',
+    d.marketCap != null ? `Mkt Cap: $${(d.marketCap / 1e9).toFixed(1)}B` : '',
+    d.divYield != null ? `Div Yield: ${d.divYield?.toFixed(2)}%` : '',
+    d.sector ? `Sector: ${d.sector}` : '',
+  ].filter(Boolean).join(' | ');
+
+  const prompt = `You are a decisive stock analyst giving a clear trading signal for ${ticker}.
+
+Market data: ${context || JSON.stringify(d)}
+
+Rules:
+- BUY if: near 52w lows with improving fundamentals, strong sector momentum, or P/E justified by growth
+- SELL if: near 52w highs with no catalyst, overvalued P/E, deteriorating fundamentals
+- HOLD only if genuinely mixed signals — do NOT default to HOLD
+- Be specific — reference the actual numbers in your reason
+
+Return JSON only: { "signal": "BUY"|"HOLD"|"SELL", "confidence": 1-10, "reason": "2 sentences referencing specific data points", "upside_pct": number, "risks": ["string","string"] }`;
 
   const msg = await client.messages.create({
     model: MODEL,

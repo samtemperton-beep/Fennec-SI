@@ -3,10 +3,11 @@ import { requireAuth, checkAndIncrementUsage, FREE_DAILY_AI_LIMIT } from '../mid
 import * as claude from '../services/claude';
 import * as gemini from '../services/gemini';
 import { getCached, setCached } from '../services/cache';
+import { fetchQuote } from '../services/yahoo';
 
 const router = Router();
 
-// Shared cache: same ticker analysis served to all users for 6 hours
+// Shared cache: same ticker analysis served to all users for 4 hours
 // Premium users get Claude analysis (separate cache key)
 router.post('/analyze', requireAuth, async (req, res) => {
   const { ticker, data, riskLevel } = req.body;
@@ -20,10 +21,29 @@ router.post('/analyze', requireAuth, async (req, res) => {
 
   try {
     const user = (req as any).user;
+    // Enrich with live quote so the AI has real data to reason about
+    let enriched = { ...data };
+    try {
+      const q = await fetchQuote(ticker);
+      enriched = {
+        price: q.price,
+        changePctToday: q.changePct,
+        w52Hi: q.w52Hi,
+        w52Lo: q.w52Lo,
+        marketCap: q.marketCap,
+        pe: q.pe,
+        divYield: q.divYield,
+        sector: q.sector || data?.sector,
+        exchange: q.exchange,
+        // How far from 52w high/low as a signal
+        pctFrom52Hi: q.w52Hi ? +((q.price / q.w52Hi - 1) * 100).toFixed(1) : null,
+        pctFrom52Lo: q.w52Lo ? +((q.price / q.w52Lo - 1) * 100).toFixed(1) : null,
+      };
+    } catch { /* use whatever data was passed */ }
     const result = isPremium
-      ? await claude.analyzeStock(ticker, data, user.user_metadata?.anthropic_key)
-      : await gemini.analyzeStock(ticker, data, riskLevel);
-    await setCached(cacheKey, result, 6);
+      ? await claude.analyzeStock(ticker, enriched, user.user_metadata?.anthropic_key)
+      : await gemini.analyzeStock(ticker, enriched, riskLevel);
+    await setCached(cacheKey, result, 4);
     res.json(result);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
