@@ -10,6 +10,7 @@ import { fmtCurrency, fmtPct, fmtLarge, fmt } from '@/lib/utils'
 import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera, IconChevronUp, IconChevronDown, IconSelector, IconExternalLink } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { getBrokerById, getStockUrl, type Broker } from '@/lib/brokers'
+import { StockDetailModal } from '@/components/shared/StockDetailModal'
 
 interface WItem {
   id: number; ticker: string; market: string; name?: string; current_price?: number
@@ -29,6 +30,8 @@ export default function WatchlistPage() {
   const [analyzingSet, setAnalyzingSet] = useState(new Set<number>())
   const [screenshotOpen, setScreenshotOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [detailTicker, setDetailTicker] = useState<string | null>(null)
+  const [detailName, setDetailName] = useState<string | undefined>()
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [filterSector, setFilterSector] = useState('All')
@@ -393,7 +396,9 @@ export default function WatchlistPage() {
             </thead>
             <tbody>
               {filteredItems.map(item => (
-                <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }} className="hover:bg-surface2">
+                <tr key={item.id} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }} className="hover:bg-surface2"
+                  onClick={e => { if ((e.target as HTMLElement).closest('a,button')) return; setDetailTicker(item.ticker); setDetailName(item.name) }}
+                >
                   <td style={{ padding: '12px', minWidth: 160 }}>
                     <a href={getStockUrl(broker, item.ticker, item.market)} target="_blank" rel="noopener noreferrer"
                       title={broker ? `View on ${broker.name}` : undefined}
@@ -551,6 +556,15 @@ export default function WatchlistPage() {
           </button>
         </form>
       </Modal>
+
+      <StockDetailModal
+        ticker={detailTicker}
+        name={detailName}
+        userId={userId}
+        inWatchlist={detailTicker ? items.some(i => i.ticker === detailTicker) : false}
+        onClose={() => setDetailTicker(null)}
+        onWatchlistAdd={() => {}}
+      />
     </div>
   )
 }

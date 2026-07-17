@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { WatchlistButton } from '@/components/shared/WatchlistButton'
-import { IconRefresh, IconExternalLink } from '@tabler/icons-react'
+import { IconRefresh, IconExternalLink, IconChartLine } from '@tabler/icons-react'
 import { timeAgo } from '@/lib/utils'
 import { toast } from 'sonner'
+import { StockDetailModal } from '@/components/shared/StockDetailModal'
 
 const BUBBLE_COLORS = ['#5B7CF0','#14B8A6','#22C55E','#F59E0B','#EF4444','#A855F7','#F97316','#0EA5E9','#EC4899','#6366F1']
 function tickerColor(t: string) {
@@ -62,6 +63,8 @@ export default function Top10Page() {
   const [picks, setPicks] = useState<Pick[]>([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Pick | null>(null)
+  const [chartTicker, setChartTicker] = useState<string | null>(null)
+  const [chartName, setChartName] = useState<string | undefined>()
   const [deepDive, setDeepDive] = useState<any>(null)
   const [diveNews, setDiveNews] = useState<any[]>([])
   const [diving, setDiving] = useState(false)
@@ -281,9 +284,15 @@ export default function Top10Page() {
 
                 {/* Progress bar + watchlist row */}
                 <div style={{ marginTop: 'auto' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 16px 12px' }}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px 12px' }}
                     onClick={e => e.stopPropagation()}
                   >
+                    <button
+                      onClick={() => { setChartTicker(p.ticker); setChartName(p.name) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}
+                    >
+                      <IconChartLine size={13} /> Price chart
+                    </button>
                     <WatchlistButton
                       ticker={p.ticker} userId={userId}
                       inWatchlist={watchlistSet.has(p.ticker)}
@@ -377,6 +386,16 @@ export default function Top10Page() {
           </div>
         )}
       </Modal>
+
+      <StockDetailModal
+        ticker={chartTicker}
+        name={chartName}
+        userId={userId}
+        inWatchlist={chartTicker ? watchlistSet.has(chartTicker) : false}
+        inPortfolio={chartTicker ? portfolioSet.has(chartTicker) : false}
+        onClose={() => setChartTicker(null)}
+        onWatchlistAdd={t => setWatchlist(prev => [...prev, t])}
+      />
     </div>
   )
 }

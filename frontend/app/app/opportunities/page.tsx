@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase'
 import { loadPrefs, topInterests } from '@/lib/newsPrefs'
 import { LoadingSpinner, SkeletonCard } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
-import { IconBrain, IconRefresh, IconPlus, IconExternalLink, IconArrowRight } from '@tabler/icons-react'
+import { IconBrain, IconRefresh, IconPlus, IconExternalLink, IconArrowRight, IconChartLine } from '@tabler/icons-react'
 import { timeAgo } from '@/lib/utils'
 import { toast } from 'sonner'
+import { StockDetailModal } from '@/components/shared/StockDetailModal'
 
 interface Opp {
   ticker: string; name: string; market: string; sector: string
@@ -64,6 +65,8 @@ export default function DiscoverPage() {
   const [diveAnalysis, setDiveAnalysis] = useState<any>(null)
   const [diveNews, setDiveNews] = useState<any[]>([])
   const [diving, setDiving] = useState(false)
+  const [chartTicker, setChartTicker] = useState<string | null>(null)
+  const [chartName, setChartName] = useState<string | undefined>()
   const supabase = createClient()
 
   useEffect(() => {
@@ -232,6 +235,11 @@ export default function DiscoverPage() {
                     {o.market && o.market !== 'US' ? o.market : 'US'} · {o.market_cap_category}-cap
                   </span>
                   <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => { setChartTicker(o.ticker); setChartName(o.name) }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      <IconChartLine size={13} /> Price chart
+                    </button>
                     <button onClick={() => openDive(o)}
                       style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}
                     >
@@ -319,6 +327,13 @@ export default function DiscoverPage() {
           </div>
         )}
       </Modal>
+
+      <StockDetailModal
+        ticker={chartTicker}
+        name={chartName}
+        userId={userId}
+        onClose={() => setChartTicker(null)}
+      />
 
       {/* Premium teaser */}
       {limited && opps.length > 0 && (
