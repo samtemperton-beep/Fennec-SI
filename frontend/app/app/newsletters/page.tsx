@@ -30,7 +30,8 @@ const SOURCES = [
   { id: 'moby',        name: 'Moby',                  color: '#6366f1' },
   { id: 'asr',         name: 'Australian Stock Report', color: '#003366' },
   { id: 'sharechat',  name: 'ShareChat',               color: '#00a86b' },
-  { id: 'asb-nz',    name: 'ASB Markets',             color: '#e31837' },
+  { id: 'asb-nz',      name: 'ASB Markets',   color: '#e31837' },
+  { id: 'morningstar', name: 'Morningstar',   color: '#e8351a' },
 ]
 
 const CATEGORIES = ['All', 'Picks', 'Macro', 'Earnings']
