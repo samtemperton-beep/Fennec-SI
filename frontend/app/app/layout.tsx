@@ -37,7 +37,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/app/community', label: 'Community', icon: IconUsers },
       { href: '/app/leaderboard', label: 'Leaderboard', icon: IconTrophy },
-      { href: '/app/alerts', label: 'Alerts', icon: IconBell },
+      { href: '/app/alerts', label: 'Notifications', icon: IconBell },
     ],
   },
 ]

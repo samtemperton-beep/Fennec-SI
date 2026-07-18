@@ -41,8 +41,14 @@ function getMarketStatus(market: string): 'open' | 'closed' | 'always' {
 
 const STATUS_COLOR: Record<string, string> = {
   open:   '#22c55e',
-  closed: 'var(--text3)',
+  closed: '#ef4444',
   always: '#22c55e',
+}
+
+const LABEL_COLOR: Record<string, string> = {
+  open:   '#22c55e',
+  closed: 'var(--text3)',
+  always: 'var(--text3)',
 }
 
 export function MarketTicker() {
@@ -97,9 +103,9 @@ export function MarketTicker() {
                 width: 5, height: 5, borderRadius: '50%',
                 background: STATUS_COLOR[status],
                 flexShrink: 0,
-                boxShadow: status !== 'closed' ? `0 0 4px ${STATUS_COLOR[status]}` : 'none',
+                boxShadow: status === 'open' || status === 'always' ? `0 0 4px ${STATUS_COLOR[status]}` : 'none',
               }} />
-              <span style={{ color: 'var(--text3)', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em' }}>{item.label}</span>
+              <span style={{ color: LABEL_COLOR[status], fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '.04em' }}>{item.label}</span>
               {item.price > 0 ? (
                 <>
                   <span style={{ color: 'var(--text)', fontWeight: 500 }}>{item.price.toFixed(2)}</span>

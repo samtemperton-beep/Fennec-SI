@@ -94,6 +94,18 @@ export const api = {
   checkAlerts: () =>
     apiFetch('/api/alerts/check', { method: 'POST' }),
 
+  getNotifications: () =>
+    apiFetch('/api/alerts/notifications'),
+
+  markNotificationsRead: (ids?: number[]) =>
+    apiFetch('/api/alerts/notifications/mark-read', { method: 'POST', body: JSON.stringify({ ids }) }),
+
+  getNotificationPrefs: () =>
+    apiFetch('/api/alerts/prefs'),
+
+  saveNotificationPrefs: (prefs: object) =>
+    apiFetch('/api/alerts/prefs', { method: 'PUT', body: JSON.stringify(prefs) }),
+
   getPremiumStatus: () =>
     apiFetch('/api/premium/status'),
 
