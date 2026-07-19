@@ -53,6 +53,7 @@ router.get('/prefs', requireAuth, async (req, res) => {
     take_profit_pct: 20,
     portfolio_sell_alerts: true,
     watchlist_buy_alerts: true,
+    watchlist_sell_alerts: true,
     price_alerts: true,
   });
 });
@@ -66,6 +67,7 @@ router.put('/prefs', requireAuth, async (req, res) => {
     take_profit_pct: req.body.take_profit_pct ?? 20,
     portfolio_sell_alerts: req.body.portfolio_sell_alerts ?? true,
     watchlist_buy_alerts: req.body.watchlist_buy_alerts ?? true,
+    watchlist_sell_alerts: req.body.watchlist_sell_alerts ?? true,
     price_alerts: req.body.price_alerts ?? true,
     updated_at: new Date().toISOString(),
   };
@@ -86,7 +88,7 @@ router.post('/check', requireAuth, async (req, res) => {
 
   // Load prefs
   const { data: prefs } = await supabase.from('notification_prefs').select('*').eq('user_id', user.id).single();
-  const p = prefs || { frequency: 'morning', stop_loss_pct: 10, take_profit_pct: 20, portfolio_sell_alerts: true, watchlist_buy_alerts: true, price_alerts: true };
+  const p = prefs || { frequency: 'morning', stop_loss_pct: 10, take_profit_pct: 20, portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true };
 
   // 1. Price alerts (existing)
   if (p.price_alerts !== false) {
@@ -175,14 +177,14 @@ router.post('/check', requireAuth, async (req, res) => {
           .eq('type', 'watchlist_signal').gte('created_at', since).limit(1);
         if (recent?.length) continue;
 
-        if (w.signal === 'BUY') {
+        if (w.signal === 'BUY' && p.watchlist_buy_alerts !== false) {
           triggered.push({ ticker: w.ticker, category: 'watchlist_signal', signal: 'BUY' });
           await writeNotification(
             user.id, 'watchlist_signal', w.ticker,
             `${w.ticker} signals BUY`,
             `${w.name || w.ticker} on your watchlist has a BUY signal. This could be a good entry point — review the analysis before acting.`
           );
-        } else if (w.signal === 'SELL') {
+        } else if (w.signal === 'SELL' && p.watchlist_sell_alerts !== false) {
           triggered.push({ ticker: w.ticker, category: 'watchlist_signal', signal: 'SELL' });
           await writeNotification(
             user.id, 'watchlist_signal', w.ticker,

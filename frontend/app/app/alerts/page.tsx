@@ -23,6 +23,7 @@ interface Prefs {
   take_profit_pct: number
   portfolio_sell_alerts: boolean
   watchlist_buy_alerts: boolean
+  watchlist_sell_alerts: boolean
   price_alerts: boolean
 }
 
@@ -81,7 +82,7 @@ export default function NotificationsPage() {
   // Preferences
   const [prefs, setPrefs] = useState<Prefs>({
     frequency: 'morning', stop_loss_pct: 10, take_profit_pct: 20,
-    portfolio_sell_alerts: true, watchlist_buy_alerts: true, price_alerts: true,
+    portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true,
   })
   const [savingPrefs, setSavingPrefs] = useState(false)
 
@@ -312,15 +313,15 @@ export default function NotificationsPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
-                { label: 'BUY signals', desc: 'Alert when a watchlist stock gets a BUY signal', type: 'buy' },
-                { label: 'SELL signals', desc: 'Alert when a watchlist stock gets a SELL signal', type: 'sell' },
+                { label: 'BUY signals', desc: 'Alert when a watchlist stock gets a BUY signal', prefKey: 'watchlist_buy_alerts' as const },
+                { label: 'SELL signals', desc: 'Alert when a watchlist stock gets a SELL signal', prefKey: 'watchlist_sell_alerts' as const },
               ].map(row => (
-                <div key={row.type} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <div key={row.prefKey} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                   <div>
                     <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>{row.label}</div>
                     <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{row.desc}</div>
                   </div>
-                  <Toggle checked={prefs.watchlist_buy_alerts} onChange={v => setPrefs(p => ({ ...p, watchlist_buy_alerts: v }))} />
+                  <Toggle checked={(prefs as any)[row.prefKey]} onChange={v => setPrefs(p => ({ ...p, [row.prefKey]: v }))} />
                 </div>
               ))}
             </div>
