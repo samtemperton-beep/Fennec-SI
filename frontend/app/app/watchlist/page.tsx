@@ -7,7 +7,7 @@ import { SignalBadge } from '@/components/shared/SignalBadge'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
 import { fmtCurrency, fmtPct, fmtLarge, fmt } from '@/lib/utils'
-import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera, IconChevronUp, IconChevronDown, IconSelector, IconExternalLink } from '@tabler/icons-react'
+import { IconPlus, IconBrain, IconRefresh, IconTrash, IconArrowRight, IconCamera, IconChevronUp, IconChevronDown, IconSelector, IconExternalLink, IconChartLine } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { getBrokerById, getStockUrl, type Broker } from '@/lib/brokers'
 import { StockDetailModal } from '@/components/shared/StockDetailModal'
@@ -435,6 +435,13 @@ export default function WatchlistPage() {
                   </td>
                   <td style={{ padding: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button
+                        onClick={() => { setDetailTicker(item.ticker); setDetailName(item.name) }}
+                        title="Price chart"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        <IconChartLine size={11} /> Chart
+                      </button>
                       <a
                         href={getStockUrl(broker, item.ticker, item.market)}
                         target="_blank"
