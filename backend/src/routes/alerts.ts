@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { fetchPrices } from '../services/yahoo';
+import { fetchEarningsCalendar } from '../services/finnhub';
 import { Resend } from 'resend';
 import ws from 'ws';
 import dotenv from 'dotenv';
@@ -88,7 +89,7 @@ router.post('/check', requireAuth, async (req, res) => {
 
   // Load prefs
   const { data: prefs } = await supabase.from('notification_prefs').select('*').eq('user_id', user.id).single();
-  const p = prefs || { frequency: 'morning', stop_loss_pct: 10, take_profit_pct: 20, portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true };
+  const p = prefs || { frequency: 'morning', stop_loss_pct: 10, take_profit_pct: 20, portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true, earnings_alerts: true };
 
   // 1. Price alerts (existing)
   if (p.price_alerts !== false) {
@@ -193,6 +194,34 @@ router.post('/check', requireAuth, async (req, res) => {
           );
         }
       }
+    }
+  }
+
+  // 4. Earnings reminders (1 day ahead)
+  if (p.earnings_alerts !== false) {
+    const { data: holdings } = await supabase.from('holdings').select('ticker').eq('user_id', user.id);
+    const { data: watchlist } = await supabase.from('watchlist').select('ticker').eq('user_id', user.id);
+    const allTickers = [...new Set([...(holdings || []), ...(watchlist || [])].map((x: any) => x.ticker))];
+    if (allTickers.length) {
+      try {
+        const upcoming = await fetchEarningsCalendar(allTickers, 2, 0);
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+        for (const ev of upcoming) {
+          if (ev.date !== tomorrow) continue;
+          const since = new Date(Date.now() - 86400000).toISOString();
+          const { data: recent } = await supabase.from('notifications')
+            .select('id').eq('user_id', user.id).eq('ticker', ev.symbol)
+            .eq('type', 'earnings_reminder').gte('created_at', since).limit(1);
+          if (recent?.length) continue;
+          const timeLabel = ev.hour === 'bmo' ? 'before market open' : ev.hour === 'amc' ? 'after market close' : '';
+          triggered.push({ ticker: ev.symbol, category: 'earnings_reminder' });
+          await writeNotification(
+            user.id, 'earnings_reminder', ev.symbol,
+            `${ev.symbol} reports earnings tomorrow`,
+            `${ev.symbol} Q${ev.quarter} ${ev.year} earnings are tomorrow${timeLabel ? ' ' + timeLabel : ''}.${ev.epsEstimate != null ? ` EPS estimate: $${ev.epsEstimate.toFixed(2)}.` : ''} Review your position before the report.`
+          );
+        }
+      } catch {}
     }
   }
 

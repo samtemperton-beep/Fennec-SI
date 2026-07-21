@@ -25,6 +25,7 @@ interface Prefs {
   watchlist_buy_alerts: boolean
   watchlist_sell_alerts: boolean
   price_alerts: boolean
+  earnings_alerts: boolean
 }
 
 type Tab = 'feed' | 'rules' | 'preferences'
@@ -32,10 +33,11 @@ type Tab = 'feed' | 'rules' | 'preferences'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const NOTIF_ICON: Record<string, { icon: typeof IconBell; color: string; bg: string }> = {
-  price_alert:      { icon: IconBell,      color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-  stop_loss:        { icon: IconArrowDown, color: '#ef4444', bg: 'rgba(239,68,68,0.12)'  },
-  take_profit:      { icon: IconArrowUp,   color: '#22c55e', bg: 'rgba(34,197,94,0.12)'  },
-  watchlist_signal: { icon: IconEye,       color: '#5b7cf0', bg: 'rgba(91,124,240,0.12)' },
+  price_alert:       { icon: IconBell,      color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  stop_loss:         { icon: IconArrowDown, color: '#ef4444', bg: 'rgba(239,68,68,0.12)'  },
+  take_profit:       { icon: IconArrowUp,   color: '#22c55e', bg: 'rgba(34,197,94,0.12)'  },
+  watchlist_signal:  { icon: IconEye,       color: '#5b7cf0', bg: 'rgba(91,124,240,0.12)' },
+  earnings_reminder: { icon: IconBell,      color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
 }
 
 const FREQ_OPTIONS = [
@@ -82,7 +84,7 @@ export default function NotificationsPage() {
   // Preferences
   const [prefs, setPrefs] = useState<Prefs>({
     frequency: 'morning', stop_loss_pct: 10, take_profit_pct: 20,
-    portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true,
+    portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true, earnings_alerts: true,
   })
   const [savingPrefs, setSavingPrefs] = useState(false)
 
@@ -443,6 +445,7 @@ export default function NotificationsPage() {
             {[
               { key: 'portfolio_sell_alerts', label: 'Portfolio stop-loss & take-profit', desc: 'Alert when holdings hit your % thresholds below' },
               { key: 'watchlist_buy_alerts',  label: 'Watchlist AI signals',              desc: 'Alert when a watched stock gets a BUY or SELL signal' },
+              { key: 'earnings_alerts',       label: 'Earnings reminders',               desc: 'Alert 1 day before a stock in your portfolio or watchlist reports earnings' },
               { key: 'price_alerts',          label: 'Custom price alerts',               desc: 'Alert when a stock crosses your set price' },
             ].map(row => (
               <div key={row.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>

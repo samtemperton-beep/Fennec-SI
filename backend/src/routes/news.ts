@@ -24,16 +24,16 @@ router.get('/ipo', async (_req, res) => {
   }
 });
 
-// Upcoming earnings dates for portfolio/watchlist tickers (next 30 days)
+// Earnings dates for portfolio/watchlist tickers — past 30 days + next 60 days
 router.get('/earnings', async (req, res) => {
   const tickers = String(req.query.tickers || '').split(',').filter(Boolean);
   if (!tickers.length) return res.json([]);
-  const cacheKey = `earnings:${[...tickers].sort().join(',')}`;
+  const cacheKey = `earnings2:${[...tickers].sort().join(',')}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json(cached);
   try {
-    const data = await fetchEarningsCalendar(tickers, 45);
-    await setCached(cacheKey, data, 1); // 1 hour
+    const data = await fetchEarningsCalendar(tickers, 60, 30);
+    await setCached(cacheKey, data, 2); // 2 hours
     res.json(data);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
