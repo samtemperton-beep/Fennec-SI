@@ -341,7 +341,7 @@ export default function EventsPage() {
                   {/* Upcoming earnings list */}
                   {upcoming.length > 0 && (
                     <div style={{ marginTop: 28 }}>
-                      <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.05em', fontSize: 11 }}>
+                      <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 11, marginBottom: 12, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
                         Next up
                       </h2>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
