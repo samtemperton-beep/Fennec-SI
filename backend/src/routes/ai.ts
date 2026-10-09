@@ -52,7 +52,7 @@ router.post('/analyze', requireAuth, async (req, res) => {
 
 // Helper: free users limited to Gemini; counts toward daily quota
 router.post('/helper', requireAuth, async (req, res) => {
-  const { messages } = req.body;
+  const { messages, context } = req.body;
   const isPremium = (req as any).isPremium;
   const user = (req as any).user;
 
@@ -66,9 +66,10 @@ router.post('/helper', requireAuth, async (req, res) => {
   }
 
   try {
+    // All users get context-aware helper; premium uses Claude Sonnet, free uses Gemini
     const stream = isPremium
-      ? claude.streamHelper(messages, user.user_metadata?.anthropic_key)
-      : gemini.streamHelper(messages);
+      ? claude.streamHelper(messages, user.user_metadata?.anthropic_key, context)
+      : gemini.streamHelper(messages, context);
     for await (const chunk of stream) {
       res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
     }

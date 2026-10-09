@@ -89,9 +89,14 @@ export async function draftPost(ticker: string, signal: string, context: string)
   return text.trim();
 }
 
-export async function* streamHelper(messages: any[]) {
+export async function* streamHelper(messages: any[], context?: { portfolioSummary?: string; watchlistSummary?: string; recentNews?: string[] }) {
   const client = getClient();
-  const system = `You are Fennec, a friendly stock market educator built into the Fennec SI investment platform. Explain financial terms and investing concepts in plain English. Keep answers concise — short definition then a real-world example. Cover topics like P/E ratios, EPS, market cap, dividends, ETFs, indices, options, technical indicators. Be encouraging — many users are beginners. For complex topics, break into 2-3 short paragraphs max. Never give personalised buy/sell recommendations.`;
+
+  const portfolioSection = context?.portfolioSummary ? `\n\nUser's portfolio: ${context.portfolioSummary}` : '';
+  const watchlistSection = context?.watchlistSummary ? `\n\nUser's watchlist: ${context.watchlistSummary}` : '';
+  const newsSection = context?.recentNews?.length ? `\n\nRecent news (use to answer current questions):\n${context.recentNews.slice(0, 15).map((h, i) => `${i + 1}. ${h}`).join('\n')}` : '';
+
+  const system = `You are Fennec, an expert financial analyst built into the Fennec SI investment platform. You have deep knowledge of equity markets, macroeconomics, fundamental and technical analysis, ETFs, bonds, and global markets (US, ASX, NZX). Give specific, data-driven answers like a senior portfolio manager. Reference the user's actual holdings and current news when relevant. Use bold for key terms and bullet points for lists. Be direct and confident. 150-250 words unless more depth is genuinely needed. Note this is information, not personal financial advice.${portfolioSection}${watchlistSection}${newsSection}`;
 
   const history = messages.slice(0, -1).map((m: any) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
