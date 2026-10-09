@@ -566,6 +566,9 @@ export default function SettingsPage() {
         </button>
       </form>
 
+      {/* Akahu / Finance */}
+      <AkahuSettings supabase={supabase} />
+
       {/* Danger zone */}
       <div className="card mt-6 mb-8" style={{ border: '1px solid rgba(240,84,84,0.3)' }}>
         <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--red)', marginBottom: 8 }}>Danger Zone</h2>
@@ -581,6 +584,66 @@ export default function SettingsPage() {
           <IconTrash size={16} /> Delete Account
         </button>
       </div>
+    </div>
+  )
+}
+
+function AkahuSettings({ supabase }: { supabase: any }) {
+  const [appToken, setAppToken] = useState('')
+  const [userToken, setUserToken] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [hasCreds, setHasCreds] = useState(false)
+
+  useEffect(() => {
+    supabase.from('akahu_credentials').select('app_token').maybeSingle().then(({ data }: any) => {
+      if (data) setHasCreds(true)
+    })
+  }, [])
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    if (!appToken.trim() || !userToken.trim()) return
+    setSaving(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const API = process.env.NEXT_PUBLIC_API_URL || ''
+      const r = await fetch(`${API}/api/finance/credentials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ app_token: appToken.trim(), user_token: userToken.trim() }),
+      })
+      if (!r.ok) throw new Error((await r.json()).error)
+      setSaved(true); setHasCreds(true); setAppToken(''); setUserToken('')
+    } catch (e: any) { alert(e.message) }
+    setSaving(false)
+  }
+
+  return (
+    <div className="card mt-6" style={{ marginTop: 24 }}>
+      <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Akahu Bank Sync</h2>
+      <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
+        Connect your NZ bank accounts via <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Akahu</a>. Create a personal app at my.akahu.nz/apps to get your tokens.
+        {hasCreds && <span style={{ marginLeft: 8, color: 'var(--green)', fontWeight: 600 }}>✓ Connected</span>}
+      </p>
+      <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>App Token</label>
+          <input type="password" value={appToken} onChange={e => setAppToken(e.target.value)}
+            placeholder={hasCreds ? '••••••••• (saved)' : 'app_token_...'}
+            style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>User Token</label>
+          <input type="password" value={userToken} onChange={e => setUserToken(e.target.value)}
+            placeholder={hasCreds ? '••••••••• (saved)' : 'user_token_...'}
+            style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }} />
+        </div>
+        <button type="submit" disabled={saving || (!appToken && !userToken)}
+          style={{ padding: '9px 20px', borderRadius: 8, background: 'var(--primary)', color: 'white', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: saving || (!appToken && !userToken) ? 0.6 : 1, width: 'fit-content' }}>
+          {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Akahu Tokens'}
+        </button>
+      </form>
     </div>
   )
 }

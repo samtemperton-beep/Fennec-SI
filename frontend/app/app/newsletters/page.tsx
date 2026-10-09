@@ -75,7 +75,7 @@ export default function NewslettersPage() {
   )
 
   return (
-    <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20 }} className="grid-cols-1 xl:grid-cols-[1fr_220px]">
+    <div className="p-4 xl:p-6 grid grid-cols-1 xl:grid-cols-[1fr_220px] gap-5">
       {/* Main content */}
       <div>
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">

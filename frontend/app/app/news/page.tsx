@@ -189,7 +189,7 @@ export default function NewsPage() {
     })
 
   return (
-    <div style={{ padding: 28 }}>
+    <div className="p-4 xl:p-7">
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Market News</h1>
@@ -223,7 +223,7 @@ export default function NewsPage() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20 }} className="grid-cols-1 xl:grid-cols-[1fr_280px]">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-5">
         {/* News cards */}
         <div>
           {loading ? (

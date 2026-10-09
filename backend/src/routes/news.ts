@@ -32,7 +32,12 @@ router.get('/earnings', async (req, res) => {
   const cached = await getCached(cacheKey);
   if (cached) return res.json(cached);
   try {
-    const data = await fetchEarningsCalendar(tickers, 60, 30);
+    // Batch into chunks of 20 (Finnhub free-tier limit per call)
+    const CHUNK = 20;
+    const chunks: string[][] = [];
+    for (let i = 0; i < tickers.length; i += CHUNK) chunks.push(tickers.slice(i, i + CHUNK));
+    const results = await Promise.all(chunks.map(chunk => fetchEarningsCalendar(chunk, 60, 30)));
+    const data = results.flat().sort((a, b) => a.date.localeCompare(b.date));
     await setCached(cacheKey, data, 2); // 2 hours
     res.json(data);
   } catch (e: any) {

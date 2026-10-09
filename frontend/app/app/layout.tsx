@@ -7,7 +7,8 @@ import {
   IconChartBar, IconBrain, IconTrendingUp, IconStar, IconEye,
   IconNewSection, IconMail, IconCalendar, IconUsers, IconBell,
   IconSettings, IconMenu2, IconX, IconLogout, IconTrophy,
-  IconSun, IconMoon, IconShield,
+  IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
+  IconWallet, IconReceipt, IconTarget,
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
 import { MarketTicker } from '@/components/shared/MarketTicker'
@@ -30,6 +31,16 @@ const NAV_SECTIONS = [
       { href: '/app/news', label: 'News', icon: IconNewSection },
       { href: '/app/newsletters', label: 'Newsletters', icon: IconMail },
       { href: '/app/ipo', label: 'Events', icon: IconCalendar },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { href: '/app/finance/accounts', label: 'Accounts', icon: IconBuildingBank },
+      { href: '/app/finance/transactions', label: 'Transactions', icon: IconArrowsExchange },
+      { href: '/app/finance/budget', label: 'Budget', icon: IconWallet },
+      { href: '/app/finance/bills', label: 'Bills', icon: IconReceipt },
+      { href: '/app/finance/goals', label: 'Goals', icon: IconTarget },
     ],
   },
   {

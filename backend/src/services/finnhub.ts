@@ -37,7 +37,7 @@ export async function fetchEarningsCalendar(tickers: string[], days = 60, pastDa
   const from = new Date(Date.now() - pastDays * 86400_000).toISOString().split('T')[0];
   const to = new Date(Date.now() + days * 86400_000).toISOString().split('T')[0];
   const results: any[] = [];
-  for (const symbol of tickers.slice(0, 20)) {
+  for (const symbol of tickers) {
     try {
       const { data } = await axios.get(
         `${BASE}/calendar/earnings?from=${from}&to=${to}&symbol=${symbol}&token=${key()}`,
