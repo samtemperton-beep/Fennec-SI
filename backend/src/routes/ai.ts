@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, checkAndIncrementUsage, FREE_DAILY_AI_LIMIT } from '../middleware/auth';
+import { requireAuth, checkAndIncrementUsage, FREE_DAILY_AI_LIMIT, getPlatformSettings } from '../middleware/auth';
 import * as claude from '../services/claude';
 import * as gemini from '../services/gemini';
 import { getCached, setCached } from '../services/cache';
@@ -40,8 +40,9 @@ router.post('/analyze', requireAuth, async (req, res) => {
         pctFrom52Lo: q.w52Lo ? +((q.price / q.w52Lo - 1) * 100).toFixed(1) : null,
       };
     } catch { /* use whatever data was passed */ }
+    const settings = await getPlatformSettings();
     const result = isPremium
-      ? await claude.analyzeStock(ticker, enriched, user.user_metadata?.anthropic_key)
+      ? await claude.analyzeStock(ticker, enriched, user.user_metadata?.anthropic_key, settings['model_analyze'])
       : await gemini.analyzeStock(ticker, enriched, riskLevel);
     await setCached(cacheKey, result, 4);
     res.json(result);
@@ -66,9 +67,9 @@ router.post('/helper', requireAuth, async (req, res) => {
   }
 
   try {
-    // All users get context-aware helper; premium uses Claude Sonnet, free uses Gemini
+    const settings = await getPlatformSettings();
     const stream = isPremium
-      ? claude.streamHelper(messages, user.user_metadata?.anthropic_key, context)
+      ? claude.streamHelper(messages, user.user_metadata?.anthropic_key, context, settings['model_helper'])
       : gemini.streamHelper(messages, context);
     for await (const chunk of stream) {
       res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
@@ -95,7 +96,8 @@ router.post('/chat', requireAuth, async (req, res) => {
   }
 
   try {
-    for await (const chunk of claude.streamChat(messages, portfolio || [], user.user_metadata?.anthropic_key)) {
+    const settings = await getPlatformSettings();
+    for await (const chunk of claude.streamChat(messages, portfolio || [], user.user_metadata?.anthropic_key, settings['model_chat'])) {
       res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
     }
     res.write('data: [DONE]\n\n');
@@ -120,7 +122,8 @@ router.post('/top10', requireAuth, async (req, res) => {
 
   const user = (req as any).user;
   try {
-    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key, newsContext, rotationSeed);
+    const settings = await getPlatformSettings();
+    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key, newsContext, rotationSeed, settings['model_top10']);
     await setCached(cacheKey, data, 2); // 2h TTL — resets with each hour bucket
     res.json({ data, cached: false });
   } catch (e: any) {
@@ -143,7 +146,8 @@ router.post('/opportunities', requireAuth, async (req, res) => {
   if (!await checkAndIncrementUsage(req, res)) return;
 
   try {
-    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key, sector, market, newsContext, userInterests);
+    const settings = await getPlatformSettings();
+    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key, sector, market, newsContext, userInterests, settings['model_opportunities']);
     await setCached(cacheKey, data, newsContext ? 3 : 4);
     res.json({ data: isPremium ? data : data.slice(0, 2), cached: false, limited: !isPremium });
   } catch (e: any) {
@@ -163,7 +167,8 @@ router.post('/news-digest', requireAuth, async (req, res) => {
 
   const user = (req as any).user;
   try {
-    const data = await claude.analyzeNews(headlines, portfolio || [], user.user_metadata?.anthropic_key);
+    const settings = await getPlatformSettings();
+    const data = await claude.analyzeNews(headlines, portfolio || [], user.user_metadata?.anthropic_key, settings['model_news']);
     await setCached(cacheKey, data, 2);
     res.json(data);
   } catch (e: any) {
@@ -183,8 +188,9 @@ router.post('/ipo-analysis', requireAuth, async (req, res) => {
 
   try {
     const user = (req as any).user;
+    const settings = await getPlatformSettings();
     const data = isPremium
-      ? await claude.analyzeIPO(ipo, user.user_metadata?.anthropic_key)
+      ? await claude.analyzeIPO(ipo, user.user_metadata?.anthropic_key, settings['model_ipo'])
       : await gemini.analyzeIPO(ipo);
     await setCached(cacheKey, data, 24);
     res.json({ data, cached: false });
@@ -209,7 +215,8 @@ router.post('/deep-dive', requireAuth, async (req, res) => {
 
   const user = (req as any).user;
   try {
-    const data = await claude.deepDive(ticker, context, user.user_metadata?.anthropic_key);
+    const settings = await getPlatformSettings();
+    const data = await claude.deepDive(ticker, context, user.user_metadata?.anthropic_key, settings['model_deep_dive']);
     await setCached(cacheKey, data, 6);
     res.json(data);
   } catch (e: any) {

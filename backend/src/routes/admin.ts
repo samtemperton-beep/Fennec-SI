@@ -74,6 +74,20 @@ router.patch('/settings/:key', requireAuth, requireAdmin, async (req, res) => {
   res.json({ success: true, key, value: String(value) });
 });
 
+// GET /api/admin/usage-stats — per-user and aggregate AI usage
+router.get('/usage-stats', requireAuth, requireAdmin, async (_req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, username, email, usage_count, last_usage_reset, subscription_tier, is_admin')
+    .order('usage_count', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  const list = profiles ?? [];
+  const totalToday = list.reduce((s, p) => s + (p.last_usage_reset === today ? (p.usage_count || 0) : 0), 0);
+  const totalAllTime = list.reduce((s, p) => s + (p.usage_count || 0), 0);
+  res.json({ totalToday, totalAllTime, perUser: list });
+});
+
 // GET /api/admin/stats — basic platform stats
 router.get('/stats', requireAuth, requireAdmin, async (_req, res) => {
   const [{ count: total }, { count: premium }, { count: active }] = await Promise.all([

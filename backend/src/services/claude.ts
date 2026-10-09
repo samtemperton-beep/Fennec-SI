@@ -4,9 +4,11 @@ function getClient(apiKey?: string) {
   return new Anthropic({ apiKey: apiKey || process.env.ANTHROPIC_API_KEY });
 }
 
-const MODEL = 'claude-haiku-4-5-20251001';
+export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+export const HELPER_MODEL = 'claude-sonnet-4-6';
+const MODEL = DEFAULT_MODEL;
 
-export async function analyzeStock(ticker: string, data: any, apiKey?: string) {
+export async function analyzeStock(ticker: string, data: any, apiKey?: string, model?: string) {
   const client = getClient(apiKey);
   const d = data || {};
   const context = [
@@ -33,7 +35,7 @@ Rules:
 Return JSON only: { "signal": "BUY"|"HOLD"|"SELL", "confidence": 1-10, "reason": "2 sentences referencing specific data points", "upside_pct": number, "risks": ["string","string"] }`;
 
   const msg = await client.messages.create({
-    model: MODEL,
+    model: model || MODEL,
     max_tokens: 512,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -46,7 +48,7 @@ Return JSON only: { "signal": "BUY"|"HOLD"|"SELL", "confidence": 1-10, "reason":
   }
 }
 
-export async function generateTop10(market: string, timeframe: string, apiKey?: string, newsContext?: string, rotationSeed?: number) {
+export async function generateTop10(market: string, timeframe: string, apiKey?: string, newsContext?: string, rotationSeed?: number, model?: string) {
   const client = getClient(apiKey);
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
@@ -93,7 +95,7 @@ Return a JSON array of exactly 10 objects:
 Be specific. Mention company names, products, events. Make each reason feel like it was written today, not a year ago.`;
 
   const msg = await client.messages.create({
-    model: MODEL,
+    model: model || MODEL,
     max_tokens: 2048,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -110,6 +112,7 @@ export async function generateOpportunities(
   market = 'US',
   newsContext?: string,
   userInterests?: { topSectors: string[]; topTickers: string[] },
+  model?: string,
 ) {
   const client = getClient(apiKey);
   const sectorFilter = sector !== 'All' ? `Focus specifically on the ${sector} sector.` : 'Spread across different sectors.';
@@ -148,7 +151,7 @@ catalyst (1 sentence — specific upcoming trigger), time_horizon (Short/Medium/
 reason (2 sentences of analysis), risk_level (1-10), upside_min_pct, upside_max_pct`;
 
   const msg = await client.messages.create({
-    model: MODEL,
+    model: model || MODEL,
     max_tokens: 2048,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -157,14 +160,14 @@ reason (2 sentences of analysis), risk_level (1-10), upside_min_pct, upside_max_
   return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 }
 
-export async function analyzeNews(headlines: string[], portfolio: string[], apiKey?: string) {
+export async function analyzeNews(headlines: string[], portfolio: string[], apiKey?: string, model?: string) {
   const client = getClient(apiKey);
   const prompt = `Analyze these financial news headlines and provide a brief digest for an investor holding: ${portfolio.join(', ')}.
 Headlines: ${headlines.slice(0, 20).join('\n')}
 Return JSON with: summary (3 sentences), sentiment (bullish/bearish/neutral), key_themes (array of 3 strings), portfolio_impact (string), action (string).`;
 
   const msg = await client.messages.create({
-    model: MODEL,
+    model: model || MODEL,
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -173,14 +176,14 @@ Return JSON with: summary (3 sentences), sentiment (bullish/bearish/neutral), ke
   return jsonMatch ? JSON.parse(jsonMatch[0]) : { summary: text };
 }
 
-export async function analyzeIPO(ipoData: any, apiKey?: string) {
+export async function analyzeIPO(ipoData: any, apiKey?: string, model?: string) {
   const client = getClient(apiKey);
   const prompt = `Analyze this upcoming IPO and give an investment recommendation.
 IPO Data: ${JSON.stringify(ipoData)}
 Return JSON with: recommendation (STRONG_BUY/WATCH/SKIP), score (1-10), business_model (2 sentences), risks (array of 3 strings), valuation_analysis (2 sentences), action (string).`;
 
   const msg = await client.messages.create({
-    model: MODEL,
+    model: model || MODEL,
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -189,13 +192,13 @@ Return JSON with: recommendation (STRONG_BUY/WATCH/SKIP), score (1-10), business
   return jsonMatch ? JSON.parse(jsonMatch[0]) : { recommendation: 'WATCH', score: 5 };
 }
 
-export async function deepDive(ticker: string, context: string, apiKey?: string) {
+export async function deepDive(ticker: string, context: string, apiKey?: string, model?: string) {
   const client = getClient(apiKey);
   const prompt = `Provide a deep-dive analysis of ${ticker}. Context: ${context}
 Return JSON with: what_happened (string), why_it_matters (string), portfolio_impact (string), what_to_watch (array of 3 strings), action_suggestion (string), signal (BUY/HOLD/SELL).`;
 
   const msg = await client.messages.create({
-    model: MODEL,
+    model: model || MODEL,
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -222,7 +225,7 @@ export interface HelperContext {
   recentNews?: string[];
 }
 
-export async function* streamHelper(messages: any[], apiKey?: string, context?: HelperContext) {
+export async function* streamHelper(messages: any[], apiKey?: string, context?: HelperContext, model?: string) {
   const client = getClient(apiKey);
 
   const portfolioSection = context?.portfolioSummary
@@ -263,7 +266,7 @@ export async function* streamHelper(messages: any[], apiKey?: string, context?: 
 - Always note this is information and analysis, not personal financial advice`;
 
   const stream = client.messages.stream({
-    model: 'claude-sonnet-4-6',
+    model: model || HELPER_MODEL,
     max_tokens: 1024,
     system,
     messages,
@@ -276,13 +279,13 @@ export async function* streamHelper(messages: any[], apiKey?: string, context?: 
   }
 }
 
-export async function* streamChat(messages: any[], portfolio: string[], apiKey?: string) {
+export async function* streamChat(messages: any[], portfolio: string[], apiKey?: string, model?: string) {
   const client = getClient(apiKey);
   const system = `You are Fennec SI, an expert investment advisor. The user's portfolio includes: ${portfolio.join(', ')}.
 Provide concise, actionable investment advice. Use specific numbers and data. Be direct and helpful.`;
 
   const stream = client.messages.stream({
-    model: MODEL,
+    model: model || MODEL,
     max_tokens: 1024,
     system,
     messages,

@@ -1,294 +1,506 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-const supabase = createClient()
-import { IconSettings, IconUsers, IconRefresh, IconCrown, IconCheck, IconX } from '@tabler/icons-react'
-import { toast } from 'sonner'
+import { api } from '@/lib/api'
+import {
+  IconShield, IconUsers, IconBrain, IconSettings2,
+  IconRefresh, IconCrown, IconActivity, IconCheck, IconX,
+} from '@tabler/icons-react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+const AVAILABLE_MODELS = [
+  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', note: 'Fast & cheap' },
+  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6', note: 'Balanced (recommended)' },
+]
 
-interface User {
-  id: string
-  username: string | null
-  email: string | null
-  subscription_tier: string
-  is_admin: boolean
-  usage_count: number | null
-  last_usage_reset: string | null
-  created_at: string
+const AI_SECTIONS = [
+  { key: 'model_analyze', label: 'Stock Analyzer', desc: 'Individual stock analysis signal' },
+  { key: 'model_helper', label: 'AI Helper', desc: 'Floating chat assistant', defaultModel: 'claude-sonnet-4-6' },
+  { key: 'model_chat', label: 'AI Advisor Chat', desc: 'Portfolio chat advisor' },
+  { key: 'model_top10', label: "Today's Picks", desc: 'Top 10 stock picks generation' },
+  { key: 'model_opportunities', label: 'Discover / Opportunities', desc: 'Hidden gem opportunities' },
+  { key: 'model_news', label: 'News Digest', desc: 'AI news analysis & digest' },
+  { key: 'model_ipo', label: 'IPO Analysis', desc: 'IPO scoring and analysis' },
+  { key: 'model_deep_dive', label: 'Deep Dive', desc: 'In-depth stock research (premium)' },
+]
+
+function Tag({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+      background: `${color}22`, color, letterSpacing: '.04em', textTransform: 'uppercase' as const,
+    }}>
+      {children}
+    </span>
+  )
 }
 
-interface Setting {
-  key: string
-  value: string
-  description: string | null
-  updated_at: string
-}
-
-interface Stats {
-  total: number
-  premium: number
-  activeThisWeek: number
-}
-
-const SETTING_LABELS: Record<string, string> = {
-  free_daily_ai_limit: 'Free daily AI calls',
-  free_max_holdings: 'Free max holdings',
-  free_max_watchlist: 'Free max watchlist items',
+function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+  return (
+    <div style={{
+      background: 'var(--surface2)', border: '1px solid var(--border)',
+      borderRadius: 12, padding: '18px 20px', flex: 1, minWidth: 140,
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' as const }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>{sub}</div>}
+    </div>
+  )
 }
 
 export default function AdminPage() {
-  const [token, setToken] = useState<string | null>(null)
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
-  const [tab, setTab] = useState<'users' | 'settings'>('users')
-  const [users, setUsers] = useState<User[]>([])
-  const [settings, setSettings] = useState<Setting[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [editingKey, setEditingKey] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [search, setSearch] = useState('')
+  const router = useRouter()
+  const [checking, setChecking] = useState(true)
+  const [tab, setTab] = useState<'overview' | 'models' | 'users'>('overview')
+
+  // Stats
+  const [stats, setStats] = useState<any>(null)
+  const [usageStats, setUsageStats] = useState<any>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
+
+  // Models
+  const [settings, setSettings] = useState<Record<string, string>>({})
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [settingsLoading, setSettingsLoading] = useState(false)
+  const [pendingModels, setPendingModels] = useState<Record<string, string>>({})
+
+  // Users
+  const [users, setUsers] = useState<any[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [resettingId, setResettingId] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      const t = data.session?.access_token ?? null
-      setToken(t)
-      if (!t) { setIsAdmin(false); setLoading(false); return }
-      const { data: profile } = await supabase.from('profiles').select('is_admin').single()
-      setIsAdmin(profile?.is_admin === true)
-      setLoading(false)
+    const supabase = createClient()
+    supabase.from('profiles').select('is_admin').then(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace('/login'); return }
+      const { data: p } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single()
+      if (!p?.is_admin) { router.replace('/app/portfolio'); return }
+      setChecking(false)
     })
+  }, [router])
+
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true)
+    try {
+      const [s, u] = await Promise.all([api.adminGetStats(), api.adminGetUsageStats()])
+      setStats(s)
+      setUsageStats(u)
+    } catch {}
+    setStatsLoading(false)
   }, [])
 
-  async function headers() {
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+  const loadSettings = useCallback(async () => {
+    setSettingsLoading(true)
+    try {
+      const { settings: list } = await api.adminGetSettings()
+      const map: Record<string, string> = {}
+      for (const s of list) map[s.key] = s.value
+      setSettings(map)
+      setPendingModels(map)
+    } catch {}
+    setSettingsLoading(false)
+  }, [])
+
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true)
+    try {
+      const { users: list } = await api.adminGetUsers()
+      setUsers(list || [])
+    } catch {}
+    setUsersLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (checking) return
+    loadStats()
+    loadSettings()
+    loadUsers()
+  }, [checking, loadStats, loadSettings, loadUsers])
+
+  async function saveModel(key: string, value: string) {
+    setSavingKey(key)
+    try {
+      await api.adminSetSetting(key, value)
+      setSettings(prev => ({ ...prev, [key]: value }))
+      setSavedKey(key)
+      setTimeout(() => setSavedKey(null), 2000)
+    } catch {}
+    setSavingKey(null)
   }
 
-  async function loadAll() {
-    setLoading(true)
-    const [uRes, sRes, stRes] = await Promise.all([
-      fetch(`${API}/api/admin/users`, { headers: await headers() }),
-      fetch(`${API}/api/admin/settings`, { headers: await headers() }),
-      fetch(`${API}/api/admin/stats`, { headers: await headers() }),
-    ])
-    if (uRes.ok) setUsers((await uRes.json()).users ?? [])
-    if (sRes.ok) setSettings((await sRes.json()).settings ?? [])
-    if (stRes.ok) setStats(await stRes.json())
-    setLoading(false)
+  async function toggleTier(userId: string, currentTier: string) {
+    setTogglingId(userId)
+    const next = currentTier === 'premium' ? 'free' : 'premium'
+    try {
+      await api.adminSetTier(userId, next)
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, subscription_tier: next } : u))
+    } catch {}
+    setTogglingId(null)
   }
 
-  useEffect(() => { if (isAdmin) loadAll() }, [isAdmin])
-
-  async function toggleTier(user: User) {
-    const tier = user.subscription_tier === 'premium' ? 'free' : 'premium'
-    const res = await fetch(`${API}/api/admin/users/${user.id}/tier`, {
-      method: 'PATCH',
-      headers: await headers(),
-      body: JSON.stringify({ tier }),
-    })
-    if (res.ok) {
-      setUsers(u => u.map(x => x.id === user.id ? { ...x, subscription_tier: tier } : x))
-      toast.success(`${user.username ?? 'User'} set to ${tier}`)
-    } else toast.error('Failed to update tier')
+  async function resetUsage(userId: string) {
+    setResettingId(userId)
+    try {
+      await api.adminResetUsage(userId)
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, usage_count: 0 } : u))
+      if (usageStats) {
+        setUsageStats((prev: any) => ({
+          ...prev,
+          perUser: prev.perUser.map((u: any) => u.id === userId ? { ...u, usage_count: 0 } : u),
+        }))
+      }
+    } catch {}
+    setResettingId(null)
   }
 
-  async function resetUsage(user: User) {
-    const res = await fetch(`${API}/api/admin/users/${user.id}/reset-usage`, {
-      method: 'POST',
-      headers: await headers(),
-    })
-    if (res.ok) {
-      setUsers(u => u.map(x => x.id === user.id ? { ...x, usage_count: 0 } : x))
-      toast.success('Usage reset')
-    } else toast.error('Failed to reset usage')
-  }
+  if (checking) return null
 
-  async function saveSetting(key: string) {
-    setSaving(true)
-    const res = await fetch(`${API}/api/admin/settings/${key}`, {
-      method: 'PATCH',
-      headers: await headers(),
-      body: JSON.stringify({ value: editValue }),
-    })
-    setSaving(false)
-    if (res.ok) {
-      setSettings(s => s.map(x => x.key === key ? { ...x, value: editValue } : x))
-      setEditingKey(null)
-      toast.success('Setting saved')
-    } else toast.error('Failed to save')
-  }
+  const today = new Date().toISOString().slice(0, 10)
 
-  const filteredUsers = users.filter(u =>
-    !search || (u.username ?? '').toLowerCase().includes(search.toLowerCase()) || (u.email ?? '').toLowerCase().includes(search.toLowerCase())
-  )
-
-  if (loading) return (
-    <div style={{ padding: 40, color: 'var(--text2)', fontSize: 14 }}>Loading…</div>
-  )
-
-  if (!isAdmin) return (
-    <div style={{ padding: 40 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--red)' }}>Access denied</h1>
-      <p style={{ color: 'var(--text2)', marginTop: 8 }}>You need admin privileges to view this page.</p>
-    </div>
-  )
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: IconActivity },
+    { id: 'models', label: 'AI Models', icon: IconBrain },
+    { id: 'users', label: 'Users', icon: IconUsers },
+  ] as const
 
   return (
-    <div style={{ padding: '28px 24px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: '28px 32px', maxWidth: 1000, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800 }}>Admin Panel</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>Manage users, limits, and platform settings</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+        <div style={{
+          width: 38, height: 38, borderRadius: 10,
+          background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <IconShield size={20} color="#fff" />
         </div>
-        <button onClick={loadAll} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 13 }}>
-          <IconRefresh size={14} /> Refresh
-        </button>
+        <div>
+          <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800, margin: 0, lineHeight: 1.2 }}>Admin Panel</h1>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--text2)' }}>Platform management and configuration</p>
+        </div>
       </div>
 
-      {/* Stats row */}
-      {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-          {[
-            { label: 'Total users', value: stats.total },
-            { label: 'Premium users', value: stats.premium },
-            { label: 'Active this week', value: stats.activeThisWeek },
-          ].map(s => (
-            <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
-              <p style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</p>
-              <p style={{ fontSize: 28, fontWeight: 800, fontFamily: 'DM Mono, monospace', color: 'var(--primary)', marginTop: 4 }}>{s.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {(['users', 'settings'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 20, border: '1px solid var(--border)', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: tab === t ? 'var(--primary)' : 'none', color: tab === t ? 'white' : 'var(--text2)' }}>
-            {t === 'users' ? <IconUsers size={14} /> : <IconSettings size={14} />}
-            {t === 'users' ? 'Users' : 'Platform settings'}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: 'var(--surface2)', padding: 4, borderRadius: 10, width: 'fit-content' }}>
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13,
+              background: tab === t.id ? 'var(--surface)' : 'transparent',
+              color: tab === t.id ? 'var(--text)' : 'var(--text2)',
+              fontWeight: tab === t.id ? 700 : 400,
+              boxShadow: tab === t.id ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            <t.icon size={14} />
+            {t.label}
           </button>
         ))}
       </div>
 
-      {/* Users tab */}
-      {tab === 'users' && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or email…"
-              style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: 13, outline: 'none' }} />
+      {/* OVERVIEW TAB */}
+      {tab === 'overview' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Platform Overview</h2>
+            <button
+              onClick={() => { loadStats() }}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              <IconRefresh size={13} />
+              Refresh
+            </button>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['User', 'Tier', 'AI today', 'Joined', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '10px 16px', textAlign: h === 'Actions' ? 'center' : 'left', fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map(u => (
-                  <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '12px 16px' }}>
-                      <p style={{ fontWeight: 600, fontSize: 13 }}>{u.username ?? '—'}</p>
-                      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{u.email ?? u.id.slice(0, 8) + '…'}</p>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: u.subscription_tier === 'premium' ? 'rgba(250,204,21,0.15)' : 'var(--surface2)', color: u.subscription_tier === 'premium' ? '#FACC15' : 'var(--text2)' }}>
-                        {u.subscription_tier === 'premium' && <IconCrown size={10} />}
-                        {u.subscription_tier}
-                      </span>
-                      {u.is_admin && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--primary)', fontWeight: 700 }}>ADMIN</span>}
-                    </td>
-                    <td style={{ padding: '12px 16px', fontFamily: 'DM Mono, monospace', fontSize: 13 }}>
-                      {u.usage_count ?? 0}
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text2)' }}>
-                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-                        <button onClick={() => toggleTier(u)}
-                          disabled={u.is_admin}
-                          title={u.is_admin ? 'Cannot change admin tier' : `Set to ${u.subscription_tier === 'premium' ? 'free' : 'premium'}`}
-                          style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: u.is_admin ? 'var(--text3)' : 'var(--primary)', fontSize: 11, cursor: u.is_admin ? 'default' : 'pointer', fontWeight: 600, opacity: u.is_admin ? 0.4 : 1 }}>
-                          {u.subscription_tier === 'premium' ? 'Downgrade' : 'Upgrade'}
-                        </button>
-                        <button onClick={() => resetUsage(u)}
-                          title="Reset today's AI usage"
-                          style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--text2)', fontSize: 11, cursor: 'pointer' }}>
-                          Reset
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredUsers.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>No users found</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+
+          {statsLoading ? (
+            <div style={{ color: 'var(--text2)', fontSize: 13, padding: '20px 0' }}>Loading…</div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 28 }}>
+                <StatCard label="Total Users" value={stats?.total ?? '—'} />
+                <StatCard label="Premium Users" value={stats?.premium ?? '—'} sub={stats?.total ? `${Math.round((stats.premium / stats.total) * 100)}% of total` : undefined} />
+                <StatCard label="Active This Week" value={stats?.activeThisWeek ?? '—'} />
+                <StatCard label="AI Calls Today" value={usageStats?.totalToday ?? '—'} />
+                <StatCard label="AI Calls All-time" value={usageStats?.totalAllTime ?? '—'} />
+              </div>
+
+              {/* Per-user usage top 10 */}
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Top Users by AI Usage (Today)</h3>
+              <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      {['User', 'Tier', 'Usage Today', 'Total Usage'].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text2)', fontWeight: 600, letterSpacing: '.04em', fontSize: 11 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(usageStats?.perUser ?? [])
+                      .slice()
+                      .sort((a: any, b: any) => {
+                        const aToday = a.last_usage_reset === today ? (a.usage_count || 0) : 0
+                        const bToday = b.last_usage_reset === today ? (b.usage_count || 0) : 0
+                        return bToday - aToday
+                      })
+                      .slice(0, 15)
+                      .map((u: any) => {
+                        const todayCount = u.last_usage_reset === today ? (u.usage_count || 0) : 0
+                        return (
+                          <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '9px 14px', color: 'var(--text)' }}>
+                              {u.username || u.email || u.id.slice(0, 8)}
+                              {u.is_admin && <span style={{ marginLeft: 6 }}><Tag color="var(--accent)">admin</Tag></span>}
+                            </td>
+                            <td style={{ padding: '9px 14px' }}>
+                              {u.subscription_tier === 'premium'
+                                ? <Tag color="var(--amber)">Premium</Tag>
+                                : <Tag color="var(--text2)">Free</Tag>}
+                            </td>
+                            <td style={{ padding: '9px 14px', color: todayCount > 0 ? 'var(--text)' : 'var(--text2)', fontWeight: todayCount > 5 ? 700 : 400 }}>{todayCount}</td>
+                            <td style={{ padding: '9px 14px', color: 'var(--text2)' }}>{u.usage_count || 0}</td>
+                          </tr>
+                        )
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* Settings tab */}
-      {tab === 'settings' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {settings.length === 0 && (
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 32, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
-              No settings found. Run the SQL setup in Supabase first.
+      {/* MODELS TAB */}
+      {tab === 'models' && (
+        <div>
+          <div style={{ marginBottom: 18 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>AI Model Configuration</h2>
+            <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>
+              Set the Claude model used for each AI feature. Changes take effect within 60 seconds (settings cache TTL).
+              Applies to premium users; free users always use Gemini.
+            </p>
+          </div>
+
+          {settingsLoading ? (
+            <div style={{ color: 'var(--text2)', fontSize: 13, padding: '20px 0' }}>Loading…</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {AI_SECTIONS.map(section => {
+                const currentModel = pendingModels[section.key] || section.defaultModel || 'claude-haiku-4-5-20251001'
+                const savedModel = settings[section.key] || section.defaultModel || 'claude-haiku-4-5-20251001'
+                const isDirty = currentModel !== savedModel
+                const isSaving = savingKey === section.key
+                const isSaved = savedKey === section.key
+                return (
+                  <div
+                    key={section.key}
+                    style={{
+                      background: 'var(--surface2)', border: '1px solid var(--border)',
+                      borderRadius: 12, padding: '16px 18px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{section.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text2)' }}>{section.desc}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {AVAILABLE_MODELS.map(m => (
+                          <button
+                            key={m.id}
+                            onClick={() => setPendingModels(prev => ({ ...prev, [section.key]: m.id }))}
+                            title={m.note}
+                            style={{
+                              padding: '6px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                              fontWeight: currentModel === m.id ? 700 : 400,
+                              border: currentModel === m.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                              background: currentModel === m.id ? 'var(--accent)22' : 'var(--surface)',
+                              color: currentModel === m.id ? 'var(--accent)' : 'var(--text2)',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => saveModel(section.key, currentModel)}
+                        disabled={isSaving || !isDirty}
+                        style={{
+                          padding: '6px 14px', borderRadius: 7, fontSize: 12, cursor: isDirty && !isSaving ? 'pointer' : 'default',
+                          border: 'none',
+                          background: isSaved ? 'var(--green)' : isDirty ? 'var(--accent)' : 'var(--surface)',
+                          color: isSaved || isDirty ? '#fff' : 'var(--text2)',
+                          fontWeight: 600, opacity: !isDirty && !isSaved ? 0.4 : 1,
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {isSaved ? <><IconCheck size={13} /> Saved</> : isSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Free limit setting */}
+              <div style={{ marginTop: 14 }}>
+                <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Platform Settings</h3>
+                <FreeLimitEditor
+                  current={settings['free_daily_ai_limit'] || '10'}
+                  onSave={(v) => saveModel('free_daily_ai_limit', v)}
+                  isSaving={savingKey === 'free_daily_ai_limit'}
+                  isSaved={savedKey === 'free_daily_ai_limit'}
+                />
+              </div>
             </div>
           )}
-          {settings.map(s => {
-            const isEditing = editingKey === s.key
-            return (
-              <div key={s.key} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 700, fontSize: 14 }}>{SETTING_LABELS[s.key] ?? s.key}</p>
-                  {s.description && <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{s.description}</p>}
-                  <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
-                    key: <code style={{ fontFamily: 'DM Mono, monospace' }}>{s.key}</code>
-                    {s.updated_at && ` · updated ${new Date(s.updated_at).toLocaleDateString()}`}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {isEditing ? (
-                    <>
-                      <input value={editValue} onChange={e => setEditValue(e.target.value)}
-                        type="number" min={0}
-                        style={{ width: 80, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--primary)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, fontFamily: 'DM Mono, monospace', textAlign: 'center', outline: 'none' }}
-                        onKeyDown={e => { if (e.key === 'Enter') saveSetting(s.key); if (e.key === 'Escape') setEditingKey(null) }}
-                        autoFocus
-                      />
-                      <button onClick={() => saveSetting(s.key)} disabled={saving}
-                        style={{ padding: 6, borderRadius: 6, border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                        <IconCheck size={14} />
-                      </button>
-                      <button onClick={() => setEditingKey(null)}
-                        style={{ padding: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--text2)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                        <IconX size={14} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 800, color: 'var(--primary)', minWidth: 40, textAlign: 'center' }}>{s.value}</span>
-                      <button onClick={() => { setEditingKey(s.key); setEditValue(s.value) }}
-                        style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                        Edit
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          })}
         </div>
       )}
+
+      {/* USERS TAB */}
+      {tab === 'users' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 2px' }}>User Management</h2>
+              <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>{users.length} users</p>
+            </div>
+            <button
+              onClick={loadUsers}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              <IconRefresh size={13} />
+              Refresh
+            </button>
+          </div>
+
+          {usersLoading ? (
+            <div style={{ color: 'var(--text2)', fontSize: 13, padding: '20px 0' }}>Loading…</div>
+          ) : (
+            <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    {['User', 'Tier', 'Usage', 'Last Active', 'Actions'].map(h => (
+                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text2)', fontWeight: 600, letterSpacing: '.04em', fontSize: 11 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 14px' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text)' }}>{u.username || '—'}</div>
+                        <div style={{ color: 'var(--text2)', fontSize: 10.5 }}>{u.email}</div>
+                        {u.is_admin && <Tag color="var(--accent)">admin</Tag>}
+                      </td>
+                      <td style={{ padding: '9px 14px' }}>
+                        {u.subscription_tier === 'premium'
+                          ? <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconCrown size={12} color="var(--amber)" /><Tag color="var(--amber)">Premium</Tag></span>
+                          : <Tag color="var(--text2)">Free</Tag>}
+                      </td>
+                      <td style={{ padding: '9px 14px', color: 'var(--text)' }}>
+                        {u.last_usage_reset === today ? u.usage_count || 0 : 0}
+                        <span style={{ color: 'var(--text2)', fontSize: 10.5 }}> today</span>
+                      </td>
+                      <td style={{ padding: '9px 14px', color: 'var(--text2)', fontSize: 11 }}>
+                        {u.last_usage_reset || '—'}
+                      </td>
+                      <td style={{ padding: '9px 14px' }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => toggleTier(u.id, u.subscription_tier)}
+                            disabled={togglingId === u.id}
+                            style={{
+                              padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                              border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)',
+                              opacity: togglingId === u.id ? 0.5 : 1,
+                            }}
+                          >
+                            {togglingId === u.id ? '…' : u.subscription_tier === 'premium' ? 'Downgrade' : 'Upgrade'}
+                          </button>
+                          <button
+                            onClick={() => resetUsage(u.id)}
+                            disabled={resettingId === u.id}
+                            title="Reset daily AI usage counter"
+                            style={{
+                              padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                              border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text2)',
+                              opacity: resettingId === u.id ? 0.5 : 1,
+                            }}
+                          >
+                            {resettingId === u.id ? '…' : 'Reset'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FreeLimitEditor({ current, onSave, isSaving, isSaved }: {
+  current: string
+  onSave: (v: string) => void
+  isSaving: boolean
+  isSaved: boolean
+}) {
+  const [val, setVal] = useState(current)
+  useEffect(() => { setVal(current) }, [current])
+  const isDirty = val !== current
+
+  return (
+    <div style={{
+      background: 'var(--surface2)', border: '1px solid var(--border)',
+      borderRadius: 12, padding: '16px 18px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+    }}>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>Free Daily AI Limit</div>
+        <div style={{ fontSize: 11, color: 'var(--text2)' }}>Max AI calls per day for free-tier users</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input
+          type="number"
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          min={1}
+          max={100}
+          style={{
+            width: 70, padding: '6px 10px', borderRadius: 7, fontSize: 13,
+            border: '1px solid var(--border)', background: 'var(--surface)',
+            color: 'var(--text)', textAlign: 'center' as const,
+          }}
+        />
+        <button
+          onClick={() => onSave(val)}
+          disabled={isSaving || !isDirty}
+          style={{
+            padding: '6px 14px', borderRadius: 7, fontSize: 12, cursor: isDirty && !isSaving ? 'pointer' : 'default',
+            border: 'none',
+            background: isSaved ? 'var(--green)' : isDirty ? 'var(--accent)' : 'var(--surface)',
+            color: isSaved || isDirty ? '#fff' : 'var(--text2)',
+            fontWeight: 600, opacity: !isDirty && !isSaved ? 0.4 : 1,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}
+        >
+          {isSaved ? <><IconCheck size={13} /> Saved</> : isSaving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
     </div>
   )
 }

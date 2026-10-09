@@ -137,6 +137,21 @@ export const api = {
   adminSetTier: (userId: string, tier: 'free' | 'premium') =>
     apiFetch(`/api/admin/users/${userId}/tier`, { method: 'PATCH', body: JSON.stringify({ tier }) }),
 
+  adminResetUsage: (userId: string) =>
+    apiFetch(`/api/admin/users/${userId}/reset-usage`, { method: 'POST' }),
+
+  adminGetStats: () =>
+    apiFetch('/api/admin/stats'),
+
+  adminGetUsageStats: () =>
+    apiFetch('/api/admin/usage-stats'),
+
+  adminGetSettings: () =>
+    apiFetch('/api/admin/settings'),
+
+  adminSetSetting: (key: string, value: string) =>
+    apiFetch(`/api/admin/settings/${key}`, { method: 'PATCH', body: JSON.stringify({ value }) }),
+
   async *streamChat(messages: any[], portfolio: string[]) {
     const token = await getToken()
     const res = await fetch(`${API}/api/ai/chat`, {
