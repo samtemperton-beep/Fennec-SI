@@ -10,7 +10,7 @@ import {
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
   IconWallet, IconReceipt, IconTarget, IconLayoutDashboard, IconPigMoney,
 } from '@tabler/icons-react'
-import { StockHelper } from '@/components/shared/StockHelper'
+import { FennecAI } from '@/components/shared/FennecAI'
 import { MarketTicker } from '@/components/shared/MarketTicker'
 import { Avatar } from '@/components/shared/Avatar'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
@@ -278,7 +278,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
-      <StockHelper />
+      <FennecAI />
     </div>
   )
 }

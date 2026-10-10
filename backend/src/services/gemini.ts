@@ -89,14 +89,20 @@ export async function draftPost(ticker: string, signal: string, context: string)
   return text.trim();
 }
 
-export async function* streamHelper(messages: any[], context?: { portfolioSummary?: string; watchlistSummary?: string; recentNews?: string[] }) {
+export async function* streamHelper(messages: any[], context?: { pageHint?: string; portfolioSummary?: string; watchlistSummary?: string; recentNews?: string[]; accountsSummary?: string; monthlySpend?: string; goalsSummary?: string; kiwiSaverSummary?: string }) {
   const client = getClient();
 
-  const portfolioSection = context?.portfolioSummary ? `\n\nUser's portfolio: ${context.portfolioSummary}` : '';
-  const watchlistSection = context?.watchlistSummary ? `\n\nUser's watchlist: ${context.watchlistSummary}` : '';
-  const newsSection = context?.recentNews?.length ? `\n\nRecent news (use to answer current questions):\n${context.recentNews.slice(0, 15).map((h, i) => `${i + 1}. ${h}`).join('\n')}` : '';
+  const sections = [
+    context?.portfolioSummary ? `\nPortfolio: ${context.portfolioSummary}` : '',
+    context?.watchlistSummary ? `\nWatchlist: ${context.watchlistSummary}` : '',
+    context?.recentNews?.length ? `\nRecent news:\n${context.recentNews.slice(0, 15).map((h, i) => `${i + 1}. ${h}`).join('\n')}` : '',
+    context?.accountsSummary ? `\nBank accounts: ${context.accountsSummary}` : '',
+    context?.monthlySpend ? `\nSpending: ${context.monthlySpend}` : '',
+    context?.goalsSummary ? `\nSavings goals: ${context.goalsSummary}` : '',
+    context?.kiwiSaverSummary ? `\nKiwiSaver: ${context.kiwiSaverSummary}` : '',
+  ].join('');
 
-  const system = `You are Fennec, an expert financial analyst built into the Fennec SI investment platform. You have deep knowledge of equity markets, macroeconomics, fundamental and technical analysis, ETFs, bonds, and global markets (US, ASX, NZX). Give specific, data-driven answers like a senior portfolio manager. Reference the user's actual holdings and current news when relevant. Use bold for key terms and bullet points for lists. Be direct and confident. 150-250 words unless more depth is genuinely needed. Note this is information, not personal financial advice.${portfolioSection}${watchlistSection}${newsSection}`;
+  const system = `You are Fennec, an expert AI financial adviser for NZ users. You cover both investing (equities, ETFs, macro, US/ASX/NZX markets) and personal finance (budgeting, savings, KiwiSaver, NZ tax). Give specific, data-driven answers. Reference the user's actual data when relevant. Use bold for key terms, bullet points for lists. Be direct and concise (150-250 words). Note this is information, not regulated financial advice.${sections}`;
 
   const history = messages.slice(0, -1).map((m: any) => ({
     role: m.role === 'assistant' ? 'model' : 'user',

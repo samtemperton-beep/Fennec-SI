@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { HoldingsTable, type Holding } from '@/components/portfolio/HoldingsTable'
 import { PLChart } from '@/components/portfolio/PLChart'
-import { AIAdvisor } from '@/components/portfolio/AIAdvisor'
 import { StatsBar } from '@/components/shared/StatsBar'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -435,9 +434,6 @@ export default function PortfolioPage() {
             </div>
             {holdings.length > 1 && <PLChart holdings={holdings} />}
             {badges.length > 0 && <BadgesDisplay badges={badges} />}
-          </div>
-          <div>
-            <AIAdvisor portfolio={portfolio} />
           </div>
         </div>
       )}

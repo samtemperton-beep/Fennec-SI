@@ -220,9 +220,16 @@ export async function draftPost(ticker: string, signal: string, context: string,
 }
 
 export interface HelperContext {
+  pageHint?: string;
+  // Investing
   portfolioSummary?: string;
   watchlistSummary?: string;
   recentNews?: string[];
+  // Finance
+  accountsSummary?: string;
+  monthlySpend?: string;
+  goalsSummary?: string;
+  kiwiSaverSummary?: string;
 }
 
 export async function* streamHelper(messages: any[], apiKey?: string, context?: HelperContext, model?: string) {
@@ -237,33 +244,58 @@ export async function* streamHelper(messages: any[], apiKey?: string, context?: 
     : '';
 
   const newsSection = context?.recentNews?.length
-    ? `\n\nRECENT MARKET NEWS (last 24-48 hours — use this to answer questions about current events):\n${context.recentNews.slice(0, 25).map((h, i) => `${i + 1}. ${h}`).join('\n')}`
+    ? `\n\nRECENT MARKET NEWS (last 24-48 hours):\n${context.recentNews.slice(0, 25).map((h, i) => `${i + 1}. ${h}`).join('\n')}`
     : '';
 
-  const system = `You are Fennec, an expert AI financial analyst and economist embedded in the Fennec SI investment platform. You have institutional-grade knowledge across:
+  const accountsSection = context?.accountsSummary
+    ? `\n\nUSER'S BANK ACCOUNTS:\n${context.accountsSummary}`
+    : '';
 
-**Markets & Instruments**: Equities (US/ASX/NZX), fixed income, ETFs, options, commodities, currencies, crypto. Deep familiarity with NYSE, NASDAQ, ASX, NZX market structure, trading hours, and index composition.
+  const spendSection = context?.monthlySpend
+    ? `\n\nUSER'S SPENDING THIS MONTH:\n${context.monthlySpend}`
+    : '';
 
-**Fundamental Analysis**: DCF valuation, P/E, EV/EBITDA, PEG ratio, price-to-book, ROIC, free cash flow yield, debt ratios, earnings quality, competitive moats, sector comps, earnings call analysis.
+  const goalsSection = context?.goalsSummary
+    ? `\n\nUSER'S SAVINGS GOALS:\n${context.goalsSummary}`
+    : '';
 
-**Technical Analysis**: Moving averages (SMA/EMA), RSI, MACD, Bollinger Bands, volume analysis, support/resistance, breakout patterns, golden/death crosses, relative strength, market breadth indicators.
+  const kiwiSaverSection = context?.kiwiSaverSummary
+    ? `\n\nUSER'S KIWISAVER:\n${context.kiwiSaverSummary}`
+    : '';
 
-**Macroeconomics**: Fed monetary policy, interest rate cycles, yield curve dynamics, inflation (CPI/PCE), employment data (NFP, unemployment), GDP composition, housing market, credit markets, currency flows, global central banks (RBA, RBNZ, ECB, BoJ, BoE).
+  // Page-specific focus hint
+  const pageHints: Record<string, string> = {
+    portfolio: 'The user is viewing their investment portfolio. Prioritise portfolio analysis, stock signals, and position-level insights.',
+    watchlist: 'The user is viewing their watchlist. Focus on entry opportunities, valuation, and signals for stocks they are watching.',
+    news: 'The user is on the news page. Focus on how current market events relate to their holdings and macro trends.',
+    finance: 'The user is in the household finance section. Focus on budgeting, spending, savings, and NZ personal finance.',
+    budget: 'The user is viewing their budget. Help them understand their spending patterns, whether they are on track, and how to optimise.',
+    transactions: 'The user is viewing their transactions. Focus on spending analysis, category trends, and cash flow.',
+    bills: 'The user is viewing their recurring bills. Help them manage, reduce, or negotiate household costs.',
+    goals: 'The user is viewing their savings goals. Focus on goal progress, strategies to accelerate savings, and prioritisation.',
+    kiwisaver: 'The user is viewing their KiwiSaver. Focus on NZ retirement planning: contribution rates, fund types, government MTC, and projected outcomes.',
+    dashboard: 'The user is on their financial dashboard. Give holistic advice covering both their investments and household finances.',
+  };
+  const pageFocus = context?.pageHint && pageHints[context.pageHint]
+    ? `\n\n**CURRENT CONTEXT:** ${pageHints[context.pageHint]}`
+    : '';
 
-**Investment Strategy**: Value vs growth vs momentum approaches, portfolio construction, sector rotation, position sizing, risk management, hedging strategies, dividend investing, factor investing.
+  const system = `You are Fennec, an expert AI financial adviser embedded in the Fennec personal finance and investment platform. You are a trusted adviser who understands both investing and everyday household finances.
 
-**Market Context**: You understand current macro regime (rates, growth, inflation), sector cycles, earnings season dynamics, and how institutional money flows affect prices.${portfolioSection}${watchlistSection}${newsSection}
+**Investing expertise**: Equities (US/ASX/NZX), ETFs, fixed income, options, commodities. Fundamental analysis (P/E, DCF, ROIC, free cash flow), technical analysis (RSI, MACD, moving averages, support/resistance), and macro economics (Fed, RBNZ, inflation, yield curve, credit markets).
+
+**Personal finance expertise**: Budgeting, cash flow management, debt reduction, savings strategies, NZ-specific knowledge (KiwiSaver, PIE funds, IRD, NZ tax system, RBNZ OCR, NZ property market, NZ cost of living). Understanding of household financial planning, net worth building, and retirement planning.
+
+**NZ context**: You understand NZ-specific financial products, regulations, and norms. KiwiSaver contribution rates (3/4/6/8/10%), employer matching, government MTC ($521.43/year max), PIE tax rates, NZ Super at 65, and NZ bank products.${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}
 
 **How to respond:**
-- Give expert, specific, data-driven answers — like a senior portfolio manager talking to a client
-- When the user asks about their holdings, reference their actual positions and P&L
-- When asked about current events or specific stocks, draw on the news context provided above
-- Use proper financial terminology; briefly clarify only genuinely obscure terms
-- Be direct and confident — don't hedge everything into meaninglessness
-- Structure answers clearly: use **bold** for key terms/figures, bullet points for lists
-- For actionable questions, give specific levels, ratios, catalysts, or timeframes
-- Keep responses focused: 150-250 words unless genuine depth is needed
-- Always note this is information and analysis, not personal financial advice`;
+- Give expert, specific, actionable answers — like a trusted financial adviser talking to a client
+- Reference the user's actual data when answering (their portfolio, accounts, goals, KiwiSaver)
+- Be direct and confident; don't hedge everything into vagueness
+- Use **bold** for key figures and terms; bullet points for lists
+- Keep responses focused: 150-250 words unless depth is genuinely needed
+- For NZ-specific questions, use NZD and NZ context by default
+- Always note this is information and analysis, not regulated financial advice`;
 
   const stream = client.messages.stream({
     model: model || HELPER_MODEL,
