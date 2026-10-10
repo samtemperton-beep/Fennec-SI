@@ -167,7 +167,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Section switcher */}
-      <div style={{ padding: '10px 10px 8px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 4 }}>
+      <div style={{ padding: '8px 8px 6px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 3 }}>
         {(Object.entries(SECTIONS) as [SectionKey, typeof SECTIONS[SectionKey]][]).map(([key, s]) => {
           const Icon = s.icon
           const isActive = activeSection === key
@@ -178,15 +178,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={() => setOpen(false)}
               title={s.label}
               style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                padding: '7px 4px', borderRadius: 8, textDecoration: 'none',
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                padding: '6px 2px', borderRadius: 7, textDecoration: 'none', minWidth: 0,
                 background: isActive ? 'var(--primary-light)' : 'transparent',
                 border: isActive ? '1px solid var(--primary)' : '1px solid transparent',
                 transition: 'all 0.15s',
               }}
             >
-              <Icon size={16} style={{ color: isActive ? 'var(--primary)' : 'var(--text3)' }} />
-              <span style={{ fontSize: 8.5, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: isActive ? 'var(--primary)' : 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+              <Icon size={15} style={{ color: isActive ? 'var(--primary)' : 'var(--text3)', flexShrink: 0 }} />
+              <span style={{ fontSize: 7.5, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: isActive ? 'var(--primary)' : 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.02em', lineHeight: 1, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
                 {s.label}
               </span>
             </Link>
