@@ -1,6 +1,6 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -25,6 +25,10 @@ interface Transaction {
 interface Category { id: string; name: string }
 
 export default function TransactionsPage() {
+  return <Suspense><TransactionsPageInner /></Suspense>
+}
+
+function TransactionsPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const accountId = searchParams.get('account')
@@ -103,11 +107,12 @@ export default function TransactionsPage() {
     if (error) { toast.error(error.message); setSavingRule(false); return }
 
     // Bulk-apply to matching uncategorised transactions
-    const { count } = await supabase.from('fin_transactions')
+    const { data: updated } = await supabase.from('fin_transactions')
       .update({ category_id: creatingRule.categoryId })
       .ilike('description', `%${keyword}%`)
       .is('category_id', null)
-      .select('id', { count: 'exact', head: true })
+      .select('id')
+    const count = updated?.length ?? 0
 
     // Also update local state for any visible matches
     setTransactions(prev => prev.map(t =>
@@ -221,7 +226,7 @@ export default function TransactionsPage() {
       )}
     </div>
   )
-}
+}  // end TransactionsPageInner
 
 // ── Create Rule Banner ────────────────────────────────────────────────────────
 
