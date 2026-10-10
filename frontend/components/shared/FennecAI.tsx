@@ -418,14 +418,14 @@ export function FennecAI() {
         title="Ask Fennec AI"
         style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9998,
-          width: 52, height: 52, borderRadius: '50%',
+          width: 60, height: 60, borderRadius: '50%',
           background: open ? 'var(--surface)' : 'var(--primary)',
           border: open ? '1px solid var(--border)' : 'none',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: open ? 'none' : '0 4px 20px rgba(0,0,0,0.25)',
           transition: 'all 0.2s',
-          fontSize: open ? 18 : 24,
+          fontSize: open ? 20 : 40,
         }}
         onMouseEnter={e => { if (!open) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)' }}
         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
