@@ -736,16 +736,16 @@ function AkahuSettings({ supabase }: { supabase: any }) {
     if (!appToken.trim() || !userToken.trim()) return
     setSaving(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const API = process.env.NEXT_PUBLIC_API_URL || ''
-      const r = await fetch(`${API}/api/finance/credentials`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ app_token: appToken.trim(), user_token: userToken.trim() }),
-      })
-      if (!r.ok) throw new Error((await r.json()).error)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not logged in')
+      const { error } = await supabase.from('akahu_credentials').upsert(
+        { user_id: user.id, app_token: appToken.trim(), user_token: userToken.trim() },
+        { onConflict: 'user_id' }
+      )
+      if (error) throw error
       setSaved(true); setHasCreds(true); setAppToken(''); setUserToken('')
-    } catch (e: any) { alert(e.message) }
+      toast.success('Akahu tokens saved')
+    } catch (e: any) { toast.error(e.message) }
     setSaving(false)
   }
 
