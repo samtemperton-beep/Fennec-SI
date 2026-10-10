@@ -1,9 +1,10 @@
 'use client'
 export const dynamic = 'force-dynamic'
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { IconSearch, IconX, IconCheck } from '@tabler/icons-react'
+import { IconSearch, IconX, IconCheck, IconArrowLeft } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 const supabase = createClient()
@@ -24,6 +25,10 @@ interface Transaction {
 interface Category { id: string; name: string }
 
 export default function TransactionsPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const accountId = searchParams.get('account')
+  const [accountName, setAccountName] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,11 +44,15 @@ export default function TransactionsPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  useEffect(() => { loadAll() }, [])
-  useEffect(() => { loadTransactions() }, [debouncedSearch, dateFrom, dateTo, uncatOnly])
+  useEffect(() => { loadAll() }, [accountId])
+  useEffect(() => { loadTransactions() }, [debouncedSearch, dateFrom, dateTo, uncatOnly, accountId])
 
   async function loadAll() {
     setLoading(true)
+    if (accountId) {
+      const { data } = await supabase.from('fin_accounts').select('name').eq('id', accountId).maybeSingle()
+      setAccountName(data?.name || null)
+    }
     await Promise.all([loadTransactions(), loadCategories()])
     setLoading(false)
   }
@@ -63,6 +72,7 @@ export default function TransactionsPage() {
     if (dateFrom) q = q.gte('date', dateFrom)
     if (dateTo) q = q.lte('date', dateTo)
     if (uncatOnly) q = q.is('category_id', null)
+    if (accountId) q = q.eq('account_id', accountId)
     const { data, error } = await q
     if (error) toast.error(error.message)
     else setTransactions((data as any) || [])
@@ -81,8 +91,18 @@ export default function TransactionsPage() {
   return (
     <div style={{ padding: 28 }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Transactions</h1>
-        <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>Last 200 transactions across all accounts</p>
+        {accountId && (
+          <button onClick={() => router.push('/app/finance/accounts')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, fontFamily: 'Syne, sans-serif', padding: '0 0 8px', marginBottom: 4 }}>
+            <IconArrowLeft size={13} /> Back to Accounts
+          </button>
+        )}
+        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>
+          {accountName ? accountName : 'Transactions'}
+        </h1>
+        <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>
+          {accountId ? `Showing transactions for this account` : 'Last 200 transactions across all accounts'}
+        </p>
       </div>
 
       {/* Filters */}
