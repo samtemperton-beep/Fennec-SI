@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { IconSearch, IconX, IconCheck, IconArrowLeft } from '@tabler/icons-react'
+import { IconSearch, IconX, IconCheck, IconArrowLeft, IconWand } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 const supabase = createClient()
@@ -38,6 +38,8 @@ export default function TransactionsPage() {
   const [dateTo, setDateTo] = useState('')
   const [uncatOnly, setUncatOnly] = useState(false)
   const [editingCat, setEditingCat] = useState<string | null>(null)
+  const [creatingRule, setCreatingRule] = useState<{ txId: string; description: string; categoryId: string; categoryName: string } | null>(null)
+  const [savingRule, setSavingRule] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -79,13 +81,43 @@ export default function TransactionsPage() {
     setLoading(false)
   }
 
-  async function setCategory(txId: string, categoryId: string) {
+  async function setCategory(txId: string, categoryId: string, description: string) {
     const { error } = await supabase.from('fin_transactions').update({ category_id: categoryId }).eq('id', txId)
     if (error) { toast.error(error.message); return }
+    const cat = categories.find(c => c.id === categoryId)
     setTransactions(prev => prev.map(t => t.id === txId
-      ? { ...t, category_id: categoryId, category: categories.find(c => c.id === categoryId) ? { name: categories.find(c => c.id === categoryId)!.name } : null }
+      ? { ...t, category_id: categoryId, category: cat ? { name: cat.name } : null }
       : t))
     setEditingCat(null)
+    if (cat) setCreatingRule({ txId, description, categoryId, categoryName: cat.name })
+  }
+
+  async function saveRule(pattern: string) {
+    if (!creatingRule || savingRule) return
+    setSavingRule(true)
+    const keyword = pattern.trim().toLowerCase()
+    const { error } = await supabase.from('fin_category_rules').upsert(
+      { keyword, category_id: creatingRule.categoryId },
+      { onConflict: 'keyword' }
+    )
+    if (error) { toast.error(error.message); setSavingRule(false); return }
+
+    // Bulk-apply to matching uncategorised transactions
+    const { count } = await supabase.from('fin_transactions')
+      .update({ category_id: creatingRule.categoryId })
+      .ilike('description', `%${keyword}%`)
+      .is('category_id', null)
+      .select('id', { count: 'exact', head: true })
+
+    // Also update local state for any visible matches
+    setTransactions(prev => prev.map(t =>
+      t.description?.toLowerCase().includes(keyword) && !t.category_id
+        ? { ...t, category_id: creatingRule.categoryId, category: { name: creatingRule.categoryName } }
+        : t
+    ))
+    toast.success(`Rule saved — auto-categorised ${count ?? 0} existing transactions`)
+    setCreatingRule(null)
+    setSavingRule(false)
   }
 
   return (
@@ -128,6 +160,17 @@ export default function TransactionsPage() {
         )}
       </div>
 
+      {/* Create rule banner */}
+      {creatingRule && (
+        <CreateRuleBanner
+          description={creatingRule.description}
+          categoryName={creatingRule.categoryName}
+          saving={savingRule}
+          onSave={saveRule}
+          onDismiss={() => setCreatingRule(null)}
+        />
+      )}
+
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><LoadingSpinner size={28} /></div>
       ) : (
@@ -135,6 +178,7 @@ export default function TransactionsPage() {
           {transactions.length === 0 ? (
             <p style={{ padding: 32, color: 'var(--text2)', textAlign: 'center', fontSize: 14 }}>No transactions found.</p>
           ) : transactions.map((t, i) => {
+
             const isIncome = t.amount > 0
             const catName = (t.category as any)?.name ?? null
             return (
@@ -151,7 +195,7 @@ export default function TransactionsPage() {
                     {editingCat === t.id ? (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                         {categories.map(c => (
-                          <button key={c.id} onClick={() => setCategory(t.id, c.id)}
+                          <button key={c.id} onClick={() => setCategory(t.id, c.id, t.description)}
                             style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: catColor(c.name) + '22', color: catColor(c.name), border: `1px solid ${catColor(c.name)}44`, cursor: 'pointer', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
                             {c.name}
                           </button>
@@ -175,6 +219,59 @@ export default function TransactionsPage() {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Create Rule Banner ────────────────────────────────────────────────────────
+
+function CreateRuleBanner({ description, categoryName, saving, onSave, onDismiss }: {
+  description: string; categoryName: string; saving: boolean
+  onSave: (pattern: string) => void; onDismiss: () => void
+}) {
+  const [pattern, setPattern] = useState(() => {
+    // Auto-suggest: first 2-3 meaningful words from description
+    const words = description.replace(/[^a-zA-Z0-9 ]/g, ' ').trim().split(/\s+/).filter(w => w.length > 2)
+    return words.slice(0, 3).join(' ').toLowerCase()
+  })
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 88, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 9990, background: 'var(--surface)', border: '1px solid var(--primary)',
+      borderRadius: 14, padding: '16px 20px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+      minWidth: 340, maxWidth: 480,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <IconWand size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+        <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>
+          Create auto-categorise rule?
+        </span>
+        <button onClick={onDismiss} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', lineHeight: 0 }}>
+          <IconX size={14} />
+        </button>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10, lineHeight: 1.5 }}>
+        Any transaction containing this keyword will automatically be tagged <strong style={{ color: catColor(categoryName) }}>{categoryName}</strong>:
+      </p>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          value={pattern}
+          onChange={e => setPattern(e.target.value)}
+          style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, fontFamily: 'DM Mono, monospace', outline: 'none' }}
+          onKeyDown={e => { if (e.key === 'Enter') onSave(pattern) }}
+          autoFocus
+        />
+        <button
+          onClick={() => onSave(pattern)}
+          disabled={saving || !pattern.trim()}
+          style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--primary)', color: 'white', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, cursor: 'pointer', opacity: saving || !pattern.trim() ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 5 }}>
+          {saving ? <LoadingSpinner size={12} /> : <IconCheck size={13} />} Save rule
+        </button>
+      </div>
+      <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 8 }}>
+        This will also apply to existing uncategorised transactions that match.
+      </p>
     </div>
   )
 }
