@@ -8,7 +8,7 @@ import {
   IconNewSection, IconMail, IconCalendar, IconUsers, IconBell,
   IconSettings, IconLogout, IconTrophy,
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
-  IconWallet, IconReceipt, IconTarget, IconLayoutDashboard,
+  IconWallet, IconReceipt, IconTarget, IconLayoutDashboard, IconPigMoney,
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
 import { MarketTicker } from '@/components/shared/MarketTicker'
@@ -61,6 +61,7 @@ const SECTIONS = {
           { href: '/app/finance/budget',       label: 'Budget',       icon: IconWallet },
           { href: '/app/finance/bills',        label: 'Bills',        icon: IconReceipt },
           { href: '/app/finance/goals',        label: 'Goals',        icon: IconTarget },
+          { href: '/app/finance/kiwisaver',    label: 'KiwiSaver',    icon: IconPigMoney },
         ],
       },
     ],

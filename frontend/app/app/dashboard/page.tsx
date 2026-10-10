@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import {
   IconTrendingUp, IconBuildingBank, IconTarget, IconArrowRight,
   IconChartBar, IconArrowsExchange, IconWallet, IconNewSection,
-  IconArrowUpRight, IconArrowDownRight,
+  IconArrowDownRight, IconPigMoney,
 } from '@tabler/icons-react'
 
 function fmt(n: number) {
@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const [bankBalance, setBankBalance] = useState<number | null>(null)
   const [monthSpend, setMonthSpend] = useState<number | null>(null)
   const [activeGoals, setActiveGoals] = useState<any[]>([])
-  const [recentNews, setRecentNews] = useState<any[]>([])
+  const [kiwiSaver, setKiwiSaver] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -39,12 +39,13 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      const [{ data: p }, { data: holdings }, { data: accounts }, { data: txns }, { data: goals }] = await Promise.all([
+      const [{ data: p }, { data: holdings }, { data: accounts }, { data: txns }, { data: goals }, { data: ks }] = await Promise.all([
         supabase.from('profiles').select('username').eq('id', user.id).single(),
         supabase.from('holdings').select('quantity, avg_price').eq('user_id', user.id),
         supabase.from('fin_accounts').select('current_balance').eq('owner', 'me'),
         supabase.from('fin_transactions').select('amount').gte('date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]).lt('amount', 0),
         supabase.from('fin_goals').select('name, target_amount, current_amount').eq('status', 'active').limit(3),
+        supabase.from('fin_kiwisaver').select('current_balance').eq('user_id', user.id).maybeSingle(),
       ])
 
       setProfile(p)
@@ -65,6 +66,7 @@ export default function DashboardPage() {
       }
 
       if (goals && goals.length > 0) setActiveGoals(goals)
+      if (ks?.current_balance) setKiwiSaver(Number(ks.current_balance))
 
       setLoading(false)
     }
@@ -76,7 +78,8 @@ export default function DashboardPage() {
   const displaySpend = monthSpend ?? MOCK.monthSpend
   const displayGoals = activeGoals.length > 0 ? activeGoals : MOCK.goals
   const isMock = portfolioValue === null && bankBalance === null
-  const netWorth = displayPortfolio + displayBank
+  const displayKiwiSaver = kiwiSaver ?? 0
+  const netWorth = displayPortfolio + displayBank + displayKiwiSaver
   const greeting = (() => {
     const h = new Date().getHours()
     if (h < 12) return 'Good morning'
@@ -90,6 +93,7 @@ export default function DashboardPage() {
     { href: '/app/finance/transactions', label: 'Transactions', icon: IconArrowsExchange, section: 'Finance' },
     { href: '/app/finance/budget', label: 'Budget', icon: IconWallet, section: 'Finance' },
     { href: '/app/finance/goals', label: 'Goals', icon: IconTarget, section: 'Finance' },
+    { href: '/app/finance/kiwisaver', label: 'KiwiSaver', icon: IconPigMoney, section: 'Finance' },
     { href: '/app/news', label: 'News', icon: IconNewSection, section: 'Investing' },
   ]
 
@@ -127,6 +131,12 @@ export default function DashboardPage() {
               <div style={{ fontSize: 10, opacity: 0.75 }}>Bank</div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>{loading ? '—' : fmt(displayBank)}</div>
             </div>
+            {displayKiwiSaver > 0 && (
+              <div>
+                <div style={{ fontSize: 10, opacity: 0.75 }}>KiwiSaver</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{fmt(displayKiwiSaver)}</div>
+              </div>
+            )}
           </div>
         </div>
 
