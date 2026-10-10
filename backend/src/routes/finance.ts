@@ -50,18 +50,30 @@ function makeAkahuClient(appToken: string, userToken: string) {
 router.post('/sync', requireAuth, async (req: any, res) => {
   const userId: string = req.user.id;
 
-  // Fetch stored Akahu credentials for this user
-  const { data: creds, error: credsErr } = await supabase
-    .from('akahu_credentials')
-    .select('app_token, user_token, last_synced_at')
-    .eq('user_id', userId)
-    .maybeSingle();
+  // Accept tokens from request body (preferred) or fall back to DB lookup
+  let appToken: string = req.body?.app_token;
+  let userToken: string = req.body?.user_token;
+  let lastSyncedAt: string | undefined;
 
-  if (credsErr || !creds) {
-    return res.status(400).json({ error: 'No Akahu credentials found. Add them in Finance > Settings.' });
+  if (!appToken || !userToken) {
+    const { data: creds, error: credsErr } = await supabase
+      .from('akahu_credentials')
+      .select('app_token, user_token, last_synced_at')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (credsErr || !creds) {
+      return res.status(400).json({ error: 'No Akahu credentials found. Add them in Finance > Settings.' });
+    }
+    appToken = creds.app_token;
+    userToken = creds.user_token;
+    lastSyncedAt = creds.last_synced_at;
+  } else {
+    // Still fetch last_synced_at for incremental sync
+    const { data } = await supabase.from('akahu_credentials').select('last_synced_at').eq('user_id', userId).maybeSingle();
+    lastSyncedAt = data?.last_synced_at;
   }
 
-  const akahu = makeAkahuClient(creds.app_token, creds.user_token);
+  const akahu = makeAkahuClient(appToken, userToken);
 
   try {
     const akahuAccounts = await akahu.listAccounts();
@@ -86,6 +98,7 @@ router.post('/sync', requireAuth, async (req: any, res) => {
         accountId = existing.id;
       } else {
         const { data: inserted, error: insErr } = await supabase.from('fin_accounts').insert({
+          user_id: userId,
           owner: 'me',
           akahu_account_id: aa._id,
           name: aa.name,
@@ -99,9 +112,10 @@ router.post('/sync', requireAuth, async (req: any, res) => {
       }
 
       // Sync transactions since last sync
-      const txs = await akahu.listTransactionsSince(aa._id, creds.last_synced_at ?? undefined);
+      const txs = await akahu.listTransactionsSince(aa._id, lastSyncedAt);
       if (txs.length > 0) {
         const rows = txs.map((t: any) => ({
+          user_id: userId,
           account_id: accountId,
           akahu_transaction_id: t._id,
           date: t.date,

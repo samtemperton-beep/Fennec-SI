@@ -51,9 +51,19 @@ export default function AccountsPage() {
     try {
       const API = process.env.NEXT_PUBLIC_API_URL || ''
       const { data: { session } } = await supabase.auth.getSession()
+
+      // Read credentials client-side (user has RLS access to their own row)
+      const { data: creds } = await supabase
+        .from('akahu_credentials')
+        .select('app_token, user_token')
+        .maybeSingle()
+
+      if (!creds) throw new Error('No Akahu credentials found. Add them in Settings → Akahu Bank Sync.')
+
       const r = await fetch(`${API}/api/finance/sync`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ app_token: creds.app_token, user_token: creds.user_token }),
       })
       const result = await r.json()
       if (!r.ok) throw new Error(result.error || 'Sync failed')
