@@ -325,8 +325,8 @@ export function FennecAI() {
       const token = await getToken()
       const cfg = getPageConfig(pathname)
       const [investing, finance] = await Promise.all([
-        cfg.loadInvesting ? loadInvestingContext(token) : Promise.resolve({}),
-        cfg.loadFinance ? loadFinanceContext() : Promise.resolve({}),
+        cfg.loadInvesting ? loadInvestingContext(token) : Promise.resolve({} as Partial<FennecContext>),
+        cfg.loadFinance ? loadFinanceContext() : Promise.resolve({} as Partial<FennecContext>),
       ])
       const ctx: FennecContext = { pageHint: cfg.pageHint, ...investing, ...finance }
       setContext(ctx)
