@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase'
 import {
   IconChartBar, IconBrain, IconTrendingUp, IconStar, IconEye,
   IconNewSection, IconMail, IconCalendar, IconUsers, IconBell,
-  IconSettings, IconMenu2, IconX, IconLogout, IconTrophy,
+  IconSettings, IconLogout, IconTrophy,
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
   IconWallet, IconReceipt, IconTarget, IconLayoutDashboard,
 } from '@tabler/icons-react'
@@ -96,7 +96,6 @@ function getActiveSection(pathname: string): SectionKey {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [isPremium, setIsPremium] = useState(false)
@@ -175,7 +174,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Link
               key={key}
               href={s.defaultHref}
-              onClick={() => setOpen(false)}
               title={s.label}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
@@ -210,7 +208,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={n.href}
                   href={n.href}
-                  onClick={() => setOpen(false)}
                   className={`nav-link mb-1 ${pathname === n.href || pathname.startsWith(n.href + '/') ? 'active' : ''}`}
                 >
                   <n.icon size={16} />
@@ -268,34 +265,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Desktop sidebar */}
-      <div className="hidden md:block">{sidebar}</div>
-
-      {/* Mobile overlay */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <div style={{ width: 240, flexShrink: 0 }}>{sidebar}</div>
-          <div style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setOpen(false)} className="flex-1" />
-        </div>
-      )}
+      {/* Permanent sidebar — always visible, always pushes content right */}
+      {sidebar}
 
       {/* Main */}
-      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Mobile top bar */}
-        <div className="flex items-center gap-3 px-4 py-3 md:hidden" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'relative', zIndex: 51 }}>
-          <button onClick={() => setOpen(o => !o)} style={{ color: 'var(--primary)' }}>
-            {open ? <IconX size={22} /> : <IconMenu2 size={22} />}
-          </button>
-          {!open && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec</span>
-              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'var(--primary-light)', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 700 }}>
-                {SECTIONS[activeSection].label}
-              </span>
-            </div>
-          )}
-        </div>
-
+      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Market ticker — investing section only */}
         {showTicker && <MarketTicker />}
 
