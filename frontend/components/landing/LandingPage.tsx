@@ -2,55 +2,70 @@
 import Link from 'next/link'
 import { IconCheck, IconArrowRight } from '@tabler/icons-react'
 
+// ── Feature cards ─────────────────────────────────────────────────────────────
+
 const FEATURES = [
   {
-    icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+    emoji: '📈',
     title: 'Portfolio Tracking',
-    desc: 'Track NZ, ASX & US stocks in one place. Real-time prices, P&L, and performance metrics.',
+    desc: 'Track NZ, ASX & US stocks in one place. Real-time prices, P&L, AI signals, and performance charts.',
   },
   {
-    icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58"/></svg>,
-    title: 'AI Signals',
-    desc: 'Claude AI generates BUY/HOLD/SELL signals for every holding. Streaming AI advisor chat.',
+    emoji: '🏦',
+    title: 'Household Finance',
+    desc: 'Sync your NZ bank accounts via Akahu. Track spending by category, set budgets, manage recurring bills.',
   },
   {
-    icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
-    title: 'Daily Top 10 Picks',
-    desc: 'AI-curated top 10 stocks across markets. Updated with projected returns and catalyst reasoning.',
+    emoji: '🦊',
+    title: 'Fennec AI',
+    desc: 'Context-aware AI adviser that knows your portfolio and finances. Ask anything — it adapts to the page you\'re on.',
   },
   {
-    icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+    emoji: '🥝',
+    title: 'KiwiSaver Tracker',
+    desc: 'Track your KiwiSaver balance, model retirement projections, and see when you\'ll hit key milestones.',
+  },
+  {
+    emoji: '🎯',
+    title: 'Savings Goals',
+    desc: 'Set goals for holidays, emergencies, or big purchases. Track progress and see how long until you get there.',
+  },
+  {
+    emoji: '🔔',
     title: 'Smart Alerts',
-    desc: 'Price alerts and AI signal changes. Email notifications when your targets are triggered.',
+    desc: 'Price alerts and AI signal changes sent to your email. Know the moment your targets are triggered.',
   },
   {
-    icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-    title: 'Investment Community',
-    desc: 'Share picks, milestones, and market takes. Real-time community feed with leaderboards.',
+    emoji: '🏆',
+    title: 'Leaderboard & Community',
+    desc: 'Share picks, compete on verified portfolio returns, and learn from other NZ & ASX investors.',
   },
   {
-    icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+    emoji: '🔒',
     title: 'Secure & Private',
-    desc: 'Your API keys encrypted with AES-256. Hosted on Vercel + Railway for reliability.',
+    desc: 'Bank sync via Akahu — read-only access. Keys encrypted with AES-256. Hosted on Vercel + Railway.',
   },
 ]
 
 const FREE_FEATURES = [
-  'Basic portfolio tracking',
+  'Portfolio tracking (NZ, ASX, US)',
   '10 AI analyses per day',
-  'Community feed (read-only 7 days)',
+  'Community feed access',
   'Watchlist up to 20 stocks',
-  'Daily top 10 picks',
+  'Daily top 10 AI picks',
+  'Household finance overview',
+  'KiwiSaver projection tool',
 ]
 
 const PRO_FEATURES = [
   'Unlimited AI analyses (Claude)',
+  'Fennec AI — unlimited chat',
+  'NZ bank sync via Akahu',
   'Portfolio verification & badges',
-  'Leaderboard access',
+  'Leaderboard & premium community',
   'Real-time price alerts & email',
-  'IPO analysis & newsletter digest',
-  'Deep-dive reports & AI drafts',
   'CSV & screenshot import',
+  'Deep-dive reports & AI drafts',
 ]
 
 const COMMUNITY_POSTS = [
@@ -79,13 +94,13 @@ export default function LandingPage() {
       {/* ── Nav ── */}
       <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ background: 'var(--primary)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="18" height="18" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-            </svg>
+          <div style={{ background: 'var(--primary)', borderRadius: 10, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+            🦊
           </div>
-          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18 }}>Fennec SI</span>
+          <div>
+            <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontWeight: 800, fontSize: 16, display: 'block', lineHeight: 1.1 }}>Fennec</span>
+            <span style={{ fontSize: 9, color: 'var(--text3)', fontStyle: 'italic' }}>spend &amp; invest</span>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <a href="#features" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Features</a>
@@ -101,16 +116,25 @@ export default function LandingPage() {
       {/* ── Hero ── */}
       <section style={{ maxWidth: 900, margin: '0 auto', padding: '60px 32px 56px', textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, background: 'var(--primary-light)', border: '1px solid var(--primary)', fontSize: 12, color: 'var(--primary)', marginBottom: 24, fontFamily: 'Syne, sans-serif' }}>
-          ✦ AI-powered · NZ, ASX &amp; US markets
+          ✦ NZ stocks · household finance · AI adviser
         </div>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 'clamp(2rem,5vw,3.6rem)', fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
-          Your AI-powered stock<br />
-          <span style={{ color: 'var(--primary)' }}>portfolio tracker</span>
+        <h1 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 'clamp(2rem,5vw,3.4rem)', fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
+          Your complete<br />
+          <span style={{ color: 'var(--primary)' }}>personal financial hub</span>
         </h1>
-        <p style={{ color: 'var(--text2)', fontSize: 18, lineHeight: 1.6, marginBottom: 40, maxWidth: 560, margin: '0 auto 40px' }}>
-          Track NZ, ASX &amp; US stocks. Get AI signals, daily picks, and community insights — all in one place.
+        <p style={{ color: 'var(--text2)', fontSize: 17, lineHeight: 1.7, marginBottom: 40, maxWidth: 580, margin: '0 auto 40px' }}>
+          Track your NZ, ASX &amp; US investments. Manage household finances and KiwiSaver.
+          Get answers from an AI adviser that knows your full financial picture.
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+
+        {/* Mini feature pills */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 36 }}>
+          {['📈 Stock portfolio', '🏦 Bank sync (Akahu)', '🥝 KiwiSaver tracker', '🎯 Savings goals', '🦊 AI adviser', '🏆 Community'].map(f => (
+            <span key={f} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>{f}</span>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
           <Link
             href="/login"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--primary)', color: 'white', padding: '14px 28px', borderRadius: 10, fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, textDecoration: 'none' }}
@@ -124,22 +148,37 @@ export default function LandingPage() {
             View community
           </Link>
         </div>
-        <p style={{ color: 'var(--text2)', fontSize: 12 }}>No credit card required · Free tier includes 10 AI analyses/day</p>
+        <p style={{ color: 'var(--text3)', fontSize: 12 }}>No credit card required · Free tier available</p>
       </section>
 
-      {/* ── Live community feed ── */}
+      {/* ── Dashboard preview strip ── */}
+      <section style={{ maxWidth: 860, margin: '0 auto', padding: '0 32px 60px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {[
+            { label: 'Net Worth', value: '$189,240', sub: 'portfolio + bank + KiwiSaver', color: 'var(--primary)' },
+            { label: 'Portfolio', value: '$94,580', sub: '+17.2% all time', color: '#10b981' },
+            { label: 'This Month', value: '-$3,210', sub: 'household spending', color: '#f59e0b' },
+            { label: 'KiwiSaver', value: '$52,400', sub: 'projected $480k at 65', color: '#8b5cf6' },
+          ].map(stat => (
+            <div key={stat.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>{stat.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'Plus Jakarta Sans, sans-serif', color: stat.color }}>{stat.value}</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{stat.sub}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Community feed ── */}
       <section style={{ maxWidth: 680, margin: '0 auto', padding: '0 32px 64px' }}>
         <p style={{ textAlign: 'center', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
           Live Community Feed
         </p>
         <div style={{ border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', overflow: 'hidden' }}>
           {COMMUNITY_POSTS.map((p, i) => (
-            <div
-              key={i}
-              style={{ padding: '16px 20px', borderBottom: i < COMMUNITY_POSTS.length - 1 ? '1px solid var(--border)' : undefined, opacity: i === 0 ? 1 : i === 1 ? 0.65 : 0.35 }}
-            >
+            <div key={i} style={{ padding: '16px 20px', borderBottom: i < COMMUNITY_POSTS.length - 1 ? '1px solid var(--border)' : undefined, opacity: i === 0 ? 1 : i === 1 ? 0.65 : 0.35 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'white', fontWeight: 700, fontFamily: 'Syne, sans-serif' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'white', fontWeight: 700 }}>
                   {p.initial}
                 </div>
                 <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>{p.user}</span>
@@ -156,19 +195,36 @@ export default function LandingPage() {
 
       {/* ── Features ── */}
       <section id="features" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 32px 64px' }}>
-        <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 28, fontWeight: 700, textAlign: 'center', marginBottom: 40 }}>
-          Everything you need to invest smarter
+        <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 28, fontWeight: 700, textAlign: 'center', marginBottom: 8 }}>
+          Everything in one place
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-          {FEATURES.map(({ icon, title, desc }) => (
-            <div key={title} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, transition: 'border-color 0.2s' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--primary)' }}>
-                {icon}
-              </div>
-              <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 8 }}>{title}</h3>
-              <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 }}>{desc}</p>
+        <p style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 15, marginBottom: 40 }}>Investing and household finances — finally in a single dashboard.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+          {FEATURES.map(({ emoji, title, desc }) => (
+            <div key={title} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 24, marginBottom: 10 }}>{emoji}</div>
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{title}</h3>
+              <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6 }}>{desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Fennec AI callout ── */}
+      <section style={{ maxWidth: 760, margin: '0 auto', padding: '0 32px 64px' }}>
+        <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 16, padding: '28px 32px', display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 36, flexShrink: 0 }}>🦊</div>
+          <div>
+            <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18, color: 'var(--primary)', marginBottom: 8 }}>Meet Fennec AI</h3>
+            <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
+              An AI adviser that knows your full financial picture — your holdings, bank balances, KiwiSaver, spending, and goals. It changes focus automatically based on what you're looking at, so answers are always relevant.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {['"Am I on track for retirement?"', '"Should I rebalance my portfolio?"', '"Where am I overspending?"', '"What\'s my net worth trajectory?"'].map(q => (
+                <span key={q} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text2)' }}>{q}</span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -178,8 +234,6 @@ export default function LandingPage() {
           Simple, transparent pricing
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-
-          {/* Free */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
             <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20, marginBottom: 4 }}>Free</p>
             <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 36, fontWeight: 800, marginBottom: 20 }}>
@@ -198,7 +252,6 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Premium */}
           <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 12, padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20 }}>Premium</p>
@@ -226,17 +279,13 @@ export default function LandingPage() {
       <footer style={{ borderTop: '1px solid var(--border)', padding: '24px 32px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ background: 'var(--primary)', borderRadius: 6, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="12" height="12" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-              </svg>
-            </div>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14 }}>Fennec SI</span>
+            <span style={{ fontSize: 18 }}>🦊</span>
+            <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontWeight: 700, fontSize: 14 }}>Fennec</span>
+            <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic' }}>spend &amp; invest</span>
           </div>
-          <p style={{ color: 'var(--text2)', fontSize: 12 }}>© 2026 Fennec SI. Not financial advice.</p>
+          <p style={{ color: 'var(--text2)', fontSize: 12 }}>© 2026 Fennec. Not financial advice.</p>
           <div style={{ display: 'flex', gap: 20 }}>
-            {['Privacy', 'Terms', 'GitHub'].map(l => (
+            {['Privacy', 'Terms'].map(l => (
               <a key={l} href="#" style={{ color: 'var(--text2)', fontSize: 12, fontFamily: 'Syne, sans-serif', textDecoration: 'none' }}>{l}</a>
             ))}
           </div>

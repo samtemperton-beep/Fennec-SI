@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Avatar } from '@/components/shared/Avatar'
-import { IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconCrown, IconExternalLink } from '@tabler/icons-react'
+import { IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconCrown, IconExternalLink, IconShieldCheck, IconShieldOff, IconQrcode, IconCopy } from '@tabler/icons-react'
 import { BROKERS, getBrokerById, type Broker } from '@/lib/brokers'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
@@ -63,6 +63,14 @@ export default function SettingsPage() {
   const [goalForm, setGoalForm] = useState({ targetPct: '100', months: '12', label: 'Double my portfolio' })
   const [editingGoal, setEditingGoal] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // 2FA state
+  const [mfaFactors, setMfaFactors] = useState<any[]>([])
+  const [mfaEnrolling, setMfaEnrolling] = useState(false)
+  const [mfaQR, setMfaQR] = useState('')
+  const [mfaSecret, setMfaSecret] = useState('')
+  const [mfaFactorId, setMfaFactorId] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaLoading, setMfaLoading] = useState(false)
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -85,6 +93,9 @@ export default function SettingsPage() {
         else if (data.avatar_emoji) setAvatarTab('emoji')
       }
       api.getPremiumStatus().then(s => setPremiumStatus(s)).catch(() => {})
+      supabase.auth.mfa.listFactors().then(({ data }) => {
+        setMfaFactors(data?.totp || [])
+      }).catch(() => {})
       // Load goal from localStorage
       const saved = localStorage.getItem(`portfolio_goal_${u.id}`)
       if (saved) {
@@ -165,6 +176,44 @@ export default function SettingsPage() {
     setGoal(null)
     setEditingGoal(false)
     toast.success('Goal cleared')
+  }
+
+  async function startMfaEnroll() {
+    setMfaLoading(true)
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Authenticator app' })
+    setMfaLoading(false)
+    if (error || !data) { toast.error(error?.message || 'Failed to start 2FA setup'); return }
+    setMfaQR(data.totp.qr_code)
+    setMfaSecret(data.totp.secret)
+    setMfaFactorId(data.id)
+    setMfaEnrolling(true)
+    setMfaCode('')
+  }
+
+  async function confirmMfaEnroll(e: React.FormEvent) {
+    e.preventDefault()
+    if (mfaCode.length !== 6) return
+    setMfaLoading(true)
+    const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId })
+    if (challengeErr) { toast.error(challengeErr.message); setMfaLoading(false); return }
+    const { error: verifyErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challengeData.id, code: mfaCode })
+    setMfaLoading(false)
+    if (verifyErr) { toast.error('Invalid code — check your authenticator app'); return }
+    toast.success('Two-factor authentication enabled!')
+    setMfaEnrolling(false)
+    const { data } = await supabase.auth.mfa.listFactors()
+    setMfaFactors(data?.totp || [])
+  }
+
+  async function removeMfa(factorId: string) {
+    if (!confirm('Disable two-factor authentication? Your account will be less secure.')) return
+    setMfaLoading(true)
+    const { error } = await supabase.auth.mfa.unenroll({ factorId })
+    setMfaLoading(false)
+    if (error) { toast.error(error.message); return }
+    toast.success('Two-factor authentication disabled')
+    setMfaFactors(prev => prev.filter(f => f.id !== factorId))
+    setMfaEnrolling(false)
   }
 
   const RISK_LABELS = ['', 'Very Conservative', 'Conservative', 'Moderate-Conservative', 'Moderate', 'Moderate', 'Moderate-Aggressive', 'Aggressive', 'Aggressive', 'Very Aggressive', 'Maximum Risk']
@@ -568,6 +617,87 @@ export default function SettingsPage() {
 
       {/* Akahu / Finance */}
       <AkahuSettings supabase={supabase} />
+
+      {/* Two-Factor Authentication */}
+      <div className="card mt-6">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <IconShieldCheck size={16} style={{ color: 'var(--primary)' }} />
+          <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>Two-Factor Authentication</h2>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
+          Add an extra layer of security. After entering your password you&apos;ll be asked for a code from your authenticator app (Google Authenticator, Authy, etc).
+        </p>
+
+        {mfaFactors.length > 0 ? (
+          <div>
+            {mfaFactors.map(f => (
+              <div key={f.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 10, marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <IconShieldCheck size={18} style={{ color: 'var(--green)', flexShrink: 0 }} />
+                  <div>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, color: 'var(--green)' }}>2FA enabled</p>
+                    <p style={{ fontSize: 11, color: 'var(--text2)' }}>{f.friendly_name || 'Authenticator app'}</p>
+                  </div>
+                </div>
+                <button onClick={() => removeMfa(f.id)} disabled={mfaLoading}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'rgba(240,84,84,0.1)', border: '1px solid rgba(240,84,84,0.3)', color: 'var(--red)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                >
+                  <IconShieldOff size={13} /> Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : mfaEnrolling ? (
+          <div>
+            <p style={{ fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 12 }}>
+              1. Scan this QR code with your authenticator app
+            </p>
+            {mfaQR && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={mfaQR} alt="2FA QR code" style={{ width: 160, height: 160, borderRadius: 8, background: 'white', padding: 6 }} />
+              </div>
+            )}
+            {mfaSecret && (
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Or enter this key manually:</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 8, fontFamily: 'DM Mono, monospace', fontSize: 12, letterSpacing: '0.1em' }}>
+                  <span style={{ flex: 1, wordBreak: 'break-all' }}>{mfaSecret}</span>
+                  <button type="button" onClick={() => { navigator.clipboard.writeText(mfaSecret); toast.success('Copied') }} style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', lineHeight: 0, flexShrink: 0 }}>
+                    <IconCopy size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+            <p style={{ fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 10 }}>
+              2. Enter the 6-digit code to confirm
+            </p>
+            <form onSubmit={confirmMfaEnroll} style={{ display: 'flex', gap: 8 }}>
+              <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="000000"
+                value={mfaCode} onChange={e => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                autoFocus
+                style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 18, outline: 'none', textAlign: 'center', letterSpacing: '0.2em' }}
+                onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+              />
+              <button type="submit" disabled={mfaCode.length !== 6 || mfaLoading}
+                style={{ padding: '10px 18px', borderRadius: 10, background: 'var(--primary)', color: 'white', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, cursor: mfaCode.length === 6 ? 'pointer' : 'not-allowed', opacity: mfaCode.length !== 6 || mfaLoading ? 0.5 : 1 }}
+              >
+                {mfaLoading ? '...' : 'Verify'}
+              </button>
+            </form>
+            <button onClick={() => { setMfaEnrolling(false); setMfaCode('') }} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button onClick={startMfaEnroll} disabled={mfaLoading}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+          >
+            <IconQrcode size={15} /> Set up authenticator app
+          </button>
+        )}
+      </div>
 
       {/* Danger zone */}
       <div className="card mt-6 mb-8" style={{ border: '1px solid rgba(240,84,84,0.3)' }}>

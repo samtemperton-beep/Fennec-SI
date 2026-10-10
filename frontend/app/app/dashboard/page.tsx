@@ -42,9 +42,9 @@ export default function DashboardPage() {
       const [{ data: p }, { data: holdings }, { data: accounts }, { data: txns }, { data: goals }, { data: ks }] = await Promise.all([
         supabase.from('profiles').select('username').eq('id', user.id).single(),
         supabase.from('holdings').select('quantity, avg_price').eq('user_id', user.id),
-        supabase.from('fin_accounts').select('current_balance').eq('owner', 'me'),
-        supabase.from('fin_transactions').select('amount').gte('date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]).lt('amount', 0),
-        supabase.from('fin_goals').select('name, target_amount, current_amount').eq('status', 'active').limit(3),
+        supabase.from('fin_accounts').select('current_balance').eq('user_id', user.id),
+        supabase.from('fin_transactions').select('amount').eq('user_id', user.id).gte('date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]).lt('amount', 0),
+        supabase.from('fin_goals').select('name, target_amount, current_amount').eq('user_id', user.id).eq('status', 'active').limit(3),
         supabase.from('fin_kiwisaver').select('current_balance').eq('user_id', user.id).maybeSingle(),
       ])
 
@@ -80,12 +80,14 @@ export default function DashboardPage() {
   const isMock = portfolioValue === null && bankBalance === null
   const displayKiwiSaver = kiwiSaver ?? 0
   const netWorth = displayPortfolio + displayBank + displayKiwiSaver
-  const greeting = (() => {
+  // Computed client-side only to avoid SSR/client mismatch
+  const [greeting, setGreeting] = useState('')
+  const [dateLabel, setDateLabel] = useState('')
+  useEffect(() => {
     const h = new Date().getHours()
-    if (h < 12) return 'Good morning'
-    if (h < 17) return 'Good afternoon'
-    return 'Good evening'
-  })()
+    setGreeting(h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening')
+    setDateLabel(new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' }))
+  }, [])
 
   const quickLinks = [
     { href: '/app/portfolio', label: 'Portfolio', icon: IconChartBar, section: 'Investing' },
@@ -105,7 +107,7 @@ export default function DashboardPage() {
           {greeting}{profile?.username ? `, ${profile.username}` : ''}
         </h1>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>
-          {new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {dateLabel}
         </p>
       </div>
 

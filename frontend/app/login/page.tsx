@@ -1,45 +1,128 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { IconMail, IconLoader } from '@tabler/icons-react'
+import { IconMail, IconLoader, IconLock, IconEye, IconEyeOff, IconShieldCheck, IconArrowLeft } from '@tabler/icons-react'
+
+type Step = 'login' | 'mfa' | 'sent'
+type Method = 'password' | 'magic'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
-  const [loading, setLoading] = useState<'google' | 'magic' | null>(null)
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [method, setMethod] = useState<Method>('password')
+  const [step, setStep] = useState<Step>('login')
+  const [totpCode, setTotpCode] = useState('')
+  const [factorId, setFactorId] = useState('')
+  const [loading, setLoading] = useState<'google' | 'password' | 'magic' | 'totp' | null>(null)
   const [agreed, setAgreed] = useState(false)
+  const [error, setError] = useState('')
   const supabase = createClient()
 
   async function signInGoogle() {
+    if (!agreed) return
     setLoading('google')
+    setError('')
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/app/portfolio` },
     })
   }
 
+  async function signInPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!agreed || !email || !password) return
+    setLoading('password')
+    setError('')
+    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
+    setLoading(null)
+    if (err) { setError(err.message); return }
+
+    // Check if MFA is required
+    if (data.session === null && data.user === null) {
+      // Shouldn't happen, but guard
+      setError('Sign in failed. Please try again.')
+      return
+    }
+
+    const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    if (assurance?.nextLevel === 'aal2' && assurance?.currentLevel === 'aal1') {
+      // MFA enrolled — need TOTP
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      const totp = factors?.totp?.[0]
+      if (totp) {
+        setFactorId(totp.id)
+        setStep('mfa')
+        return
+      }
+    }
+    // No MFA or already aal2 — redirect
+    window.location.href = '/app/portfolio'
+  }
+
   async function signInMagicLink(e: React.FormEvent) {
     e.preventDefault()
+    if (!agreed || !email) return
     setLoading('magic')
-    const { error } = await supabase.auth.signInWithOtp({
+    setError('')
+    const { error: err } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/app/portfolio` },
     })
     setLoading(null)
-    if (!error) setSent(true)
+    if (err) { setError(err.message); return }
+    setStep('sent')
   }
 
-  return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 480px' }}>
+  async function verifyTotp(e: React.FormEvent) {
+    e.preventDefault()
+    if (!totpCode || totpCode.length !== 6) return
+    setLoading('totp')
+    setError('')
+    const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId })
+    if (challengeErr) { setError(challengeErr.message); setLoading(null); return }
+    const { error: verifyErr } = await supabase.auth.mfa.verify({
+      factorId,
+      challengeId: challengeData.id,
+      code: totpCode,
+    })
+    setLoading(null)
+    if (verifyErr) { setError('Invalid code. Please try again.'); return }
+    window.location.href = '/app/portfolio'
+  }
 
-      {/* ── Left panel: value prop ── */}
+  const features = [
+    {
+      bg: 'var(--primary-light)', color: 'var(--primary)',
+      icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>,
+      title: 'Track spending & investments in one place',
+      body: 'Connect your portfolio and bank accounts. See where every dollar goes and how your investments are performing.',
+    },
+    {
+      bg: 'rgba(16,185,129,.12)', color: 'var(--green)',
+      icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58"/></svg>,
+      title: 'AI-powered signals on every holding',
+      body: 'Get BUY / HOLD / SELL reasoning in real time across NZ, ASX &amp; US markets.',
+    },
+    {
+      bg: 'rgba(251,191,36,.1)', color: '#fbbf24',
+      icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+      title: 'Smart budgets & earnings calendar',
+      body: 'Set spending targets, get earnings reminders, and stay ahead of market events that affect your portfolio.',
+    },
+  ]
+
+  return (
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 480px' }}
+      className="grid-cols-1 md:grid-cols-[1fr_480px]">
+
+      {/* ── Left panel ── */}
       <div style={{
         display: 'flex', flexDirection: 'column', justifyContent: 'center',
         padding: '60px 48px', borderRight: '1px solid var(--border)',
         background: 'linear-gradient(135deg,rgba(44,110,106,.07) 0%,var(--bg) 60%)',
         position: 'relative', overflow: 'hidden',
-      }}>
-        {/* Ambient glows */}
+      }} className="hidden md:flex">
         <div style={{ position: 'absolute', top: -100, left: -100, width: 400, height: 400, background: 'radial-gradient(circle,rgba(44,110,106,.12) 0%,transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -60, right: -60, width: 300, height: 300, background: 'radial-gradient(circle,rgba(16,185,129,.08) 0%,transparent 70%)', pointerEvents: 'none' }} />
 
@@ -47,55 +130,36 @@ export default function LoginPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 56 }}>
           <div style={{ background: 'var(--primary)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="18" height="18" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
           </div>
-          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18 }}>Fennec SI</span>
+          <div>
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18 }}>Fennec SI</span>
+            <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic', display: 'block', lineHeight: 1, marginTop: 1 }}>Spend &amp; Invest</span>
+          </div>
         </div>
 
         <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 'clamp(1.6rem,3vw,2.4rem)', fontWeight: 800, lineHeight: 1.2, marginBottom: 16 }}>
-          Invest smarter with<br /><span style={{ color: 'var(--primary)' }}>AI at your side</span>
+          Your spending &amp;<br /><span style={{ color: 'var(--primary)' }}>investment tracker</span>
         </h2>
         <p style={{ color: 'var(--text2)', fontSize: 16, lineHeight: 1.7, marginBottom: 48, maxWidth: 440 }}>
-          Track your NZ, ASX &amp; US portfolio, get real-time AI signals, and compete on verified leaderboards.
+          One app for your portfolio, your budget, and the AI signals that tie them together.
         </p>
 
-        {/* Feature bullets */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 48 }}>
-          {[
-            {
-              bg: 'var(--primary-light)', color: 'var(--primary)',
-              icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58"/></svg>,
-              title: 'AI-powered signals on every holding',
-              body: 'Claude generates BUY / HOLD / SELL reasoning in real time, calibrated to your risk profile.',
-            },
-            {
-              bg: 'rgba(16,185,129,.12)', color: 'var(--green)',
-              icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
-              title: 'Verified portfolios & leaderboards',
-              body: 'Upload your broker statement. Claude verifies your holdings and unlocks badges & the leaderboard.',
-            },
-            {
-              bg: 'rgba(251,191,36,.1)', color: '#fbbf24',
-              icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-              title: 'Hidden gems & daily top 10',
-              body: 'AI-curated stock picks across US, ASX & NZX markets, updated daily with catalyst reasoning.',
-            },
-          ].map(({ bg, color, icon, title, body }) => (
+          {features.map(({ bg, color, icon, title, body }) => (
             <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: bg, color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                 {icon}
               </div>
               <div>
                 <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{title}</p>
-                <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6 }}>{body}</p>
+                <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: body }} />
               </div>
             </div>
           ))}
         </div>
 
-        {/* Social proof */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ display: 'flex' }}>
             {['#5b6aff', '#10b981', '#f59e0b', '#ef4444'].map((bg, i) => (
@@ -114,32 +178,82 @@ export default function LoginPage() {
       {/* ── Right panel: login form ── */}
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '40px 36px', background: 'var(--surface)' }}>
         <div style={{ width: '100%', maxWidth: 360 }}>
-          <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 24, marginBottom: 6, textAlign: 'center' }}>Welcome back</h2>
-          <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', marginBottom: 32 }}>Sign in to your portfolio</p>
 
-          {sent ? (
+          {/* Mobile logo */}
+          <div className="flex md:hidden items-center gap-2 justify-center mb-8">
+            <div style={{ background: 'var(--primary)', borderRadius: 8, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="14" height="14" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </div>
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>Fennec SI</span>
+          </div>
+
+          {/* ── Step: MFA ── */}
+          {step === 'mfa' && (
+            <div>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <IconShieldCheck size={26} style={{ color: 'var(--primary)' }} />
+              </div>
+              <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 6, textAlign: 'center' }}>Two-factor authentication</h2>
+              <p style={{ color: 'var(--text2)', fontSize: 13, textAlign: 'center', marginBottom: 28 }}>
+                Enter the 6-digit code from your authenticator app
+              </p>
+              <form onSubmit={verifyTotp}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="000 000"
+                  value={totpCode}
+                  onChange={e => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                  autoFocus
+                  style={{ width: '100%', padding: '14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 22, outline: 'none', marginBottom: 12, display: 'block', textAlign: 'center', letterSpacing: '0.3em' }}
+                  onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                />
+                {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10, textAlign: 'center' }}>{error}</p>}
+                <button type="submit" disabled={totpCode.length !== 6 || loading === 'totp'}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: totpCode.length === 6 ? 'pointer' : 'not-allowed', opacity: totpCode.length !== 6 || loading === 'totp' ? 0.5 : 1 }}
+                >
+                  {loading === 'totp' ? <IconLoader size={16} className="animate-spin" /> : <IconShieldCheck size={16} />}
+                  Verify
+                </button>
+              </form>
+              <button onClick={() => { setStep('login'); setTotpCode(''); setError('') }} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 13, cursor: 'pointer', margin: '16px auto 0' }}>
+                <IconArrowLeft size={13} /> Back to sign in
+              </button>
+            </div>
+          )}
+
+          {/* ── Step: Magic link sent ── */}
+          {step === 'sent' && (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
               <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
                 <IconMail size={26} style={{ color: 'var(--primary)' }} />
               </div>
               <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Check your email</p>
               <p style={{ color: 'var(--text2)', fontSize: 13 }}>We sent a magic link to <strong>{email}</strong></p>
-              <button onClick={() => setSent(false)} style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => { setStep('login'); setError('') }} style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontSize: 13, cursor: 'pointer' }}>
                 ← Try a different email
               </button>
             </div>
-          ) : (
+          )}
+
+          {/* ── Step: Login ── */}
+          {step === 'login' && (
             <>
-              {/* Terms agreement */}
+              <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 24, marginBottom: 6, textAlign: 'center' }}>Welcome back</h2>
+              <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', marginBottom: 28 }}>Sign in to your Fennec SI account</p>
+
+              {/* Terms */}
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={agreed}
-                  onChange={e => setAgreed(e.target.checked)}
+                <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)}
                   style={{ marginTop: 2, width: 16, height: 16, accentColor: 'var(--primary)', flexShrink: 0, cursor: 'pointer' }}
                 />
                 <span style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-                  I have read and agree to the{' '}
+                  I agree to the{' '}
                   <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>Terms of Service</a>
                   {' '}and{' '}
                   <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>Privacy Policy</a>
@@ -147,9 +261,7 @@ export default function LoginPage() {
               </label>
 
               {/* Google */}
-              <button
-                onClick={signInGoogle}
-                disabled={!!loading || !agreed}
+              <button onClick={signInGoogle} disabled={!!loading || !agreed}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: agreed ? 'pointer' : 'not-allowed', marginBottom: 16, opacity: loading === 'google' || !agreed ? 0.5 : 1, transition: 'opacity 0.15s' }}
               >
                 {loading === 'google' ? <IconLoader size={18} className="animate-spin" /> : (
@@ -170,36 +282,76 @@ export default function LoginPage() {
                 <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
               </div>
 
-              {/* Magic link */}
-              <form onSubmit={signInMagicLink}>
-                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                  style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 14, outline: 'none', marginBottom: 10, display: 'block' }}
-                  onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
-                  onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-                />
-                <button
-                  type="submit"
-                  disabled={!!loading || !email || !agreed}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: agreed && email ? 'pointer' : 'not-allowed', opacity: loading === 'magic' || !email || !agreed ? 0.5 : 1, transition: 'opacity 0.15s' }}
-                >
-                  {loading === 'magic' ? <IconLoader size={16} className="animate-spin" /> : <IconMail size={16} />}
-                  Send magic link
-                </button>
-              </form>
+              {/* Method toggle */}
+              <div style={{ display: 'flex', background: 'var(--surface2)', borderRadius: 8, padding: 3, marginBottom: 16, gap: 2 }}>
+                {(['password', 'magic'] as Method[]).map(m => (
+                  <button key={m} onClick={() => { setMethod(m); setError('') }}
+                    style={{ flex: 1, padding: '7px', borderRadius: 6, border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s', background: method === m ? 'var(--surface)' : 'transparent', color: method === m ? 'var(--text)' : 'var(--text2)', boxShadow: method === m ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                  >
+                    {m === 'password' ? '🔒 Password' : '✉️ Magic link'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Password form */}
+              {method === 'password' && (
+                <form onSubmit={signInPassword}>
+                  <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
+                  <input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', marginBottom: 10, display: 'block' }}
+                    onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                  />
+                  <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Password</label>
+                  <div style={{ position: 'relative', marginBottom: 10 }}>
+                    <input type={showPw ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required
+                      style={{ width: '100%', padding: '11px 40px 11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', display: 'block' }}
+                      onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+                      onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                    />
+                    <button type="button" onClick={() => setShowPw(p => !p)}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', padding: 0, lineHeight: 0 }}
+                    >
+                      {showPw ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                    </button>
+                  </div>
+                  {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{error}</p>}
+                  <button type="submit" disabled={!!loading || !email || !password || !agreed}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: email && password && agreed ? 'pointer' : 'not-allowed', opacity: loading === 'password' || !email || !password || !agreed ? 0.5 : 1, transition: 'opacity 0.15s' }}
+                  >
+                    {loading === 'password' ? <IconLoader size={16} className="animate-spin" /> : <IconLock size={16} />}
+                    Sign in
+                  </button>
+                  <div style={{ textAlign: 'center', marginTop: 10 }}>
+                    <a href="/reset-password" style={{ fontSize: 12, color: 'var(--text2)', textDecoration: 'none', fontFamily: 'Syne, sans-serif' }}>Forgot password?</a>
+                  </div>
+                </form>
+              )}
+
+              {/* Magic link form */}
+              {method === 'magic' && (
+                <form onSubmit={signInMagicLink}>
+                  <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
+                  <input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', marginBottom: 10, display: 'block' }}
+                    onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                  />
+                  {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{error}</p>}
+                  <button type="submit" disabled={!!loading || !email || !agreed}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: email && agreed ? 'pointer' : 'not-allowed', opacity: loading === 'magic' || !email || !agreed ? 0.5 : 1, transition: 'opacity 0.15s' }}
+                  >
+                    {loading === 'magic' ? <IconLoader size={16} className="animate-spin" /> : <IconMail size={16} />}
+                    Send magic link
+                  </button>
+                </form>
+              )}
             </>
           )}
 
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 24, paddingTop: 20, textAlign: 'center' }}>
             <p style={{ color: 'var(--text2)', fontSize: 13 }}>
-              Don&apos;t have an account?{' '}
+              New to Fennec SI?{' '}
               <a href="/login" style={{ color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none', marginLeft: 4 }}>
                 Sign up free →
               </a>
