@@ -8,50 +8,90 @@ import {
   IconNewSection, IconMail, IconCalendar, IconUsers, IconBell,
   IconSettings, IconMenu2, IconX, IconLogout, IconTrophy,
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
-  IconWallet, IconReceipt, IconTarget,
+  IconWallet, IconReceipt, IconTarget, IconLayoutDashboard,
 } from '@tabler/icons-react'
 import { StockHelper } from '@/components/shared/StockHelper'
 import { MarketTicker } from '@/components/shared/MarketTicker'
 import { Avatar } from '@/components/shared/Avatar'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 
-const NAV_SECTIONS = [
-  {
+// ── Section definitions ───────────────────────────────────────────────────────
+
+const SECTIONS = {
+  dashboard: {
+    label: 'Dashboard',
+    icon: IconLayoutDashboard,
+    defaultHref: '/app/dashboard',
+    groups: [],
+  },
+  investing: {
     label: 'Investing',
-    items: [
-      { href: '/app/portfolio', label: 'My Portfolio', icon: IconChartBar },
-      { href: '/app/top10', label: "Today's Picks", icon: IconStar },
-      { href: '/app/opportunities', label: 'Discover', icon: IconBrain },
-      { href: '/app/watchlist', label: 'Watchlist', icon: IconEye },
+    icon: IconTrendingUp,
+    defaultHref: '/app/portfolio',
+    groups: [
+      {
+        label: 'My Investing',
+        items: [
+          { href: '/app/portfolio',     label: 'My Portfolio',   icon: IconChartBar },
+          { href: '/app/top10',         label: "Today's Picks",  icon: IconStar },
+          { href: '/app/opportunities', label: 'Discover',       icon: IconBrain },
+          { href: '/app/watchlist',     label: 'Watchlist',      icon: IconEye },
+        ],
+      },
+      {
+        label: 'Market',
+        items: [
+          { href: '/app/news',        label: 'News',        icon: IconNewSection },
+          { href: '/app/newsletters', label: 'Newsletters', icon: IconMail },
+          { href: '/app/ipo',         label: 'Events',      icon: IconCalendar },
+        ],
+      },
     ],
   },
-  {
-    label: 'Market',
-    items: [
-      { href: '/app/news', label: 'News', icon: IconNewSection },
-      { href: '/app/newsletters', label: 'Newsletters', icon: IconMail },
-      { href: '/app/ipo', label: 'Events', icon: IconCalendar },
-    ],
-  },
-  {
+  finance: {
     label: 'Finance',
-    items: [
-      { href: '/app/finance/accounts', label: 'Accounts', icon: IconBuildingBank },
-      { href: '/app/finance/transactions', label: 'Transactions', icon: IconArrowsExchange },
-      { href: '/app/finance/budget', label: 'Budget', icon: IconWallet },
-      { href: '/app/finance/bills', label: 'Bills', icon: IconReceipt },
-      { href: '/app/finance/goals', label: 'Goals', icon: IconTarget },
+    icon: IconBuildingBank,
+    defaultHref: '/app/finance/accounts',
+    groups: [
+      {
+        label: 'Household',
+        items: [
+          { href: '/app/finance/accounts',     label: 'Accounts',     icon: IconBuildingBank },
+          { href: '/app/finance/transactions', label: 'Transactions', icon: IconArrowsExchange },
+          { href: '/app/finance/budget',       label: 'Budget',       icon: IconWallet },
+          { href: '/app/finance/bills',        label: 'Bills',        icon: IconReceipt },
+          { href: '/app/finance/goals',        label: 'Goals',        icon: IconTarget },
+        ],
+      },
     ],
   },
-  {
+  community: {
     label: 'Community',
-    items: [
-      { href: '/app/community', label: 'Community', icon: IconUsers },
-      { href: '/app/leaderboard', label: 'Leaderboard', icon: IconTrophy },
-      { href: '/app/alerts', label: 'Notifications', icon: IconBell },
+    icon: IconUsers,
+    defaultHref: '/app/community',
+    groups: [
+      {
+        label: 'Community',
+        items: [
+          { href: '/app/community',   label: 'Community',    icon: IconUsers },
+          { href: '/app/leaderboard', label: 'Leaderboard',  icon: IconTrophy },
+          { href: '/app/alerts',      label: 'Notifications', icon: IconBell },
+        ],
+      },
     ],
   },
-]
+} as const
+
+type SectionKey = keyof typeof SECTIONS
+
+function getActiveSection(pathname: string): SectionKey {
+  if (pathname === '/app/dashboard') return 'dashboard'
+  if (pathname.startsWith('/app/finance')) return 'finance'
+  if (pathname.startsWith('/app/community') || pathname.startsWith('/app/leaderboard') || pathname.startsWith('/app/alerts')) return 'community'
+  return 'investing'
+}
+
+// ── Layout ────────────────────────────────────────────────────────────────────
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -63,6 +103,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const supabase = createClient()
+
+  const activeSection = getActiveSection(pathname)
+  const showTicker = activeSection === 'investing'
 
   useEffect(() => {
     const saved = (typeof window !== 'undefined' && localStorage.getItem('theme')) || 'light'
@@ -81,7 +124,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user)
       if (data.user) {
-        const { data: p } = await supabase.from('profiles').select('username, avatar_color, avatar_emoji, avatar_url, location, profession, is_premium, is_admin').eq('id', data.user.id).single()
+        const { data: p } = await supabase.from('profiles')
+          .select('username, avatar_color, avatar_emoji, avatar_url, location, profession, is_premium, is_admin')
+          .eq('id', data.user.id).single()
         setProfile(p)
         if (p?.is_premium) setIsPremium(true)
         if (p?.is_admin) setIsAdmin(true)
@@ -93,6 +138,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
     router.push('/login')
   }
+
+  const section = SECTIONS[activeSection]
 
   const sidebar = (
     <aside style={{
@@ -106,49 +153,83 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       top: 0,
       flexShrink: 0,
     }}>
-      {/* Logo + tagline */}
-      <div style={{ padding: '22px 18px 16px', borderBottom: '1px solid var(--border)' }}>
-        <Link href="/app/portfolio" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, textDecoration: 'none' }}>
+      {/* Logo */}
+      <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
+        <Link href="/app/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <IconTrendingUp size={18} color="white" />
           </div>
-          <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>
+          <div>
+            <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif', display: 'block', lineHeight: 1.2 }}>Fennec</span>
+            <span style={{ fontSize: 9.5, color: 'var(--text3)', fontStyle: 'italic', lineHeight: 1 }}>spend &amp; invest</span>
+          </div>
         </Link>
-        <p style={{ fontSize: 10.5, color: 'var(--text3)', fontStyle: 'italic', paddingLeft: 44, lineHeight: 1.3, marginTop: -2 }}>grow with confidence</p>
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
-        {NAV_SECTIONS.map(section => (
-          <div key={section.label}>
-            <span style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: '.1em', color: 'var(--text3)', textTransform: 'uppercase', padding: '14px 8px 5px' }}>
-              {section.label}
-            </span>
-            {section.items.map(n => (
-              <Link
-                key={n.href}
-                href={n.href}
-                onClick={() => setOpen(false)}
-                className={`nav-link mb-1 ${pathname === n.href ? 'active' : ''}`}
-              >
-                <n.icon size={16} />
-                {n.label}
-              </Link>
-            ))}
+      {/* Section switcher */}
+      <div style={{ padding: '10px 10px 8px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 4 }}>
+        {(Object.entries(SECTIONS) as [SectionKey, typeof SECTIONS[SectionKey]][]).map(([key, s]) => {
+          const Icon = s.icon
+          const isActive = activeSection === key
+          return (
+            <Link
+              key={key}
+              href={s.defaultHref}
+              onClick={() => setOpen(false)}
+              title={s.label}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                padding: '7px 4px', borderRadius: 8, textDecoration: 'none',
+                background: isActive ? 'var(--primary-light)' : 'transparent',
+                border: isActive ? '1px solid var(--primary)' : '1px solid transparent',
+                transition: 'all 0.15s',
+              }}
+            >
+              <Icon size={16} style={{ color: isActive ? 'var(--primary)' : 'var(--text3)' }} />
+              <span style={{ fontSize: 8.5, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: isActive ? 'var(--primary)' : 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                {s.label}
+              </span>
+            </Link>
+          )
+        })}
+      </div>
+
+      {/* Sub-nav */}
+      <nav style={{ flex: 1, padding: '6px 10px', overflowY: 'auto' }}>
+        {activeSection === 'dashboard' ? (
+          <div style={{ padding: '20px 8px', textAlign: 'center' }}>
+            <p style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>Select a section above to navigate</p>
           </div>
-        ))}
+        ) : (
+          (section as any).groups.map((group: any) => (
+            <div key={group.label}>
+              <span style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: '.1em', color: 'var(--text3)', textTransform: 'uppercase', padding: '12px 8px 5px' }}>
+                {group.label}
+              </span>
+              {group.items.map((n: any) => (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  onClick={() => setOpen(false)}
+                  className={`nav-link mb-1 ${pathname === n.href || pathname.startsWith(n.href + '/') ? 'active' : ''}`}
+                >
+                  <n.icon size={16} />
+                  {n.label}
+                </Link>
+              ))}
+            </div>
+          ))
+        )}
       </nav>
 
       {/* Footer */}
-      <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
         <Link href="/app/settings" className={`nav-link mb-1 ${pathname === '/app/settings' ? 'active' : ''}`} style={{ marginBottom: 2 }}>
-          <IconSettings size={15} />
-          Settings
+          <IconSettings size={15} /> Settings
         </Link>
         {isAdmin && (
           <Link href="/app/admin" className={`nav-link mb-1 ${pathname === '/app/admin' ? 'active' : ''}`} style={{ marginBottom: 2 }}>
-            <IconShield size={15} />
-            Admin
+            <IconShield size={15} /> Admin
           </Link>
         )}
         <button onClick={toggleTheme} className="nav-link w-full mb-1" style={{ marginBottom: 2 }}>
@@ -156,8 +237,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
         <button onClick={signOut} className="nav-link w-full" style={{ color: 'var(--text2)' }}>
-          <IconLogout size={15} />
-          Sign out
+          <IconLogout size={15} /> Sign out
         </button>
         {user && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, background: 'var(--surface2)', marginTop: 8 }}>
@@ -191,7 +271,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar */}
       <div className="hidden md:block">{sidebar}</div>
 
-      {/* Mobile overlay — sidebar left, backdrop right */}
+      {/* Mobile overlay */}
       {open && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div style={{ width: 240, flexShrink: 0 }}>{sidebar}</div>
@@ -201,14 +281,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Mobile top bar — z-51 keeps it above the overlay (z-50) so toggle button stays clickable */}
+        {/* Mobile top bar */}
         <div className="flex items-center gap-3 px-4 py-3 md:hidden" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'relative', zIndex: 51 }}>
           <button onClick={() => setOpen(o => !o)} style={{ color: 'var(--primary)' }}>
             {open ? <IconX size={22} /> : <IconMenu2 size={22} />}
           </button>
-          {!open && <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>}
+          {!open && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec</span>
+              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'var(--primary-light)', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 700 }}>
+                {SECTIONS[activeSection].label}
+              </span>
+            </div>
+          )}
         </div>
-        <MarketTicker />
+
+        {/* Market ticker — investing section only */}
+        {showTicker && <MarketTicker />}
+
         <div style={{ flex: 1, overflow: 'auto' }}>
           {children}
         </div>

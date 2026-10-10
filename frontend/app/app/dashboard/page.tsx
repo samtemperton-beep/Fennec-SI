@@ -1,0 +1,187 @@
+'use client'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase'
+import {
+  IconTrendingUp, IconBuildingBank, IconTarget, IconArrowRight,
+  IconChartBar, IconArrowsExchange, IconWallet, IconNewSection,
+  IconArrowUpRight, IconArrowDownRight,
+} from '@tabler/icons-react'
+
+function fmt(n: number) {
+  return n.toLocaleString('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
+}
+
+export default function DashboardPage() {
+  const [profile, setProfile] = useState<any>(null)
+  const [portfolioValue, setPortfolioValue] = useState<number | null>(null)
+  const [bankBalance, setBankBalance] = useState<number | null>(null)
+  const [monthSpend, setMonthSpend] = useState<number | null>(null)
+  const [activeGoals, setActiveGoals] = useState<any[]>([])
+  const [recentNews, setRecentNews] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const [{ data: p }, { data: holdings }, { data: accounts }, { data: txns }, { data: goals }] = await Promise.all([
+        supabase.from('profiles').select('username').eq('id', user.id).single(),
+        supabase.from('holdings').select('quantity, avg_price').eq('user_id', user.id),
+        supabase.from('fin_accounts').select('current_balance').eq('owner', 'me'),
+        supabase.from('fin_transactions').select('amount').gte('date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]).lt('amount', 0),
+        supabase.from('fin_goals').select('name, target_amount, current_amount').eq('status', 'active').limit(3),
+      ])
+
+      setProfile(p)
+
+      if (holdings) {
+        const total = holdings.reduce((s: number, h: any) => s + (h.quantity * h.avg_price), 0)
+        setPortfolioValue(total)
+      }
+
+      if (accounts) {
+        const total = accounts.reduce((s: number, a: any) => s + (a.current_balance || 0), 0)
+        setBankBalance(total)
+      }
+
+      if (txns) {
+        const total = txns.reduce((s: number, t: any) => s + Math.abs(t.amount), 0)
+        setMonthSpend(total)
+      }
+
+      if (goals) setActiveGoals(goals)
+
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const netWorth = (portfolioValue ?? 0) + (bankBalance ?? 0)
+  const greeting = (() => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Good morning'
+    if (h < 17) return 'Good afternoon'
+    return 'Good evening'
+  })()
+
+  const quickLinks = [
+    { href: '/app/portfolio', label: 'Portfolio', icon: IconChartBar, section: 'Investing' },
+    { href: '/app/finance/accounts', label: 'Accounts', icon: IconBuildingBank, section: 'Finance' },
+    { href: '/app/finance/transactions', label: 'Transactions', icon: IconArrowsExchange, section: 'Finance' },
+    { href: '/app/finance/budget', label: 'Budget', icon: IconWallet, section: 'Finance' },
+    { href: '/app/finance/goals', label: 'Goals', icon: IconTarget, section: 'Finance' },
+    { href: '/app/news', label: 'News', icon: IconNewSection, section: 'Investing' },
+  ]
+
+  return (
+    <div style={{ padding: '28px 32px', maxWidth: 900 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, fontFamily: 'Plus Jakarta Sans, sans-serif', color: 'var(--text)', margin: 0 }}>
+          {greeting}{profile?.username ? `, ${profile.username}` : ''}
+        </h1>
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>
+          {new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </p>
+      </div>
+
+      {/* Net Worth + stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 28 }}>
+        {/* Net Worth */}
+        <div style={{ gridColumn: 'span 2', background: 'var(--primary)', borderRadius: 14, padding: '22px 24px', color: 'white' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>Net Worth</div>
+          <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+            {loading ? '—' : fmt(netWorth)}
+          </div>
+          <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, opacity: 0.75 }}>Portfolio</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{portfolioValue !== null ? fmt(portfolioValue) : '—'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, opacity: 0.75 }}>Bank</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{bankBalance !== null ? fmt(bankBalance) : '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Monthly spend */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconArrowDownRight size={15} style={{ color: 'var(--primary)' }} />
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>This Month</span>
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+            {monthSpend !== null ? fmt(monthSpend) : '—'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>spending so far</div>
+        </div>
+
+        {/* Active goals */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconTarget size={15} style={{ color: 'var(--primary)' }} />
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Goals</span>
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+            {activeGoals.length}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>active savings goals</div>
+        </div>
+      </div>
+
+      {/* Goals progress */}
+      {activeGoals.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Savings Goals</span>
+            <Link href="/app/finance/goals" style={{ fontSize: 12, color: 'var(--primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+              View all <IconArrowRight size={12} />
+            </Link>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {activeGoals.map((g: any) => {
+              const pct = Math.min(100, Math.round((g.current_amount / g.target_amount) * 100))
+              return (
+                <div key={g.name}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{g.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text2)' }}>{fmt(g.current_amount)} / {fmt(g.target_amount)}</span>
+                  </div>
+                  <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: 'var(--primary)', borderRadius: 3, transition: 'width 0.4s' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Quick links */}
+      <div>
+        <h2 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 12 }}>Quick Access</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
+          {quickLinks.map(({ href, label, icon: Icon, section }) => (
+            <Link key={href} href={href} style={{ textDecoration: 'none', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8, transition: 'border-color 0.15s' }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={16} style={{ color: 'var(--primary)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{label}</div>
+                <div style={{ fontSize: 10, color: 'var(--text3)' }}>{section}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
