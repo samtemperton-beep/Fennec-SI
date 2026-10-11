@@ -20,6 +20,9 @@ interface FennecContext {
   monthlySpend?: string
   goalsSummary?: string
   kiwiSaverSummary?: string
+  // Business
+  businessPLSummary?: string
+  businessTopExpenses?: string
   // Meta
   pageHint: string
 }
@@ -93,6 +96,45 @@ function getPageConfig(pathname: string): {
       'What bills are worth negotiating in NZ?',
       'Should I fix or float my mortgage?',
       'Tips for reducing power bills in NZ?',
+    ],
+    loadInvesting: false, loadFinance: true,
+  }
+  if (pathname.includes('/finance/business/tax')) return {
+    pageHint: 'business-tax',
+    label: 'Fennec AI — Tax',
+    description: 'Ask about NZ business tax, GST, provisional tax, or IR3 filing.',
+    suggestions: [
+      'How does provisional tax work in NZ?',
+      'What expenses are deductible for my business?',
+      'When are my tax instalments due?',
+      'Should I register for GST?',
+      'What is the bright-line test for property?',
+    ],
+    loadInvesting: false, loadFinance: true,
+  }
+  if (pathname.includes('/finance/business/transactions')) return {
+    pageHint: 'business-transactions',
+    label: 'Fennec AI — Business',
+    description: 'Ask about categorising business expenses or managing your business finances.',
+    suggestions: [
+      'What are my biggest business expenses?',
+      'Which expenses are tax-deductible in NZ?',
+      'How should I categorise contractor payments?',
+      'Tips for reducing business costs?',
+      'What records do I need to keep for IRD?',
+    ],
+    loadInvesting: false, loadFinance: true,
+  }
+  if (pathname.includes('/finance/business')) return {
+    pageHint: 'business-overview',
+    label: 'Fennec AI — Business',
+    description: 'Ask about your business P&L, profit margins, or financial performance.',
+    suggestions: [
+      'How is my business performing this year?',
+      'What\'s my profit margin and is it healthy?',
+      'How can I improve my net profit?',
+      'What are my biggest cost drivers?',
+      'How does my revenue compare to last year?',
     ],
     loadInvesting: false, loadFinance: true,
   }
@@ -256,6 +298,53 @@ async function loadFinanceContext(): Promise<Partial<FennecContext>> {
   return { accountsSummary, monthlySpend, goalsSummary, kiwiSaverSummary }
 }
 
+async function loadBusinessContext(): Promise<Partial<FennecContext>> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return {}
+
+  const now = new Date()
+  const taxYearStart = now.getMonth() >= 3
+    ? `${now.getFullYear()}-04-01`
+    : `${now.getFullYear() - 1}-04-01`
+
+  const { data: accounts } = await supabase
+    .from('fin_accounts').select('id').eq('is_business', true)
+  if (!accounts?.length) return {}
+
+  const ids = accounts.map((a: any) => a.id)
+  const { data: txns } = await supabase
+    .from('fin_transactions')
+    .select('amount, category:fin_categories(name)')
+    .in('account_id', ids)
+    .gte('date', taxYearStart)
+
+  if (!txns?.length) return {}
+
+  const fmt = (n: number) => `$${n.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  const income = txns.filter((t: any) => t.amount > 0).reduce((s: number, t: any) => s + t.amount, 0)
+  const expenses = txns.filter((t: any) => t.amount < 0).reduce((s: number, t: any) => s + Math.abs(t.amount), 0)
+  const netProfit = income - expenses
+  const margin = income > 0 ? ((netProfit / income) * 100).toFixed(1) : '0'
+
+  const businessPLSummary = `Business YTD (from ${taxYearStart}): Income ${fmt(income)}, Expenses ${fmt(expenses)}, Net Profit ${fmt(netProfit)} (${margin}% margin)`
+
+  const byCategory = txns
+    .filter((t: any) => t.amount < 0)
+    .reduce<Record<string, number>>((acc: any, t: any) => {
+      const name = (t.category as any)?.name || 'Uncategorised'
+      acc[name] = (acc[name] || 0) + Math.abs(t.amount)
+      return acc
+    }, {})
+  const topExpenses = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, amt]) => `${name}: ${fmt(amt as number)}`)
+    .join(', ')
+
+  return { businessPLSummary, businessTopExpenses: topExpenses || undefined }
+}
+
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 
 function renderMarkdown(text: string): string {
@@ -324,11 +413,13 @@ export function FennecAI() {
     try {
       const token = await getToken()
       const cfg = getPageConfig(pathname)
-      const [investing, finance] = await Promise.all([
+      const isBusiness = pathname.includes('/finance/business')
+      const [investing, finance, business] = await Promise.all([
         cfg.loadInvesting ? loadInvestingContext(token) : Promise.resolve({} as Partial<FennecContext>),
         cfg.loadFinance ? loadFinanceContext() : Promise.resolve({} as Partial<FennecContext>),
+        isBusiness ? loadBusinessContext() : Promise.resolve({} as Partial<FennecContext>),
       ])
-      const ctx: FennecContext = { pageHint: cfg.pageHint, ...investing, ...finance }
+      const ctx: FennecContext = { pageHint: cfg.pageHint, ...investing, ...finance, ...business }
       setContext(ctx)
       contextLoadedRef.current = pathname
 
@@ -408,7 +499,7 @@ export function FennecAI() {
     }
   }
 
-  const hasContext = !!(context?.portfolioSummary || context?.accountsSummary || context?.kiwiSaverSummary)
+  const hasContext = !!(context?.portfolioSummary || context?.accountsSummary || context?.kiwiSaverSummary || context?.businessPLSummary)
 
   return (
     <>
