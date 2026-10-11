@@ -134,7 +134,7 @@ export default function AccountsPage() {
                 {grouped[owner].map((a, i) => (
                   <div
                     key={a.id}
-                    onClick={() => router.push(`/app/finance/transactions?account=${a.id}`)}
+                    onClick={() => router.push(a.is_business ? '/app/finance/business' : `/app/finance/transactions?account=${a.id}`)}
                     style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: i < grouped[owner].length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', transition: 'background 0.12s' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
