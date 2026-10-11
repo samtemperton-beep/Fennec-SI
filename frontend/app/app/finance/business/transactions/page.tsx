@@ -55,7 +55,7 @@ function Inner() {
     setLoading(true)
     const [{ data: accounts }, { data: cats }] = await Promise.all([
       supabase.from('fin_accounts').select('id').eq('is_business', true),
-      supabase.from('fin_categories').select('id, name').order('name'),
+      supabase.from('fin_categories').select('id, name').eq('scope', 'business').order('name'),
     ])
     const ids = (accounts || []).map((a: any) => a.id)
     setBizAccountIds(ids)
