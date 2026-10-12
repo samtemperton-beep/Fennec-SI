@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { IconX, IconSend, IconRefresh } from '@tabler/icons-react'
 import { createClient } from '@/lib/supabase'
 import { usePathname } from 'next/navigation'
+import { FoxIcon } from './FoxIcon'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
@@ -510,18 +511,21 @@ export function FennecAI() {
         style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9998,
           width: 60, height: 60, borderRadius: '50%',
-          background: open ? 'var(--surface)' : 'var(--primary)',
-          border: open ? '1px solid var(--border)' : 'none',
+          background: open ? 'var(--surface)' : 'white',
+          border: open ? '1px solid var(--border)' : '2px solid #F97316',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: open ? 'none' : '0 4px 20px rgba(0,0,0,0.25)',
+          boxShadow: open ? 'none' : '0 4px 20px rgba(249,115,22,0.35)',
           transition: 'all 0.2s',
-          fontSize: open ? 20 : 40,
+          padding: 0,
         }}
         onMouseEnter={e => { if (!open) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)' }}
         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
       >
-        {open ? <span style={{ fontSize: 16, color: 'var(--text2)' }}>✕</span> : '🦊'}
+        {open
+          ? <IconX size={18} style={{ color: 'var(--text2)' }} />
+          : <FoxIcon size={46} />
+        }
       </button>
 
       {/* Chat panel */}
@@ -537,7 +541,7 @@ export function FennecAI() {
           {/* Header */}
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface2)', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 18 }}>🦊</span>
+              <FoxIcon size={26} />
               <div>
                 <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
                   {pageConfig.label}

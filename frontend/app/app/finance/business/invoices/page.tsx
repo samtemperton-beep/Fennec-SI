@@ -28,6 +28,7 @@ interface Invoice {
   id: string; invoice_number: string; client_name: string; client_email: string | null
   client_address: string | null; issue_date: string; due_date: string | null
   status: 'draft' | 'sent' | 'paid' | 'overdue'; notes: string | null
+  gst_excluded: boolean
   items?: InvoiceItem[]
 }
 
@@ -75,7 +76,7 @@ function StatusBadge({ status, onChange }: { status: string; onChange?: (s: stri
 
 // ── Print view ────────────────────────────────────────────────────────────────
 function PrintView({ invoice, settings, onClose }: { invoice: Invoice; settings: BizSettings; onClose: () => void }) {
-  const { subtotal, gst, total } = calcTotals(invoice.items || [], settings.gst_registered)
+  const { subtotal, gst, total } = calcTotals(invoice.items || [], settings.gst_registered && !invoice.gst_excluded)
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: 'white', color: '#111', borderRadius: 12, width: '100%', maxWidth: 720, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
@@ -100,7 +101,7 @@ function PrintView({ invoice, settings, onClose }: { invoice: Invoice; settings:
               {settings.business_address && <p style={{ fontSize: 12, color: '#555', margin: '2px 0', whiteSpace: 'pre-line' }}>{settings.business_address}</p>}
               {settings.business_email && <p style={{ fontSize: 12, color: '#555', margin: '2px 0' }}>{settings.business_email}</p>}
               {settings.business_phone && <p style={{ fontSize: 12, color: '#555', margin: '2px 0' }}>{settings.business_phone}</p>}
-              {settings.gst_registered && settings.gst_number && <p style={{ fontSize: 11, color: '#777', margin: '6px 0 0' }}>GST No. {settings.gst_number}</p>}
+              {settings.gst_registered && !invoice.gst_excluded && settings.gst_number && <p style={{ fontSize: 11, color: '#777', margin: '6px 0 0' }}>GST No. {settings.gst_number}</p>}
               {settings.ird_number && <p style={{ fontSize: 11, color: '#777', margin: '2px 0' }}>IRD No. {settings.ird_number}</p>}
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -201,13 +202,15 @@ function InvoiceModal({ invoice, settings, allInvoices, onClose, onSaved }: {
     due_date: invoice?.due_date ?? isoDate(new Date(Date.now() + settings.payment_terms * 86400000)),
     status: invoice?.status ?? 'draft',
     notes: invoice?.notes ?? '',
+    gst_excluded: invoice?.gst_excluded ?? false,
   })
   const [items, setItems] = useState<InvoiceItem[]>(
     invoice?.items?.length ? invoice.items : [{ ...EMPTY_ITEM }]
   )
   const [saving, setSaving] = useState(false)
 
-  const { subtotal, gst, total } = calcTotals(items, settings.gst_registered)
+  const gstActive = settings.gst_registered && !form.gst_excluded
+  const { subtotal, gst, total } = calcTotals(items, gstActive)
 
   function setItem(i: number, field: keyof InvoiceItem, val: string | number) {
     setItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: val } : it))
@@ -352,6 +355,19 @@ function InvoiceModal({ invoice, settings, allInvoices, onClose, onSaved }: {
             </div>
           </div>
 
+          {/* GST toggle */}
+          {settings.gst_registered && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: form.gst_excluded ? '#F59E0B11' : 'var(--surface2)', border: `1px solid ${form.gst_excluded ? '#F59E0B44' : 'var(--border)'}` }}>
+              <input type="checkbox" checked={form.gst_excluded} onChange={e => setForm(f => ({ ...f, gst_excluded: e.target.checked }))} />
+              <div>
+                <span style={{ fontWeight: 600 }}>Exclude GST from this invoice</span>
+                <span style={{ color: 'var(--text3)', fontSize: 11, marginLeft: 6 }}>
+                  {form.gst_excluded ? '— prices shown ex-GST, no GST line on invoice' : '— GST (15%) will be added to subtotal'}
+                </span>
+              </div>
+            </label>
+          )}
+
           {/* Notes */}
           <div style={{ marginBottom: 20 }}>
             <label style={labelStyle}>Notes / Terms</label>
@@ -484,7 +500,7 @@ export default function InvoicesPage() {
   }
 
   const totals = invoices.reduce((acc, inv) => {
-    const { total } = calcTotals(inv.items || [], settings.gst_registered)
+    const { total } = calcTotals(inv.items || [], settings.gst_registered && !inv.gst_excluded)
     acc.all += total
     if (inv.status === 'paid') acc.paid += total
     if (inv.status === 'sent' || inv.status === 'overdue') acc.outstanding += total
@@ -547,7 +563,7 @@ export default function InvoicesPage() {
             ))}
           </div>
           {invoices.map((inv, i) => {
-            const { total } = calcTotals(inv.items || [], settings.gst_registered)
+            const { total } = calcTotals(inv.items || [], settings.gst_registered && !inv.gst_excluded)
             return (
               <div key={inv.id} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 110px 90px 100px', gap: 0, padding: '13px 18px', borderBottom: i < invoices.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center' }}>
                 <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 600, color: 'var(--primary)' }}>{inv.invoice_number}</span>
