@@ -465,7 +465,7 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [settings, setSettings] = useState<BizSettings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState<Invoice | null | 'new'>()
+  const [editing, setEditing] = useState<Invoice | null | string>()
   const [viewing, setViewing] = useState<Invoice | null>(null)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -589,7 +589,7 @@ export default function InvoicesPage() {
       )}
 
       {/* Modals */}
-      {(editing === 'new' || (editing && editing !== 'new')) && (
+      {(editing != null) && (
         <InvoiceModal
           invoice={editing === 'new' ? null : editing as Invoice}
           settings={settings}
