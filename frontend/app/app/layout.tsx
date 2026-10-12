@@ -9,7 +9,7 @@ import {
   IconSettings, IconLogout, IconTrophy,
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
   IconWallet, IconReceipt, IconTarget, IconLayoutDashboard, IconPigMoney,
-  IconBriefcase, IconCalculator,
+  IconBriefcase, IconCalculator, IconFileInvoice,
 } from '@tabler/icons-react'
 import { FennecAI } from '@/components/shared/FennecAI'
 import { MarketTicker } from '@/components/shared/MarketTicker'
@@ -70,6 +70,7 @@ const SECTIONS = {
         items: [
           { href: '/app/finance/business',                  label: 'Overview',      icon: IconBriefcase },
           { href: '/app/finance/business/transactions',     label: 'Transactions',  icon: IconArrowsExchange },
+          { href: '/app/finance/business/invoices',         label: 'Invoices',      icon: IconFileInvoice },
           { href: '/app/finance/business/tax',              label: 'Tax',           icon: IconCalculator },
         ],
       },
