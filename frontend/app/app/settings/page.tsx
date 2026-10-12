@@ -56,6 +56,7 @@ export default function SettingsPage() {
   const [broker, setBroker] = useState<string>('')
   const [anthropicKey, setAnthropicKey] = useState('')
   const [finnhubKey, setFinnhubKey] = useState('')
+  const [linzKey, setLinzKey] = useState('')
   const [user, setUser] = useState<any>(null)
   // Goal
   const [premiumStatus, setPremiumStatus] = useState<{ tier: string; badges: any[]; verification: any } | null>(null)
@@ -145,8 +146,8 @@ export default function SettingsPage() {
         broker: broker || null,
       }
       await supabase.from('profiles').upsert(update)
-      if (anthropicKey || finnhubKey) {
-        await supabase.auth.updateUser({ data: { anthropic_key: anthropicKey || user.user_metadata?.anthropic_key, finnhub_key: finnhubKey || user.user_metadata?.finnhub_key } })
+      if (anthropicKey || finnhubKey || linzKey) {
+        await supabase.auth.updateUser({ data: { anthropic_key: anthropicKey || user.user_metadata?.anthropic_key, finnhub_key: finnhubKey || user.user_metadata?.finnhub_key, linz_key: linzKey || user.user_metadata?.linz_key } })
       }
       toast.success('Settings saved')
     } catch (e: any) {
@@ -602,6 +603,14 @@ export default function SettingsPage() {
                 placeholder={user?.user_metadata?.finnhub_key ? '••••••••••••••••••• (saved)' : 'Your Finnhub key'}
                 style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', outline: 'none' }}
               />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>LINZ API Key (for property RV &amp; sales data)</label>
+              <input type="password" value={linzKey} onChange={e => setLinzKey(e.target.value)}
+                placeholder={user?.user_metadata?.linz_key ? '••••••••••••••••••• (saved)' : 'Get a key at data.linz.govt.nz'}
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', outline: 'none' }}
+              />
+              <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Free key from <a href="https://data.linz.govt.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>data.linz.govt.nz</a> — used for Home Loan RV lookups and area sales.</p>
             </div>
           </div>
         </div>

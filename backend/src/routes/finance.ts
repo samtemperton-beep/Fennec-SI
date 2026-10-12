@@ -153,4 +153,93 @@ router.post('/credentials', requireAuth, async (req: any, res) => {
   res.json({ ok: true });
 });
 
+// ── GET /api/finance/property ─────────────────────────────────────────────────
+// Looks up RV and recent area sales from LINZ for a given NZ property address.
+router.get('/property', requireAuth, async (req: any, res) => {
+  const userId: string = req.user.id;
+  const address = req.query.address as string;
+  if (!address) return res.status(400).json({ error: 'address query param required' });
+
+  const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(userId);
+  if (userErr || !user) return res.status(401).json({ error: 'Unauthorised' });
+
+  const linzKey = user.user_metadata?.linz_key;
+  if (!linzKey) return res.status(400).json({ error: 'No LINZ API key. Add it in Settings.' });
+
+  try {
+    const LINZ = 'https://data.linz.govt.nz/services/wfs';
+    const params = new URLSearchParams({
+      service: 'WFS', version: '2.0.0', request: 'GetFeature',
+      typeNames: 'layer-105569', // NZ Property Titles
+      outputFormat: 'application/json',
+      count: '1',
+      CQL_FILTER: `strToLowerCase(full_address) LIKE strToLowerCase('%${address.replace(/'/g, "''")}%')`,
+    });
+
+    const titleRes = await fetch(`${LINZ}?${params}`, {
+      headers: { Authorization: `key ${linzKey}` },
+    });
+    const titleData = await titleRes.json();
+
+    // Get RV from NZ Property Rating Valuations
+    const rvParams = new URLSearchParams({
+      service: 'WFS', version: '2.0.0', request: 'GetFeature',
+      typeNames: 'layer-105562',
+      outputFormat: 'application/json',
+      count: '1',
+      CQL_FILTER: `strToLowerCase(address) LIKE strToLowerCase('%${address.replace(/'/g, "''")}%')`,
+    });
+
+    const rvRes = await fetch(`${LINZ}?${rvParams}`, {
+      headers: { Authorization: `key ${linzKey}` },
+    });
+    const rvData = await rvRes.json();
+
+    // Recent sales from NZ Property Sales layer
+    let recentSales: { address: string; price: number; date: string }[] = [];
+    try {
+      const feature = titleData?.features?.[0];
+      if (feature?.geometry) {
+        const [lng, lat] = feature.geometry.type === 'Point'
+          ? feature.geometry.coordinates
+          : feature.geometry.coordinates[0][0];
+
+        const salesParams = new URLSearchParams({
+          service: 'WFS', version: '2.0.0', request: 'GetFeature',
+          typeNames: 'layer-106645',
+          outputFormat: 'application/json',
+          count: '10',
+          CQL_FILTER: `DWITHIN(shape, POINT(${lng} ${lat}), 500, meters)`,
+          sortBy: 'sale_date+D',
+        });
+
+        const salesRes = await fetch(`${LINZ}?${salesParams}`, {
+          headers: { Authorization: `key ${linzKey}` },
+        });
+        const salesData = await salesRes.json();
+
+        recentSales = (salesData?.features || []).map((f: any) => ({
+          address: f.properties?.full_address || f.properties?.address || 'Nearby property',
+          price: f.properties?.sale_price || f.properties?.price || 0,
+          date: f.properties?.sale_date || f.properties?.date || '',
+        })).filter((s: any) => s.price > 0);
+      }
+    } catch (_) {}
+
+    const rvFeature = rvData?.features?.[0]?.properties;
+
+    res.json({
+      rv: rvFeature?.capital_value || rvFeature?.cv || null,
+      land_value: rvFeature?.land_value || null,
+      improvement_value: rvFeature?.improvement_value || null,
+      legal_description: titleData?.features?.[0]?.properties?.legal_description || null,
+      area_sqm: titleData?.features?.[0]?.properties?.area_sq_metres || null,
+      recent_sales: recentSales,
+      source: 'LINZ Data Service',
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 export default router;
