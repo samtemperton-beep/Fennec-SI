@@ -199,7 +199,7 @@ router.get('/property', requireAuth, async (req: any, res) => {
         ...(coords ? { CQL_FILTER: `DWITHIN(shape, POINT(${coords[0]} ${coords[1]}), 50, meters)` } : {}),
       });
       const titleRes = await fetch(`${LINZ}?${titleParams}`, { headers });
-      const titleData = await titleRes.json();
+      const titleData = await titleRes.json() as any;
       titleProps = titleData?.features?.[0]?.properties || {};
     } catch (_) {}
 
@@ -214,7 +214,7 @@ router.get('/property', requireAuth, async (req: any, res) => {
           CQL_FILTER: `DWITHIN(shape, POINT(${coords[0]} ${coords[1]}), 50, meters)`,
         });
         const parcelRes = await fetch(`${LINZ}?${parcelParams}`, { headers });
-        const parcelData = await parcelRes.json();
+        const parcelData = await parcelRes.json() as any;
         parcelProps = parcelData?.features?.[0]?.properties || {};
       }
     } catch (_) {}
@@ -232,7 +232,7 @@ router.get('/property', requireAuth, async (req: any, res) => {
         });
         const salesRes = await fetch(`${LINZ}?${salesParams}`, { headers });
         if (salesRes.ok) {
-          const salesData = await salesRes.json();
+          const salesData = await salesRes.json() as any;
           recentSales = (salesData?.features || []).map((f: any) => ({
             address: f.properties?.street_address || f.properties?.full_address || 'Nearby property',
             price: Number(f.properties?.sale_price || f.properties?.consideration || 0),
