@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { IconChartBar, IconArrowRight } from '@tabler/icons-react'
+import { FoxIcon } from '@/components/shared/FoxIcon'
+import { IconArrowRight } from '@tabler/icons-react'
 
 const STEPS = ['Profile', 'Risk Level', 'Import Portfolio', 'AI Key', 'Done']
 
@@ -67,8 +68,8 @@ export default function OnboardingPage() {
       <div style={{ width: '100%', maxWidth: 480 }}>
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div style={{ background: 'var(--accent)', borderRadius: 8, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconChartBar size={20} color="white" />
+          <div style={{ background: 'var(--primary)', borderRadius: 8, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FoxIcon size={32} />
           </div>
           <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20 }}>Fennec SI</span>
         </div>

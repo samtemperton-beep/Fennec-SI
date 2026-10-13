@@ -12,6 +12,7 @@ import {
   IconBriefcase, IconCalculator, IconFileInvoice, IconHome, IconInbox,
 } from '@tabler/icons-react'
 import { FennecAI } from '@/components/shared/FennecAI'
+import { FoxIcon } from '@/components/shared/FoxIcon'
 import { MarketTicker } from '@/components/shared/MarketTicker'
 import { Avatar } from '@/components/shared/Avatar'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
@@ -169,7 +170,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
         <Link href="/app/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <IconTrendingUp size={18} color="white" />
+            <FoxIcon size={30} />
           </div>
           <div>
             <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif', display: 'block', lineHeight: 1.2 }}>Fennec</span>

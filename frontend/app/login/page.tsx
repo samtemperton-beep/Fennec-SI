@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { FoxIcon } from '@/components/shared/FoxIcon'
 import { IconMail, IconLoader, IconLock, IconEye, IconEyeOff, IconShieldCheck, IconArrowLeft } from '@tabler/icons-react'
 
 type Step = 'login' | 'mfa' | 'sent'
@@ -129,9 +130,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 56 }}>
           <div style={{ background: 'var(--primary)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="18" height="18" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
+            <FoxIcon size={28} />
           </div>
           <div>
             <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18 }}>Fennec SI</span>
@@ -182,9 +181,7 @@ export default function LoginPage() {
           {/* Mobile logo */}
           <div className="flex md:hidden items-center gap-2 justify-center mb-8">
             <div style={{ background: 'var(--primary)', borderRadius: 8, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="14" height="14" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
+              <FoxIcon size={24} />
             </div>
             <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>Fennec SI</span>
           </div>

@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { FoxIcon } from '@/components/shared/FoxIcon'
 import { IconCheck, IconArrowRight } from '@tabler/icons-react'
 
 // ── Feature cards ─────────────────────────────────────────────────────────────
@@ -94,8 +95,8 @@ export default function LandingPage() {
       {/* ── Nav ── */}
       <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ background: 'var(--primary)', borderRadius: 10, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-            🦊
+          <div style={{ background: 'var(--primary)', borderRadius: 10, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FoxIcon size={32} />
           </div>
           <div>
             <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontWeight: 800, fontSize: 16, display: 'block', lineHeight: 1.1 }}>Fennec</span>
@@ -213,7 +214,7 @@ export default function LandingPage() {
       {/* ── Fennec AI callout ── */}
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '0 32px 64px' }}>
         <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 16, padding: '28px 32px', display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-          <div style={{ fontSize: 36, flexShrink: 0 }}>🦊</div>
+          <div style={{ flexShrink: 0 }}><FoxIcon size={56} /></div>
           <div>
             <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18, color: 'var(--primary)', marginBottom: 8 }}>Meet Fennec AI</h3>
             <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
@@ -279,7 +280,7 @@ export default function LandingPage() {
       <footer style={{ borderTop: '1px solid var(--border)', padding: '24px 32px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 18 }}>🦊</span>
+            <FoxIcon size={22} />
             <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontWeight: 700, fontSize: 14 }}>Fennec</span>
             <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic' }}>spend &amp; invest</span>
           </div>
