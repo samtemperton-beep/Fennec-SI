@@ -90,10 +90,28 @@ export default function HomeLoanPage() {
 
     setHasLinzKey(!!user.user_metadata?.linz_key)
 
+    // Load saved home loan details
     const { data } = await supabase.from('home_loan').select('*').eq('user_id', user.id).maybeSingle()
+
+    // Pull live balance from fin_accounts (type LOAN, not business)
+    const { data: loanAccounts } = await supabase
+      .from('fin_accounts')
+      .select('id, name, current_balance')
+      .eq('type', 'LOAN')
+      .eq('is_business', false)
+      .order('current_balance')
+      .limit(1)
+
+    const liveBalance = loanAccounts?.[0] ? Math.abs(Number(loanAccounts[0].current_balance)) : null
+
     if (data) {
-      setLoan(data)
-      setDraft(data)
+      const merged = { ...data, ...(liveBalance !== null ? { balance: liveBalance } : {}) }
+      setLoan(merged)
+      setDraft(merged)
+    } else if (liveBalance !== null) {
+      const merged = { ...DEFAULT, balance: liveBalance }
+      setLoan(merged)
+      setDraft(merged)
     }
     setLoading(false)
   }
