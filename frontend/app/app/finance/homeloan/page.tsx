@@ -20,12 +20,14 @@ interface LoanDetails {
   monthly_payment: number | null
   rv: number | null
   market_estimate: number | null
+  original_drawdown: number | null
+  purchase_price: number | null
 }
 
 const DEFAULT: LoanDetails = {
   address: '', balance: 0, interest_rate: 6.5, loan_term_years: 30,
   start_date: new Date().toISOString().split('T')[0], monthly_payment: null,
-  rv: null, market_estimate: null,
+  rv: null, market_estimate: null, original_drawdown: null, purchase_price: null,
 }
 
 function calcAmortisation(balance: number, annualRate: number, termYears: number, startDate: string) {
@@ -226,6 +228,8 @@ export default function HomeLoanPage() {
             {inp('Interest Rate (%)', 'interest_rate', 'number')}
             {inp('Loan Term (years)', 'loan_term_years', 'number')}
             {inp('Loan Start Date', 'start_date', 'date')}
+            {inp('Original Drawdown', 'original_drawdown', 'number', '$')}
+            {inp('Purchase Price', 'purchase_price', 'number', '$')}
             {inp('Rateable Value (RV)', 'rv', 'number', '$')}
             {inp('Market Estimate', 'market_estimate', 'number', '$')}
           </div>
@@ -279,6 +283,8 @@ export default function HomeLoanPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
+              { label: 'Purchase Price', value: loan.purchase_price },
+              { label: 'Original Drawdown', value: loan.original_drawdown },
               { label: 'Rateable Value (RV)', value: loan.rv },
               { label: 'Market Estimate', value: loan.market_estimate },
               { label: 'Equity', value: equity },
