@@ -82,6 +82,7 @@ export default function HomeLoanPage() {
   const [propertyData, setPropertyData] = useState<PropertyData | null>(null)
   const [fetchingProperty, setFetchingProperty] = useState(false)
   const [hasLinzKey, setHasLinzKey] = useState(false)
+  const [actualPayment, setActualPayment] = useState<{ amount: number; frequency: string } | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -95,7 +96,7 @@ export default function HomeLoanPage() {
     // Load saved home loan details
     const { data } = await supabase.from('home_loan').select('*').eq('user_id', user.id).maybeSingle()
 
-    // Pull live balance from fin_accounts (type LOAN, not business)
+    // Pull live balance + account id from fin_accounts (type LOAN, not business)
     const { data: loanAccounts } = await supabase
       .from('fin_accounts')
       .select('id, name, current_balance')
@@ -104,7 +105,36 @@ export default function HomeLoanPage() {
       .order('current_balance')
       .limit(1)
 
-    const liveBalance = loanAccounts?.[0] ? Math.abs(Number(loanAccounts[0].current_balance)) : null
+    const loanAccount = loanAccounts?.[0]
+    const liveBalance = loanAccount ? Math.abs(Number(loanAccount.current_balance)) : null
+
+    // Detect actual payment amount + frequency from recent transactions
+    if (loanAccount) {
+      const { data: txs } = await supabase
+        .from('fin_transactions')
+        .select('amount, date')
+        .eq('account_id', loanAccount.id)
+        .lt('amount', 0)
+        .order('date', { ascending: false })
+        .limit(20)
+
+      if (txs && txs.length >= 2) {
+        // Find the most common negative amount (the repayment)
+        const amounts = txs.map(t => Math.abs(Number(t.amount)))
+        const freq: Record<string, number> = {}
+        amounts.forEach(a => { const k = a.toFixed(2); freq[k] = (freq[k] || 0) + 1 })
+        const topAmount = parseFloat(Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0])
+
+        // Detect frequency from date gaps
+        const dates = txs.filter(t => Math.abs(Number(t.amount)).toFixed(2) === topAmount.toFixed(2))
+          .map(t => new Date(t.date).getTime()).sort((a, b) => b - a)
+        const gaps = dates.slice(0, -1).map((d, i) => Math.round((d - dates[i + 1]) / 86400000))
+        const avgGap = gaps.length ? gaps.reduce((s, g) => s + g, 0) / gaps.length : 30
+        const frequency = avgGap < 10 ? 'weekly' : avgGap < 20 ? 'fortnightly' : 'monthly'
+
+        setActualPayment({ amount: topAmount, frequency })
+      }
+    }
 
     if (data) {
       const merged = { ...data, ...(liveBalance !== null ? { balance: liveBalance } : {}) }
@@ -240,7 +270,7 @@ export default function HomeLoanPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'Current Balance', value: currency.format(loan.balance), sub: 'Outstanding principal' },
-          { label: 'Monthly Payment', value: currencyExact.format(monthlyPayment), sub: `at ${loan.interest_rate}% p.a.` },
+          { label: actualPayment ? `${actualPayment.frequency.charAt(0).toUpperCase() + actualPayment.frequency.slice(1)} Payment` : 'Monthly Payment', value: actualPayment ? currencyExact.format(actualPayment.amount) : currencyExact.format(monthlyPayment), sub: actualPayment ? `actual from transactions` : `calculated at ${loan.interest_rate}% p.a.` },
           { label: 'Total Interest', value: currency.format(totalInterest), sub: 'Over full term' },
           { label: 'Payoff Date', value: payoffDate.toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' }), sub: <YearsToPayoff startDate={loan.start_date} payoffDate={payoffDate} /> },
         ].map(k => (
