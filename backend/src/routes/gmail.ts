@@ -1,11 +1,16 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import Anthropic from '@anthropic-ai/sdk';
 
+// Node 20 has no native WebSocket, which supabase-js's realtime client needs at
+// construction time. Without this transport the process throws on import and
+// the whole server crash-loops (every other route already passes it).
 const supabase = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
+  process.env.SUPABASE_SERVICE_KEY!,
+  { realtime: { transport: ws as any } }
 );
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
