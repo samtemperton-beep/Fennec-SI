@@ -8,3 +8,6 @@ stocksense/
 
 .vercel
 .env*
+
+AKAHU.txt
+backend/Webhook secret.txt
