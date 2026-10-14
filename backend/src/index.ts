@@ -14,6 +14,7 @@ import adminRouter from './routes/admin';
 import premiumRouter from './routes/premium';
 import socialRouter from './routes/social';
 import financeRouter from './routes/finance';
+import akahuRouter from './routes/akahu';
 import gmailRouter from './routes/gmail';
 
 dotenv.config();
@@ -50,6 +51,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/premium', premiumRouter);
 app.use('/api/social', socialRouter);
 app.use('/api/finance', financeRouter);
+app.use('/api/akahu', akahuRouter);
 app.use('/api/gmail', gmailRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));

@@ -1,7 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin } from '@tabler/icons-react'
+import { api } from '@/lib/api'
+import { toast } from 'sonner'
+import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin, IconRefresh } from '@tabler/icons-react'
 
 // ── NZ KiwiSaver constants ───────────────────────────────────────────────────
 const GOVT_MTC_MAX = 521.43          // Government member tax credit per year
@@ -131,27 +133,56 @@ export default function KiwiSaverPage() {
   const [form, setForm] = useState<any>({})
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [hasCreds, setHasCreds] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+
+  // Fields Akahu owns once an account is linked; the form must not write them back.
+  const AKAHU_OWNED = ['provider', 'current_balance', 'akahu_account_id', 'akahu_returns', 'pir', 'akahu_synced_at']
+  const isSynced = !!settings?.akahu_account_id
+
+  async function loadSettings(openFormIfEmpty = true) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const { data } = await supabase.from('fin_kiwisaver').select('*').eq('user_id', user.id).maybeSingle()
+    if (data) {
+      setSettings(data)
+      setForm(data)
+    } else {
+      const defaults = {
+        provider: '', fund_type: 'balanced', current_balance: 0,
+        retirement_age: 65, annual_salary: 0,
+        employee_rate: 3, employer_rate: 3, voluntary_monthly: 0,
+        expected_return: 5.5,
+      }
+      setSettings(null)
+      setForm(defaults)
+      if (openFormIfEmpty) setEditing(true) // first time — open settings immediately
+    }
+    return data
+  }
+
+  async function syncFromAkahu(manual: boolean) {
+    setSyncing(true)
+    try {
+      await api.syncAkahu()
+      await loadSettings(false)
+      if (manual) toast.success('KiwiSaver synced from Akahu')
+    } catch (e: any) {
+      if (manual) toast.error(e.message)
+    }
+    setSyncing(false)
+  }
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase.from('fin_kiwisaver').select('*').eq('user_id', user.id).maybeSingle()
-      if (data) {
-        setSettings(data)
-        setForm(data)
-      } else {
-        const defaults = {
-          provider: '', fund_type: 'balanced', current_balance: 0,
-          retirement_age: 65, annual_salary: 0,
-          employee_rate: 3, employer_rate: 3, voluntary_monthly: 0,
-          expected_return: 5.5,
-        }
-        setSettings(null)
-        setForm(defaults)
-        setEditing(true) // first time — open settings immediately
-      }
+      const data = await loadSettings()
+      const { data: creds } = await supabase.from('akahu_credentials').select('user_id').maybeSingle()
+      setHasCreds(!!creds)
       setLoading(false)
+      // Keep the balance fresh: sync automatically when Akahu is connected and the
+      // balance is more than 6 hours old (or has never been synced).
+      const last = data?.akahu_synced_at ? new Date(data.akahu_synced_at).getTime() : 0
+      if (creds && Date.now() - last > 6 * 60 * 60 * 1000) syncFromAkahu(false)
     }
     load()
   }, [])
@@ -160,7 +191,10 @@ export default function KiwiSaverPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const payload = { ...form, user_id: user.id, last_updated: new Date().toISOString() }
+    const editable = isSynced
+      ? Object.fromEntries(Object.entries(form).filter(([k]) => !AKAHU_OWNED.includes(k)))
+      : form
+    const payload = { ...editable, user_id: user.id, last_updated: new Date().toISOString() }
     const { data, error } = await supabase.from('fin_kiwisaver').upsert(payload, { onConflict: 'user_id' }).select().single()
     if (!error && data) { setSettings(data); setForm(data) }
     setSaving(false)
@@ -192,14 +226,30 @@ export default function KiwiSaverPage() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, fontFamily: 'Plus Jakarta Sans, sans-serif', color: 'var(--text)', margin: 0 }}>KiwiSaver</h1>
           {settings?.provider && <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 3 }}>{settings.provider} · {FUND_TYPES[settings.fund_type]?.label ?? settings.fund_type} fund</p>}
+          {isSynced && (
+            <p style={{ fontSize: 11, color: 'var(--green)', marginTop: 3, fontWeight: 600 }}>
+              ● Balance synced via Akahu{settings.akahu_synced_at ? ` · ${new Date(settings.akahu_synced_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}
+            </p>
+          )}
         </div>
-        <button
-          onClick={() => editing ? save() : setEditing(true)}
-          disabled={saving}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: editing ? 'var(--primary)' : 'var(--surface2)', border: '1px solid var(--border)', color: editing ? 'white' : 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-        >
-          {editing ? <><IconCheck size={15} /> {saving ? 'Saving…' : 'Save'}</> : <><IconEdit size={15} /> Edit</>}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {hasCreds && (
+            <button
+              onClick={() => syncFromAkahu(true)}
+              disabled={syncing}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 700, fontSize: 13, cursor: syncing ? 'default' : 'pointer', opacity: syncing ? 0.7 : 1 }}
+            >
+              <IconRefresh size={15} /> {syncing ? 'Syncing…' : 'Sync'}
+            </button>
+          )}
+          <button
+            onClick={() => editing ? save() : setEditing(true)}
+            disabled={saving}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: editing ? 'var(--primary)' : 'var(--surface2)', border: '1px solid var(--border)', color: editing ? 'white' : 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+          >
+            {editing ? <><IconCheck size={15} /> {saving ? 'Saving…' : 'Save'}</> : <><IconEdit size={15} /> Edit</>}
+          </button>
+        </div>
       </div>
 
       {/* Edit form */}
@@ -228,7 +278,8 @@ export default function KiwiSaverPage() {
             {/* Current balance */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Current balance (NZD)</label>
-              <input type="number" value={form.current_balance || ''} onChange={e => setForm((f: any) => ({ ...f, current_balance: Number(e.target.value) }))} placeholder="0" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
+              <input type="number" value={form.current_balance || ''} disabled={isSynced} onChange={e => setForm((f: any) => ({ ...f, current_balance: Number(e.target.value) }))} placeholder="0" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13, opacity: isSynced ? 0.6 : 1 }} />
+              {isSynced && <span style={{ fontSize: 10, color: 'var(--text3)' }}>Kept up to date from your provider via Akahu</span>}
             </div>
             {/* Annual salary */}
             <div>
@@ -282,6 +333,14 @@ export default function KiwiSaverPage() {
               <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Current Balance</div>
               <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{fmt(settings.current_balance)}</div>
               <div style={{ fontSize: 10, opacity: 0.75, marginTop: 4 }}>{FUND_TYPES[settings.fund_type]?.label} · {settings.expected_return}% p.a.</div>
+              {settings.akahu_returns != null && (
+                <div style={{ fontSize: 11, opacity: 0.9, marginTop: 6, fontWeight: 600 }}>
+                  {Number(settings.akahu_returns) >= 0 ? '+' : ''}{fmt(Number(settings.akahu_returns))} returns to date
+                </div>
+              )}
+              {settings.pir != null && (
+                <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2 }}>PIR {Number(settings.pir)}%</div>
+              )}
             </div>
             {/* Projected at retirement */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>

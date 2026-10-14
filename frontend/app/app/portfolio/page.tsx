@@ -13,6 +13,7 @@ import { IconRefresh, IconBrain, IconPlus, IconUpload, IconShield, IconShieldChe
 import { getBrokerById, getBrokerTradeUrl, type Broker } from '@/lib/brokers'
 import Link from 'next/link'
 import { PortfolioGoal } from '@/components/portfolio/PortfolioGoal'
+import { AkahuSyncBar } from '@/components/portfolio/AkahuSyncBar'
 import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
 import { VerifyPortfolioModal } from '@/components/premium/VerifyPortfolioModal'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
@@ -133,9 +134,11 @@ export default function PortfolioPage() {
     // Enrich with live prices + company names in background
     if (rows.length) {
       try {
-        const tickers = [...new Set(rows.map((h: any) => h.ticker as string))]
+        // Locked rows (ambiguous tickers, e.g. SpaceX vs the SPCX ETF) keep the
+        // broker's valuation: a market lookup by ticker would return the wrong instrument.
+        const tickers = [...new Set(rows.filter((h: any) => !h.price_locked).map((h: any) => h.ticker as string))]
         const priceData = await api.getPrices(tickers)
-        setHoldings(rows.map((h: any) => ({
+        setHoldings(rows.map((h: any) => h.price_locked ? h : ({
           ...h,
           current_price: priceData[h.ticker]?.price ?? h.current_price,
           name: priceData[h.ticker]?.name ?? h.name,
@@ -148,15 +151,16 @@ export default function PortfolioPage() {
     if (!holdings.length) return
     setRefreshing(true)
     try {
-      const tickers = [...new Set(holdings.map(h => h.ticker))]
+      const tickers = [...new Set(holdings.filter(h => !h.price_locked).map(h => h.ticker))]
       const data = await api.getPrices(tickers)
-      const updates = holdings.map(h => ({
+      const updates = holdings.map(h => h.price_locked ? h : ({
         ...h,
         current_price: data[h.ticker]?.price ?? h.current_price,
         name: data[h.ticker]?.name ?? h.name,
       }))
       setHoldings(updates)
       for (const h of updates) {
+        if (h.price_locked) continue
         await supabase.from('holdings').update({ current_price: h.current_price }).eq('id', h.id)
       }
       toast.success('Prices updated')
@@ -305,6 +309,8 @@ export default function PortfolioPage() {
           </button>
         </div>
       </div>
+
+      <AkahuSyncBar onSynced={() => { if (userId) loadHoldings(userId) }} />
 
       {/* Summary card with ring chart */}
       {!loading && totalValue > 0 && (

@@ -43,7 +43,7 @@ async function syncHoldingsFromCSV(userId: string, csvHoldings: { ticker: string
 }
 
 // Helper: insert or update portfolio_verifications (table has no unique constraint on user_id)
-async function saveVerification(userId: string, payload: Record<string, any>) {
+export async function saveVerification(userId: string, payload: Record<string, any>) {
   const { data: existing } = await supabase
     .from('portfolio_verifications')
     .select('id')

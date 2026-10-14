@@ -24,6 +24,7 @@ export interface Holding {
   signal_reason?: string | null
   sector?: string | null
   is_verified?: boolean
+  price_locked?: boolean
 }
 
 type SortKey = 'ticker' | 'shares' | 'buy_price' | 'current_price' | 'pl' | 'plpct'
@@ -145,7 +146,14 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
                 </td>
                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                   <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 500 }}>{fmtCurrency(h.current_price * h.shares)}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>@ {fmtCurrency(h.current_price)}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
+                    @ {fmtCurrency(h.current_price)}
+                    {h.price_locked && (
+                      <span title="This ticker is shared by more than one instrument, so the price is the broker's valuation rather than a market lookup." style={{ marginLeft: 5, fontSize: 9, fontWeight: 700, color: 'var(--text3)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 4px' }}>
+                        broker price
+                      </span>
+                    )}
+                  </p>
                 </td>
                 <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: pl >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
                   {pl >= 0 ? '+' : ''}{fmtCurrency(pl)}

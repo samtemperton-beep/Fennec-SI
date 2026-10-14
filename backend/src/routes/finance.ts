@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
+import { loadAkahuCredentials, saveAkahuCredentials, credentialsErrorResponse } from '../services/akahuCredentials';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -50,28 +51,20 @@ function makeAkahuClient(appToken: string, userToken: string) {
 router.post('/sync', requireAuth, async (req: any, res) => {
   const userId: string = req.user.id;
 
-  // Accept tokens from request body (preferred) or fall back to DB lookup
-  let appToken: string = req.body?.app_token;
-  let userToken: string = req.body?.user_token;
-  let lastSyncedAt: string | undefined;
-
-  if (!appToken || !userToken) {
-    const { data: creds, error: credsErr } = await supabase
-      .from('akahu_credentials')
-      .select('app_token, user_token, last_synced_at')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (credsErr || !creds) {
-      return res.status(400).json({ error: 'No Akahu credentials found. Add them in Finance > Settings.' });
-    }
-    appToken = creds.app_token;
-    userToken = creds.user_token;
-    lastSyncedAt = creds.last_synced_at;
-  } else {
-    // Still fetch last_synced_at for incremental sync
-    const { data } = await supabase.from('akahu_credentials').select('last_synced_at').eq('user_id', userId).maybeSingle();
-    lastSyncedAt = data?.last_synced_at;
+  // Tokens are only ever read server-side from the encrypted store. They are
+  // deliberately not accepted in the request body: that would mean the browser
+  // had held the plaintext tokens.
+  let creds;
+  try {
+    creds = await loadAkahuCredentials(supabase, userId);
+  } catch (e: any) {
+    return credentialsErrorResponse(res, e);
   }
+  if (!creds) {
+    return res.status(400).json({ error: 'No Akahu credentials found. Add them in Settings → Akahu.' });
+  }
+  const { appToken, userToken } = creds;
+  const lastSyncedAt: string | undefined = creds.lastSyncedAt ?? undefined;
 
   const akahu = makeAkahuClient(appToken, userToken);
 
@@ -142,14 +135,16 @@ router.post('/sync', requireAuth, async (req: any, res) => {
 // Save Akahu credentials for the authenticated user
 router.post('/credentials', requireAuth, async (req: any, res) => {
   const userId: string = req.user.id;
-  const { app_token, user_token } = req.body;
-  if (!app_token || !user_token) return res.status(400).json({ error: 'app_token and user_token required' });
+  const { app_token, user_token } = req.body ?? {};
+  if (typeof app_token !== 'string' || typeof user_token !== 'string' || !app_token || !user_token) {
+    return res.status(400).json({ error: 'app_token and user_token required' });
+  }
 
-  const { error } = await supabase.from('akahu_credentials').upsert(
-    { user_id: userId, app_token, user_token },
-    { onConflict: 'user_id' }
-  );
-  if (error) return res.status(500).json({ error: error.message });
+  try {
+    await saveAkahuCredentials(supabase, userId, app_token, user_token);
+  } catch (e: any) {
+    return credentialsErrorResponse(res, e);
+  }
   res.json({ ok: true });
 });
 

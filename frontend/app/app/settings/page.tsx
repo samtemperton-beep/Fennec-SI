@@ -735,7 +735,8 @@ function AkahuSettings({ supabase }: { supabase: any }) {
   const [hasCreds, setHasCreds] = useState(false)
 
   useEffect(() => {
-    supabase.from('akahu_credentials').select('app_token').maybeSingle().then(({ data }: any) => {
+    // Only the row's existence is needed; the token columns aren't readable from the browser.
+    supabase.from('akahu_credentials').select('user_id').maybeSingle().then(({ data }: any) => {
       if (data) setHasCreds(true)
     })
   }, [])
@@ -745,13 +746,8 @@ function AkahuSettings({ supabase }: { supabase: any }) {
     if (!appToken.trim() || !userToken.trim()) return
     setSaving(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not logged in')
-      const { error } = await supabase.from('akahu_credentials').upsert(
-        { user_id: user.id, app_token: appToken.trim(), user_token: userToken.trim() },
-        { onConflict: 'user_id' }
-      )
-      if (error) throw error
+      // Sent to the server, which encrypts them before they're stored.
+      await api.saveAkahuCredentials(appToken.trim(), userToken.trim())
       setSaved(true); setHasCreds(true); setAppToken(''); setUserToken('')
       toast.success('Akahu tokens saved')
     } catch (e: any) { toast.error(e.message) }
@@ -760,9 +756,9 @@ function AkahuSettings({ supabase }: { supabase: any }) {
 
   return (
     <div className="card mt-6" style={{ marginTop: 24 }}>
-      <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Akahu Bank Sync</h2>
+      <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Akahu Sync</h2>
       <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
-        Connect your NZ bank accounts via <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Akahu</a>. Create a personal app at my.akahu.nz/apps to get your tokens.
+        Connect your NZ bank, Hatch and KiwiSaver accounts via <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Akahu</a>. Your Hatch portfolio and KiwiSaver balance then stay up to date automatically. Create a personal app at my.akahu.nz/apps to get your tokens.
         {hasCreds && <span style={{ marginLeft: 8, color: 'var(--green)', fontWeight: 600 }}>✓ Connected</span>}
       </p>
       <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

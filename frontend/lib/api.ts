@@ -46,6 +46,15 @@ export const api = {
 
   getIPOs: () => apiFetch('/api/news/ipo'),
 
+  // Pulls holdings (e.g. Hatch) and KiwiSaver from Akahu and makes them the
+  // source of truth. preview=true reports changes without applying them.
+  syncAkahu: (opts: { preview?: boolean; removeUnmatched?: boolean } = {}) =>
+    apiFetch('/api/akahu/sync', { method: 'POST', body: JSON.stringify(opts) }),
+
+  // Tokens are encrypted server-side; the browser can't write the table directly.
+  saveAkahuCredentials: (appToken: string, userToken: string) =>
+    apiFetch('/api/finance/credentials', { method: 'POST', body: JSON.stringify({ app_token: appToken, user_token: userToken }) }),
+
   getEarningsCalendar: (tickers: string[]) =>
     apiFetch(`/api/news/earnings?tickers=${tickers.join(',')}`),
 
