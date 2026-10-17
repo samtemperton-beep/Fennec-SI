@@ -8,12 +8,13 @@ import { PLChart } from '@/components/portfolio/PLChart'
 import { StatsBar } from '@/components/shared/StatsBar'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { fmtCurrency } from '@/lib/utils'
+import { fmtCurrency, fmtMoney } from '@/lib/utils'
 import { IconRefresh, IconBrain, IconPlus, IconUpload, IconShield, IconShieldCheck, IconExternalLink } from '@tabler/icons-react'
 import { getBrokerById, getBrokerTradeUrl, type Broker } from '@/lib/brokers'
 import Link from 'next/link'
 import { PortfolioGoal } from '@/components/portfolio/PortfolioGoal'
-import { AkahuSyncBar } from '@/components/portfolio/AkahuSyncBar'
+import { AkahuSyncBar, type BrokerAccount } from '@/components/portfolio/AkahuSyncBar'
+import { UnmatchedHoldings } from '@/components/portfolio/UnmatchedHoldings'
 import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
 import { VerifyPortfolioModal } from '@/components/premium/VerifyPortfolioModal'
@@ -87,7 +88,14 @@ export default function PortfolioPage() {
   const [syncPreview, setSyncPreview] = useState<{ format: string; toAdd: string[]; toUpdate: string[]; toRemove: string[]; total: number } | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [historyKey, setHistoryKey] = useState(0) // bumped after each Akahu sync to reload the history chart
+  const [statusKey, setStatusKey] = useState(0) // bumped to make the sync bar re-read its stored status
+  const [cashAccounts, setCashAccounts] = useState<BrokerAccount[]>([]) // broker cash, from the last Akahu sync
+  const [fx, setFx] = useState<{ rate: number; asOf: string } | null>(null) // NZD per 1 USD
   const supabase = createClient()
+
+  useEffect(() => {
+    api.getFx().then(setFx).catch(() => {})
+  }, [])
 
   const userIdRef = useCallback((uid: string) => {
     setUserId(uid)
@@ -193,9 +201,25 @@ export default function PortfolioPage() {
   }
 
   async function deleteHolding(id: number) {
-    await supabase.from('holdings').delete().eq('id', id)
+    const { error } = await supabase.from('holdings').delete().eq('id', id)
+    if (error) return toast.error(`Could not remove holding: ${error.message}`)
     setHoldings(prev => prev.filter(h => h.id !== id))
     toast.success('Holding removed')
+  }
+
+  // Bulk removal for holdings Akahu doesn't know about. Afterwards, re-sync quietly so
+  // the stored "N holdings were left untouched" note from the last sync clears.
+  async function removeUnmatched(ids: number[]) {
+    const { error } = await supabase.from('holdings').delete().in('id', ids)
+    if (error) {
+      toast.error(`Could not remove: ${error.message}`)
+      return
+    }
+    setHoldings(prev => prev.filter(h => !ids.includes(h.id)))
+    toast.success(`${ids.length} holding${ids.length !== 1 ? 's' : ''} removed`)
+    api.syncAkahu()
+      .then(() => { if (userId) loadHoldings(userId); setStatusKey(k => k + 1) })
+      .catch(() => {})
   }
 
   async function addHolding(e: React.FormEvent) {
@@ -259,6 +283,24 @@ export default function PortfolioPage() {
   const totalPLPct = totalCost > 0 ? (totalPL / totalCost) * 100 : 0
   const signals = holdings.filter(h => h.signal).length
 
+  // Holdings are priced in USD. Broker cash is in whatever currency the account
+  // holds it in; fold it into a USD total where it can be converted.
+  const cashUsd = cashAccounts.reduce((s, a) => {
+    if (a.currency === 'USD') return s + a.cashBalance
+    if (a.currency === 'NZD' && fx) return s + a.cashBalance / fx.rate
+    return s
+  }, 0)
+  const hasCash = cashAccounts.some(a => a.cashBalance > 0)
+  const cashLabel = cashAccounts.filter(a => a.cashBalance > 0).map(a => fmtMoney(a.cashBalance, a.currency)).join(' + ')
+  const nz = (usd: number) => (fx ? fmtMoney(usd * fx.rate, 'NZD', 0) : null)
+  const valueTiles = [
+    { label: 'Holdings value', main: fmtMoney(totalValue, 'USD'), sub: nz(totalValue), note: 'at current prices' },
+    ...(hasCash ? [
+      { label: 'Cash', main: cashLabel, sub: nz(cashUsd), note: 'in your broker account' },
+      { label: 'Total', main: fmtMoney(totalValue + cashUsd, 'USD'), sub: nz(totalValue + cashUsd), note: 'holdings + cash' },
+    ] : []),
+  ]
+
   const stats = [
     { label: 'Portfolio Value', value: totalValue, type: 'currency' as const },
     { label: 'Total P&L', value: totalPL, type: 'currency' as const, positive: totalPL >= 0 },
@@ -312,7 +354,8 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <AkahuSyncBar onSynced={() => { if (userId) loadHoldings(userId); setHistoryKey(k => k + 1) }} />
+      <AkahuSyncBar refreshKey={statusKey} onAccounts={setCashAccounts} onSynced={() => { if (userId) loadHoldings(userId); setHistoryKey(k => k + 1) }} />
+      <UnmatchedHoldings holdings={holdings} connected={cashAccounts.length > 0} onRemove={removeUnmatched} />
 
       {/* Summary card with ring chart */}
       {!loading && totalValue > 0 && (
@@ -335,7 +378,7 @@ export default function PortfolioPage() {
                     strokeDasharray="339" strokeDashoffset="325" opacity=".45" />
                 </svg>
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Portfolio</p>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Portfolio · USD</p>
                   <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 500, color: 'var(--text)', lineHeight: 1.1 }}>{fmtCurrency(totalValue)}</p>
                   <p style={{ fontSize: 11, fontWeight: 700, color: totalPL >= 0 ? 'var(--green)' : 'var(--red)', marginTop: 3 }}>{totalPL >= 0 ? '+' : ''}{totalPLPct.toFixed(2)}% all time</p>
                 </div>
@@ -354,11 +397,25 @@ export default function PortfolioPage() {
 
             {/* Metrics + goal */}
             <div>
+              <div className={valueTiles.length === 3 ? 'grid grid-cols-1 md:grid-cols-3' : 'grid grid-cols-1 md:grid-cols-2'} style={{ gap: 12, marginBottom: fx ? 6 : 12 }}>
+                {valueTiles.map(t => (
+                  <div key={t.label} style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, border: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>{t.label}</p>
+                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 500 }}>{t.main}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>{t.sub ? <>≈ {t.sub} NZD</> : t.note}</p>
+                  </div>
+                ))}
+              </div>
+              {fx && (
+                <p style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 12 }}>
+                  NZD at 1 USD = {fx.rate.toFixed(4)} NZD (rate as of {new Date(fx.asOf).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}). Approximate, for reference.
+                </p>
+              )}
               <div className="grid grid-cols-2 md:grid-cols-3" style={{ gap: 12, marginBottom: 16 }}>
                 <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, border: '1px solid var(--border)' }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Total gain</p>
-                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 500, color: totalPL >= 0 ? 'var(--green)' : 'var(--red)' }}>{totalPL >= 0 ? '+' : ''}{fmtCurrency(totalPL)}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>since you started</p>
+                  <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 500, color: totalPL >= 0 ? 'var(--green)' : 'var(--red)' }}>{totalPL >= 0 ? '+' : ''}{fmtMoney(totalPL, 'USD')}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>{nz(totalPL) ? `≈ ${nz(totalPL)} NZD · since you started` : 'since you started'}</p>
                 </div>
                 <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 16, border: '1px solid var(--border)' }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Holdings</p>

@@ -25,6 +25,7 @@ export interface Holding {
   sector?: string | null
   is_verified?: boolean
   price_locked?: boolean
+  source?: string | null // 'akahu' when synced from Akahu; null for manual / CSV
 }
 
 type SortKey = 'ticker' | 'shares' | 'buy_price' | 'current_price' | 'pl' | 'plpct'

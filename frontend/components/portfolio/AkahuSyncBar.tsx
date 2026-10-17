@@ -13,7 +13,7 @@ const STALE_MS = 6 * 60 * 60 * 1000
 const RETRY_BACKOFF_MS = 10 * 60 * 1000
 const ATTEMPT_KEY = 'fennec_akahu_autosync_attempt'
 
-interface BrokerAccount {
+export interface BrokerAccount {
   connection: string
   currency: string
   totalBalance: number
@@ -44,7 +44,7 @@ function money(n: number, currency: string) {
   return n.toLocaleString('en-NZ', { style: 'currency', currency, maximumFractionDigits: 2 })
 }
 
-export function AkahuSyncBar({ onSynced }: { onSynced: () => void }) {
+export function AkahuSyncBar({ onSynced, onAccounts, refreshKey = 0 }: { onSynced: () => void; onAccounts?: (accounts: BrokerAccount[]) => void; refreshKey?: number }) {
   const supabase = createClient()
   const [status, setStatus] = useState<Status | null>(null)
   const [hasCreds, setHasCreds] = useState<boolean | null>(null)
@@ -59,6 +59,7 @@ export function AkahuSyncBar({ onSynced }: { onSynced: () => void }) {
       supabase.from('akahu_credentials').select('user_id').maybeSingle(),
     ])
     setStatus((statusRes.data as Status | null) ?? null)
+    onAccounts?.((statusRes.data as Status | null)?.broker_accounts ?? [])
     setHasCreds(!!credsRes.data)
     return { status: (statusRes.data as Status | null) ?? null, hasCreds: !!credsRes.data }
   }
@@ -98,6 +99,12 @@ export function AkahuSyncBar({ onSynced }: { onSynced: () => void }) {
       sync(false)
     })
   }, [])
+
+  // Re-read the stored status when the page changes something that affects it
+  // (e.g. removing unmatched holdings, then re-syncing to clear the stale note).
+  useEffect(() => {
+    if (refreshKey > 0) loadStatus()
+  }, [refreshKey])
 
   if (hasCreds === null) return null
 

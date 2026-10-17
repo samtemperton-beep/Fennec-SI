@@ -41,6 +41,9 @@ export const api = {
   getMarketTicker: () =>
     apiFetch('/api/prices/market-ticker'),
 
+  getFx: (): Promise<{ pair: 'USDNZD'; rate: number; asOf: string }> =>
+    apiFetch('/api/prices/fx'),
+
   getNews: (tickers: string[] = []) =>
     apiFetch(`/api/news${tickers.length ? `?tickers=${tickers.join(',')}` : ''}`),
 
