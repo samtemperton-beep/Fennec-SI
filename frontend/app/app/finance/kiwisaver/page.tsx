@@ -1,9 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
-import { projectKiwiSaver, GOVT_MTC_MAX, GOVT_MTC_FULL_AT, DEFAULT_INFLATION, type ProjectionPoint } from '@/lib/kiwisaver'
+import { projectRange, EMPLOYEE_RATES, FUND_RETURNS, RANGE_SPREAD, GOVT_MTC_MAX, GOVT_MTC_FULL_AT, DEFAULT_INFLATION, type ProjectionPoint, type ProjectionInput } from '@/lib/kiwisaver'
+import { WhatIf } from '@/components/kiwisaver/WhatIf'
 import { toast } from 'sonner'
 import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin, IconRefresh } from '@tabler/icons-react'
 
@@ -13,13 +14,11 @@ const PROVIDERS = [
   'ASB', 'BNZ', 'Westpac', 'Booster', 'Generate', 'Kernel', 'Other',
 ]
 // Default rate rose from 3% to 3.5% on 1 Apr 2026 (4% from 1 Apr 2028). 3% remains available as a temporary reduction.
-const EMPLOYEE_RATES = [3, 3.5, 4, 6, 8, 10]
-const FUND_TYPES: Record<string, { label: string; defaultReturn: number; color: string }> = {
-  conservative: { label: 'Conservative',  defaultReturn: 3.5, color: '#6366f1' },
-  balanced:     { label: 'Balanced',       defaultReturn: 5.5, color: '#0ea5e9' },
-  growth:       { label: 'Growth',         defaultReturn: 7.0, color: '#10b981' },
-  aggressive:   { label: 'Aggressive',     defaultReturn: 8.5, color: '#f59e0b' },
-}
+// (EMPLOYEE_RATES and the per-fund return guides live in lib/kiwisaver.ts so the what-if shares them.)
+const FUND_COLORS: Record<string, string> = { conservative: '#6366f1', balanced: '#0ea5e9', growth: '#10b981', aggressive: '#f59e0b' }
+const FUND_TYPES: Record<string, { label: string; defaultReturn: number; color: string }> = Object.fromEntries(
+  Object.entries(FUND_RETURNS).map(([k, v]) => [k, { ...v, color: FUND_COLORS[k] }])
+)
 
 function fmt(n: number) {
   return n.toLocaleString('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
@@ -35,10 +34,12 @@ function fmtAge(dob: string, targetAge: number): string {
   return y > 0 ? `${y}y ${m}m` : `${m} months`
 }
 // ── SVG line chart ────────────────────────────────────────────────────────────
-function ProjectionChart({ points, color }: { points: ProjectionPoint[]; color: string }) {
+function ProjectionChart({ points, color, band }: { points: ProjectionPoint[]; color: string; band?: { low: ProjectionPoint[]; high: ProjectionPoint[] } }) {
   if (points.length < 2) return null
   const W = 560, H = 180, PAD = { t: 12, r: 16, b: 32, l: 56 }
-  const maxBal = Math.max(...points.map(p => p.balance))
+  // The band's three series share the same months, so it lines up index for index.
+  const bandOk = !!band && band.low.length === points.length && band.high.length === points.length
+  const maxBal = Math.max(...points.map(p => p.balance), ...(bandOk ? band!.high.map(p => p.balance) : []))
   const minBal = 0
   // Space points by elapsed time, so a part-year at the end isn't drawn as a full year.
   const span = points[points.length - 1].months || 1
@@ -69,6 +70,17 @@ function ProjectionChart({ points, color }: { points: ProjectionPoint[]; color: 
           <text x={PAD.l - 6} y={cy(m) + 4} textAnchor="end" fontSize="9" fill="var(--text3)">${m >= 1000000 ? '1M' : m >= 1000 ? `${m / 1000}k` : m}</text>
         </g>
       ))}
+      {/* Range: results if returns run a couple of points lower / higher */}
+      {bandOk && (
+        <>
+          <polygon
+            points={[...band!.high.map((p, i) => `${cx(i).toFixed(1)},${cy(p.balance).toFixed(1)}`), ...band!.low.map((p, i) => `${cx(i).toFixed(1)},${cy(p.balance).toFixed(1)}`).reverse()].join(' ')}
+            fill={color} fillOpacity="0.1"
+          />
+          <path d={band!.high.map((p, i) => `${i === 0 ? 'M' : 'L'}${cx(i).toFixed(1)},${cy(p.balance).toFixed(1)}`).join(' ')} fill="none" stroke={color} strokeOpacity="0.45" strokeWidth="1.2" strokeDasharray="4,4" />
+          <path d={band!.low.map((p, i) => `${i === 0 ? 'M' : 'L'}${cx(i).toFixed(1)},${cy(p.balance).toFixed(1)}`).join(' ')} fill="none" stroke={color} strokeOpacity="0.45" strokeWidth="1.2" strokeDasharray="4,4" />
+        </>
+      )}
       {/* Fill */}
       <polygon points={fill} fill="url(#ks-grad)" />
       {/* Line */}
@@ -175,19 +187,19 @@ export default function KiwiSaverPage() {
   }
 
   const num = (v: any, fallback: number) => (v == null || v === '' || Number.isNaN(Number(v)) ? fallback : Number(v))
-  const model = settings
-    ? projectKiwiSaver({
-        dob: settings.date_of_birth,
-        retirementAge: num(settings.retirement_age, 65),
-        annualSalary: num(settings.annual_salary, 0),
-        employeeRate: num(settings.employee_rate, 3.5),
-        employerRate: num(settings.employer_rate, 3.5),
-        voluntaryMonthly: num(settings.voluntary_monthly, 0),
-        expectedReturn: num(settings.expected_return, 5.5),
-        currentBalance: num(settings.current_balance, 0),
-        inflation: real ? DEFAULT_INFLATION : null,
-      })
-    : null
+  const projectionInput: ProjectionInput | null = useMemo(() => settings ? {
+    dob: settings.date_of_birth,
+    retirementAge: num(settings.retirement_age, 65),
+    annualSalary: num(settings.annual_salary, 0),
+    employeeRate: num(settings.employee_rate, 3.5),
+    employerRate: num(settings.employer_rate, 3.5),
+    voluntaryMonthly: num(settings.voluntary_monthly, 0),
+    expectedReturn: num(settings.expected_return, 5.5),
+    currentBalance: num(settings.current_balance, 0),
+    inflation: real ? DEFAULT_INFLATION : null,
+  } : null, [settings, real])
+  const range = useMemo(() => (projectionInput ? projectRange(projectionInput) : null), [projectionInput])
+  const model = range?.expected ?? null
   const projection = model?.points ?? []
   const projected = model?.finalBalance ?? 0
   const contrib = model?.contributions ?? null
@@ -363,7 +375,10 @@ export default function KiwiSaverPage() {
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Projected at {settings.retirement_age}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{model ? fmt(projected) : '—'}</div>
               {model
-                ? <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>{fmtAge(settings.date_of_birth, settings.retirement_age)} away · {real ? "today's money" : 'future dollars'}</div>
+                ? <>
+                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>{fmtAge(settings.date_of_birth, settings.retirement_age)} away · {real ? "today's money" : 'future dollars'}</div>
+                    {range && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Range {fmt(range.low.finalBalance)} – {fmt(range.high.finalBalance)}</div>}
+                  </>
                 : <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>needs date of birth and salary</div>}
             </div>
             {/* Monthly contributions */}
@@ -428,9 +443,17 @@ export default function KiwiSaverPage() {
                   </div>
                 </div>
               </div>
-              <ProjectionChart points={projection} color={fundColor} />
+              <ProjectionChart points={projection} color={fundColor} band={range ? { low: range.low.points, high: range.high.points } : undefined} />
+              {range && (
+                <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 8, lineHeight: 1.5 }}>
+                  The shaded area shows the result if returns average {RANGE_SPREAD}% a year lower or higher than assumed: {fmt(range.low.finalBalance)} to {fmt(range.high.finalBalance)} at {settings.retirement_age}.
+                </p>
+              )}
             </div>
           )}
+
+          {/* Try changes (nothing is saved) */}
+          {projectionInput && projection.length > 1 && <WhatIf base={projectionInput} real={real} />}
 
           {/* Milestones */}
           {projection.length > 1 && (
