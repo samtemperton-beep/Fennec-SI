@@ -79,6 +79,8 @@ export interface Projection {
   memberAnnual: number
   /** Govt contribution currently being lost because member contributions are below the full-match level. */
   govtShortfallAnnual: number
+  /** Where the final balance comes from: start + member + employerNet + govt + growth = finalBalance. */
+  totals: { start: number; member: number; employerNet: number; govt: number; growth: number }
 }
 
 /** What goes into the account each month for someone of the given age. */
@@ -112,10 +114,16 @@ export function projectKiwiSaver(i: ProjectionInput): Projection | null {
     points.push({ year: d.getFullYear(), age: Math.round(startAge + m / 12), balance: Math.round(balance), months: m })
   }
 
-  let balance = Number(i.currentBalance) || 0
+  const start = Number(i.currentBalance) || 0
+  let balance = start
+  let member = 0, employerNet = 0, govt = 0
   for (let m = 0; m < totalMonths; m++) {
     if (m % 12 === 0) pointAt(m, balance)
-    balance = balance * (1 + monthlyRate) + monthlyContributions(i, startAge + m / 12).total
+    const c = monthlyContributions(i, startAge + m / 12)
+    member += c.employee + c.voluntary
+    employerNet += c.employerNet
+    govt += c.govt
+    balance = balance * (1 + monthlyRate) + c.total
   }
   // Always end exactly at retirement, including any part-year at the end.
   pointAt(totalMonths, balance)
@@ -129,5 +137,56 @@ export function projectKiwiSaver(i: ProjectionInput): Projection | null {
     contributions,
     memberAnnual,
     govtShortfallAnnual: eligibleNow ? Math.max(0, GOVT_MTC_MAX - GOVT_MTC_RATE * memberAnnual) : 0,
+    totals: { start, member, employerNet, govt, growth: balance - start - member - employerNet - govt },
   }
+}
+
+// ── Scenarios and ranges ─────────────────────────────────────────────────────
+
+export const EMPLOYEE_RATES = [3, 3.5, 4, 6, 8, 10]
+
+/** Rough long-run return guides per fund type (after fees and tax). Illustrative, not forecasts. */
+export const FUND_RETURNS: Record<string, { label: string; defaultReturn: number }> = {
+  conservative: { label: 'Conservative', defaultReturn: 3.5 },
+  balanced:     { label: 'Balanced',     defaultReturn: 5.5 },
+  growth:       { label: 'Growth',       defaultReturn: 7.0 },
+  aggressive:   { label: 'Aggressive',   defaultReturn: 8.5 },
+}
+
+/** The range shown around a projection: returns this many points a year lower / higher. */
+export const RANGE_SPREAD = 2
+
+export interface Scenario {
+  voluntaryMonthly?: number
+  employeeRate?: number
+  expectedReturn?: number
+  retirementAge?: number
+}
+
+/** The same inputs with some values changed. Undefined fields keep the base value. */
+export function withScenario(base: ProjectionInput, s: Scenario): ProjectionInput {
+  return {
+    ...base,
+    voluntaryMonthly: s.voluntaryMonthly ?? base.voluntaryMonthly,
+    employeeRate: s.employeeRate ?? base.employeeRate,
+    expectedReturn: s.expectedReturn ?? base.expectedReturn,
+    retirementAge: s.retirementAge ?? base.retirementAge,
+  }
+}
+
+export interface ProjectionRange {
+  low: Projection
+  expected: Projection
+  high: Projection
+}
+
+/** Expected projection plus one with returns RANGE_SPREAD lower and one RANGE_SPREAD higher (never below 0%). */
+export function projectRange(i: ProjectionInput, spread: number = RANGE_SPREAD): ProjectionRange | null {
+  const now = i.now ?? new Date() // shared so all three line up month for month
+  const at = (r: number) => projectKiwiSaver({ ...i, now, expectedReturn: Math.max(0, r) })
+  const low = at(i.expectedReturn - spread)
+  const expected = at(i.expectedReturn)
+  const high = at(i.expectedReturn + spread)
+  if (!low || !expected || !high) return null
+  return { low, expected, high }
 }

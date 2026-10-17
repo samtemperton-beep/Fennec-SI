@@ -2,7 +2,8 @@ import { Router } from 'express';
 import axios from 'axios';
 import { fetchPrices, fetchQuote, fetchChart, searchSymbols } from '../services/yahoo';
 import { requireAuth } from '../middleware/auth';
-import { getUsdNzd } from '../services/fx';
+import { getUsdNzd, getRateToNzd } from '../services/fx';
+import { getProfiles } from '../services/profiles';
 
 const router = Router();
 
@@ -77,6 +78,25 @@ router.get('/fx', async (_req, res) => {
   if (!fx) return res.status(503).json({ error: 'Exchange rate unavailable' });
   res.set('Cache-Control', 'public, max-age=300');
   res.json(fx);
+});
+
+// GET /api/prices/fx-rates?currencies=USD,AUD — NZD per 1 unit of each currency,
+// so mixed-market portfolios can be compared on one scale. null = no rate available.
+router.get('/fx-rates', async (req, res) => {
+  const currencies = [...new Set(String(req.query.currencies || '').split(',').map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{3}$/.test(c)))].slice(0, 6);
+  const rates: Record<string, number | null> = {};
+  for (const c of currencies) rates[c] = await getRateToNzd(c);
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ base: 'NZD', rates });
+});
+
+// GET /api/prices/profiles?tickers=AAPL,SPY — industry per ticker (cached 24h).
+// Auth required because each uncached ticker costs a call against the Finnhub quota.
+router.get('/profiles', requireAuth, async (req, res) => {
+  const tickers = String(req.query.tickers || '').split(',').filter(Boolean);
+  if (tickers.length === 0) return res.json({ profiles: {} });
+  res.set('Cache-Control', 'private, max-age=3600');
+  res.json({ profiles: await getProfiles(tickers) });
 });
 
 router.get('/search', requireAuth, async (req, res) => {

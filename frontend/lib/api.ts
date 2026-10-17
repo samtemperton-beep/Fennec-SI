@@ -61,6 +61,12 @@ export const api = {
   getMarketTicker: () =>
     apiFetch('/api/prices/market-ticker'),
 
+  getProfiles: (tickers: string[]): Promise<{ profiles: Record<string, { status: 'ok' | 'empty' | 'error'; industry: string | null; name: string | null }> }> =>
+    apiFetch(`/api/prices/profiles?tickers=${encodeURIComponent(tickers.join(','))}`),
+
+  getFxRates: (currencies: string[]): Promise<{ base: 'NZD'; rates: Record<string, number | null> }> =>
+    apiFetch(`/api/prices/fx-rates?currencies=${encodeURIComponent(currencies.join(','))}`),
+
   getFx: (): Promise<{ pair: 'USDNZD'; rate: number; asOf: string }> =>
     apiFetch('/api/prices/fx'),
 
