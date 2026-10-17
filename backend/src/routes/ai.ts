@@ -107,6 +107,44 @@ router.post('/chat', requireAuth, async (req, res) => {
   res.end();
 });
 
+// Dashboard daily briefing. Written once per user per day from a compact
+// snapshot the dashboard sends (net worth, cash flow, notifications), then
+// cached, so opening the dashboard repeatedly never re-spends AI quota. An
+// explicit refresh regenerates it and counts toward a free user's daily limit.
+router.post('/daily-summary', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  const isPremium = (req as any).isPremium;
+  const { facts, date, refresh } = req.body ?? {};
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'date (YYYY-MM-DD) required' });
+  }
+  if (!facts || typeof facts !== 'object' || JSON.stringify(facts).length > 8000) {
+    return res.status(400).json({ error: 'facts object required (max 8KB)' });
+  }
+
+  const cacheKey = `daily-summary:${user.id}:${date}`;
+  if (!refresh) {
+    const cached = await getCached(cacheKey);
+    if (cached) return res.json({ ...cached, cached: true });
+  } else if (!isPremium) {
+    const allowed = await checkAndIncrementUsage(req, res);
+    if (!allowed) return;
+  }
+
+  try {
+    const settings = await getPlatformSettings();
+    const text = isPremium
+      ? await claude.dailySummary(facts, user.user_metadata?.anthropic_key, settings['model_summary'])
+      : await gemini.dailySummary(facts);
+    if (!text) return res.status(502).json({ error: 'The summary came back empty. Try again shortly.' });
+    const result = { summary: text, generatedAt: new Date().toISOString() };
+    await setCached(cacheKey, result, 24);
+    res.json({ ...result, cached: false });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Top 10: free users see results but it counts toward their daily quota (cached so rarely hits)
 router.post('/top10', requireAuth, async (req, res) => {
   const { market = 'US', timeframe = '12mo', newsContext } = req.body;

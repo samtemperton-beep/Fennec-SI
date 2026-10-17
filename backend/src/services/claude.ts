@@ -329,3 +329,29 @@ Provide concise, actionable investment advice. Use specific numbers and data. Be
     }
   }
 }
+
+// ── Dashboard daily summary ───────────────────────────────────────────────────
+
+export function dailySummaryPrompt(facts: unknown) {
+  return `You are Fennec, the friendly fox who looks after this person's money in the Fennec app (New Zealand, NZD).
+
+Here is today's snapshot of their finances as JSON:
+${JSON.stringify(facts)}
+
+Write their daily briefing:
+- 2 to 3 short sentences, under 70 words in total, plain text (no markdown, no lists, no emoji)
+- Lead with the single most important thing (anything overdue, over budget or past a threshold), then how things are tracking overall
+- Use the actual numbers from the snapshot; never invent figures or items that aren't in it
+- Warm and direct, NZ English, speak to them as "you"
+- Don't tell them to buy or sell any particular investment
+- If there's nothing pressing, say so and mention one thing that's going well`;
+}
+
+export async function dailySummary(facts: unknown, apiKey?: string, model?: string): Promise<string> {
+  const msg = await getClient(apiKey).messages.create({
+    model: model || MODEL,
+    max_tokens: 300,
+    messages: [{ role: 'user', content: dailySummaryPrompt(facts) }],
+  });
+  return ((msg.content[0] as any)?.text ?? '').trim();
+}

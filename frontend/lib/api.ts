@@ -147,6 +147,9 @@ export const api = {
   getAiUsage: () =>
     apiFetch('/api/ai/usage'),
 
+  getDailySummary: (facts: object, date: string, refresh = false): Promise<{ summary: string; generatedAt: string; cached: boolean }> =>
+    apiFetch('/api/ai/daily-summary', { method: 'POST', body: JSON.stringify({ facts, date, refresh }) }),
+
   verifyPortfolio: (documentBase64: string, mediaType: string) =>
     apiFetch('/api/premium/verify', { method: 'POST', body: JSON.stringify({ documentBase64, mediaType }) }),
 

@@ -121,3 +121,8 @@ export async function* streamHelper(messages: any[], context?: { pageHint?: stri
     if (chunk.text) yield chunk.text;
   }
 }
+
+export async function dailySummary(facts: unknown): Promise<string> {
+  const { dailySummaryPrompt } = await import('./claude');
+  return (await generate(dailySummaryPrompt(facts), 400)).trim();
+}
