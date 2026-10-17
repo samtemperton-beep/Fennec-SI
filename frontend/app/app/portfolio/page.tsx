@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { PortfolioGoal } from '@/components/portfolio/PortfolioGoal'
 import { AkahuSyncBar, type BrokerAccount } from '@/components/portfolio/AkahuSyncBar'
 import { UnmatchedHoldings } from '@/components/portfolio/UnmatchedHoldings'
+import { PortfolioBalance } from '@/components/portfolio/PortfolioBalance'
 import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
 import { VerifyPortfolioModal } from '@/components/premium/VerifyPortfolioModal'
@@ -464,6 +465,8 @@ export default function PortfolioPage() {
       )}
 
       <SnapshotHistory kind="broker" title="Portfolio value history" valueLabel="Holdings value" investedLabel="Cost basis" refreshKey={historyKey} />
+
+      {!loading && holdings.length > 0 && <PortfolioBalance holdings={holdings} riskLevel={riskLevel} />}
 
       {!loading && !isPremium && holdings.length >= 8 && holdings.length < 10 && (
         <div style={{ marginBottom: 16, padding: '8px 14px', borderRadius: 8, background: 'var(--amber-light)', border: '1px solid var(--amber)', fontSize: 12, color: 'var(--amber)' }}>
