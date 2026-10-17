@@ -2,8 +2,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+import { toast } from 'sonner'
 import { api, type NetWorthResponse } from '@/lib/api'
-import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
+import { NetWorthCard, type NetWorthPart } from '@/components/dashboard/NetWorthCard'
 import {
   IconBuildingBank, IconTarget, IconArrowRight,
   IconChartBar, IconArrowsExchange, IconWallet, IconNewSection,
@@ -20,6 +21,8 @@ export default function DashboardPage() {
   const [netWorthError, setNetWorthError] = useState<string | null>(null)
   const [monthSpend, setMonthSpend] = useState<number | null>(null)
   const [goals, setGoals] = useState<any[]>([])
+  const [excluded, setExcluded] = useState<NetWorthPart[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -27,6 +30,10 @@ export default function DashboardPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
+      setUserId(user.id)
+      // Separate from the main profile read so the dashboard still loads if the column isn't there yet.
+      supabase.from('profiles').select('networth_excluded').eq('id', user.id).single()
+        .then(({ data }) => { if (Array.isArray(data?.networth_excluded)) setExcluded(data.networth_excluded) })
 
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
       // fin_goals and fin_transactions are household-scoped by RLS (goals have no user_id
@@ -56,6 +63,14 @@ export default function DashboardPage() {
     setDateLabel(new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' }))
   }, [])
 
+  async function toggleNetWorthPart(part: NetWorthPart) {
+    const next = excluded.includes(part) ? excluded.filter(p => p !== part) : [...excluded, part]
+    setExcluded(next)
+    if (!userId) return
+    const { error } = await supabase.from('profiles').update({ networth_excluded: next }).eq('id', userId)
+    if (error) toast.error(`Couldn't save that preference: ${error.message}`)
+  }
+
   const noData = !loading && netWorth?.current && !netWorth.current.hasData
 
   const quickLinks = [
@@ -80,7 +95,7 @@ export default function DashboardPage() {
         <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>{dateLabel}</p>
       </div>
 
-      <NetWorthCard data={netWorth} loading={loading} error={netWorthError} />
+      <NetWorthCard data={netWorth} loading={loading} error={netWorthError} excluded={excluded} onToggle={toggleNetWorthPart} />
 
       {noData && (
         <div style={{ ...card, marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>

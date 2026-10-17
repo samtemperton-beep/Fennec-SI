@@ -2,13 +2,24 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { NetWorthResponse } from '@/lib/api'
+import { IconAdjustmentsHorizontal, IconCheck } from '@tabler/icons-react'
+import type { NetWorthBreakdown, NetWorthResponse } from '@/lib/api'
+
+export type NetWorthPart = 'bank' | 'investments' | 'kiwisaver' | 'property' | 'debt'
 
 const RANGES = [
   { label: '1M', days: 31 },
   { label: '3M', days: 92 },
   { label: '1Y', days: 366 },
   { label: 'All', days: Infinity },
+]
+
+const PARTS: { key: NetWorthPart; label: string; href: string }[] = [
+  { key: 'bank',        label: 'Bank',        href: '/app/finance/accounts' },
+  { key: 'investments', label: 'Investments', href: '/app/portfolio' },
+  { key: 'kiwisaver',   label: 'KiwiSaver',   href: '/app/finance/kiwisaver' },
+  { key: 'property',    label: 'Property',    href: '/app/finance/homeloan' },
+  { key: 'debt',        label: 'Home loan',   href: '/app/finance/homeloan' },
 ]
 
 const PROPERTY_SOURCE: Record<string, string> = {
@@ -30,39 +41,53 @@ function shortDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
 }
 
-export function NetWorthCard({ data, loading, error }: { data: NetWorthResponse | null; loading: boolean; error: string | null }) {
+// Snapshots store every component, so any combination can be re-totalled — history included.
+function totalOf(b: NetWorthBreakdown, excluded: NetWorthPart[]) {
+  return PARTS.reduce((s, p) => (excluded.includes(p.key) ? s : s + b[p.key]), 0)
+}
+
+export function NetWorthCard({ data, loading, error, excluded, onToggle }: {
+  data: NetWorthResponse | null
+  loading: boolean
+  error: string | null
+  excluded: NetWorthPart[]
+  onToggle: (part: NetWorthPart) => void
+}) {
   const [range, setRange] = useState('3M')
+  const [editing, setEditing] = useState(false)
 
   const points = useMemo(() => {
-    const history = data?.history ?? []
+    const history = (data?.history ?? []).map(p => ({ date: p.date, total: totalOf(p, excluded) }))
     const days = RANGES.find(r => r.label === range)?.days ?? Infinity
     if (!Number.isFinite(days)) return history
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - days)
     const cut = cutoff.toISOString().slice(0, 10)
     return history.filter(p => p.date >= cut)
-  }, [data, range])
+  }, [data, range, excluded])
 
   const current = data?.current
+  const total = current ? totalOf(current, excluded) : null
   const first = points[0]
-  const change = current && first && points.length >= 2 ? current.total - first.total : null
+  const change = total !== null && first && points.length >= 2 ? total - first.total : null
   const changePct = change !== null && first && first.total !== 0 ? (change / Math.abs(first.total)) * 100 : null
 
-  const parts = current ? [
-    { label: 'Bank', value: current.bank, href: '/app/finance/accounts' },
-    { label: 'Investments', value: current.investments, href: '/app/portfolio' },
-    { label: 'KiwiSaver', value: current.kiwisaver, href: '/app/finance/kiwisaver' },
-    { label: 'Property', value: current.property, href: '/app/finance/homeloan',
-      note: current.propertySource ? PROPERTY_SOURCE[current.propertySource] : 'add on Home Loan' },
-    { label: 'Home loan', value: current.debt, href: '/app/finance/homeloan' },
-  ].filter(p => p.value !== 0 || p.label === 'Property') : []
+  // Outside edit mode, hide parts that are empty (except Property, which prompts setup).
+  const visibleParts = current
+    ? PARTS.filter(p => editing || current[p.key] !== 0 || p.key === 'property')
+    : []
 
   return (
     <section className="nw-card">
       <div className="nw-head">
         <div style={{ minWidth: 0 }}>
-          <div className="nw-eyebrow">Net worth</div>
-          <div className="nw-total">{loading ? '—' : current ? fmt(current.total) : '—'}</div>
+          <div className="nw-eyebrow">
+            Net worth
+            {excluded.length > 0 && !editing && (
+              <span className="nw-badge">excl. {excluded.map(k => PARTS.find(p => p.key === k)!.label.toLowerCase()).join(', ')}</span>
+            )}
+          </div>
+          <div className="nw-total">{loading || total === null ? '—' : fmt(total)}</div>
           <div className="nw-change">
             {change !== null ? (
               <>
@@ -122,16 +147,49 @@ export function NetWorthCard({ data, loading, error }: { data: NetWorthResponse 
         ) : null}
       </div>
 
-      {parts.length > 0 && (
-        <div className="nw-parts">
-          {parts.map(p => (
-            <Link key={p.label} href={p.href} className="nw-part">
-              <span className="nw-part-label">{p.label}</span>
-              <span className="nw-part-value">{p.value === 0 && p.label === 'Property' ? '—' : fmt(p.value, { compact: Math.abs(p.value) >= 100000 })}</span>
-              {p.note && <span className="nw-part-note">{p.note}</span>}
-            </Link>
-          ))}
-        </div>
+      {current && (
+        <>
+          <div className="nw-parts-head">
+            <span>{editing ? 'Choose what counts towards your net worth' : 'Made up of'}</span>
+            <button onClick={() => setEditing(e => !e)} className="nw-edit" aria-pressed={editing}>
+              {editing ? <><IconCheck size={13} /> Done</> : <><IconAdjustmentsHorizontal size={13} /> Edit</>}
+            </button>
+          </div>
+          <div className="nw-parts">
+            {visibleParts.map(p => {
+              const value = current[p.key]
+              const isOff = excluded.includes(p.key)
+              const note = p.key === 'property'
+                ? (current.propertySource ? PROPERTY_SOURCE[current.propertySource] : 'add on Home Loan')
+                : null
+              const body = (
+                <>
+                  <span className="nw-part-label">
+                    {editing && <span className={`nw-check ${isOff ? '' : 'on'}`} aria-hidden>{!isOff && <IconCheck size={10} />}</span>}
+                    {p.label}
+                  </span>
+                  <span className="nw-part-value">{value === 0 && p.key === 'property' ? '—' : fmt(value, { compact: Math.abs(value) >= 100000 })}</span>
+                  {note && <span className="nw-part-note">{note}</span>}
+                </>
+              )
+              return editing ? (
+                <button
+                  key={p.key}
+                  onClick={() => onToggle(p.key)}
+                  className={`nw-part ${isOff ? 'off' : ''}`}
+                  role="switch"
+                  aria-checked={!isOff}
+                >
+                  {body}
+                </button>
+              ) : (
+                <Link key={p.key} href={p.href} className={`nw-part ${isOff ? 'off' : ''}`}>
+                  {body}
+                </Link>
+              )
+            })}
+          </div>
+        </>
       )}
 
       {current && current.missingFx.length > 0 && (
