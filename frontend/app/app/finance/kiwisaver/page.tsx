@@ -3,15 +3,11 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
+import { projectKiwiSaver, GOVT_MTC_MAX, GOVT_MTC_FULL_AT, DEFAULT_INFLATION, type ProjectionPoint } from '@/lib/kiwisaver'
 import { toast } from 'sonner'
 import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin, IconRefresh } from '@tabler/icons-react'
 
-// ── NZ KiwiSaver constants ───────────────────────────────────────────────────
-// Government contribution: 25c per $1 contributed, max $260.72/yr (halved from 50c / $521.43 on 1 Jul 2025),
-// for members earning $180k or less. https://www.ird.govt.nz/kiwisaver-changes
-const GOVT_MTC_MAX = 260.72
-const GOVT_MTC_MONTHLY = GOVT_MTC_MAX / 12
-
+// Rules and the projection maths live in lib/kiwisaver.ts (tested separately).
 const PROVIDERS = [
   'Simplicity', 'Fisher Funds', 'Milford', 'SuperLife', 'ANZ',
   'ASB', 'BNZ', 'Westpac', 'Booster', 'Generate', 'Kernel', 'Other',
@@ -38,57 +34,15 @@ function fmtAge(dob: string, targetAge: number): string {
   const m = months % 12
   return y > 0 ? `${y}y ${m}m` : `${m} months`
 }
-function yearsTo(dob: string, targetAge: number): number {
-  const birth = new Date(dob)
-  const retire = new Date(birth.getFullYear() + targetAge, birth.getMonth(), birth.getDate())
-  const now = new Date()
-  return Math.max(0, (retire.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 365.25))
-}
-function currentAge(dob: string): number {
-  const birth = new Date(dob)
-  const now = new Date()
-  return (now.getTime() - birth.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
-}
-
-// ── Projection engine ─────────────────────────────────────────────────────────
-interface ProjectionPoint { year: number; age: number; balance: number }
-
-function projectBalance(settings: any): ProjectionPoint[] {
-  if (!settings.date_of_birth || !settings.annual_salary) return []
-
-  const yearsLeft = yearsTo(settings.date_of_birth, settings.retirement_age)
-  const monthlyRate = (settings.expected_return / 100) / 12
-  const monthlyEmployee = ((settings.annual_salary * (settings.employee_rate / 100)) / 12)
-  const monthlyEmployer = ((settings.annual_salary * (settings.employer_rate / 100)) / 12)
-  const monthlyVoluntary = Number(settings.voluntary_monthly) || 0
-  const monthlyPMT = monthlyEmployee + monthlyEmployer + monthlyVoluntary + GOVT_MTC_MONTHLY
-
-  const points: ProjectionPoint[] = []
-  let balance = Number(settings.current_balance) || 0
-  const agNow = currentAge(settings.date_of_birth)
-  const totalMonths = Math.round(yearsLeft * 12)
-
-  for (let m = 0; m <= totalMonths; m += 12) {
-    points.push({
-      year: new Date().getFullYear() + Math.floor(m / 12),
-      age: Math.round(agNow + m / 12),
-      balance: Math.round(balance),
-    })
-    // compound monthly for next 12 months
-    for (let i = 0; i < 12 && m + i < totalMonths; i++) {
-      balance = balance * (1 + monthlyRate) + monthlyPMT
-    }
-  }
-  return points
-}
-
 // ── SVG line chart ────────────────────────────────────────────────────────────
 function ProjectionChart({ points, color }: { points: ProjectionPoint[]; color: string }) {
   if (points.length < 2) return null
   const W = 560, H = 180, PAD = { t: 12, r: 16, b: 32, l: 56 }
   const maxBal = Math.max(...points.map(p => p.balance))
   const minBal = 0
-  const cx = (i: number) => PAD.l + (i / (points.length - 1)) * (W - PAD.l - PAD.r)
+  // Space points by elapsed time, so a part-year at the end isn't drawn as a full year.
+  const span = points[points.length - 1].months || 1
+  const cx = (i: number) => PAD.l + (points[i].months / span) * (W - PAD.l - PAD.r)
   const cy = (b: number) => H - PAD.b - ((b - minBal) / (maxBal - minBal || 1)) * (H - PAD.t - PAD.b)
 
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${cx(i).toFixed(1)},${cy(p.balance).toFixed(1)}`).join(' ')
@@ -120,8 +74,13 @@ function ProjectionChart({ points, color }: { points: ProjectionPoint[]; color: 
       {/* Line */}
       <path d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       {/* X labels */}
-      {points.filter((_, i) => i % step === 0 || i === points.length - 1).map((p, idx, arr) => (
-        <text key={p.year} x={cx(points.indexOf(p))} y={H - 6} textAnchor="middle" fontSize="9" fill="var(--text3)">{p.year}</text>
+      {points.map((p, i) => ({ p, i })).filter(({ p, i }) => {
+        if (i === points.length - 1) return true
+        if (i % step !== 0) return false
+        // Don't draw a label that would collide with the final one.
+        return p.year !== points[points.length - 1].year && (points[points.length - 1].months - p.months) >= 6
+      }).map(({ p, i }) => (
+        <text key={`${p.year}-${i}`} x={cx(i)} y={H - 6} textAnchor="middle" fontSize="9" fill="var(--text3)">{p.year}</text>
       ))}
       {/* Final dot */}
       <circle cx={cx(points.length - 1)} cy={cy(points[points.length - 1].balance)} r="4" fill={color} />
@@ -140,6 +99,7 @@ export default function KiwiSaverPage() {
   const [hasCreds, setHasCreds] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [historyKey, setHistoryKey] = useState(0) // bumped after each sync to reload the history chart
+  const [real, setReal] = useState(true) // show projections in today's money rather than future dollars
 
   // Fields Akahu owns once an account is linked; the form must not write them back.
   const AKAHU_OWNED = ['provider', 'current_balance', 'akahu_account_id', 'akahu_returns', 'pir', 'akahu_synced_at']
@@ -195,21 +155,43 @@ export default function KiwiSaverPage() {
 
   async function save() {
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const editable = isSynced
-      ? Object.fromEntries(Object.entries(form).filter(([k]) => !AKAHU_OWNED.includes(k)))
-      : form
-    const payload = { ...editable, user_id: user.id, last_updated: new Date().toISOString() }
-    const { data, error } = await supabase.from('fin_kiwisaver').upsert(payload, { onConflict: 'user_id' }).select().single()
-    if (!error && data) { setSettings(data); setForm(data) }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('You are signed out. Sign in again to save.')
+      const editable = isSynced
+        ? Object.fromEntries(Object.entries(form).filter(([k]) => !AKAHU_OWNED.includes(k)))
+        : form
+      const payload = { ...editable, user_id: user.id, last_updated: new Date().toISOString() }
+      const { data, error } = await supabase.from('fin_kiwisaver').upsert(payload, { onConflict: 'user_id' }).select().single()
+      if (error || !data) throw new Error(error?.message ?? 'Could not save')
+      setSettings(data)
+      setForm(data)
+      setEditing(false)
+    } catch (e: any) {
+      // Keep the form open so nothing the user typed is lost.
+      toast.error(`Could not save: ${e.message}`)
+    }
     setSaving(false)
-    setEditing(false)
   }
 
-  const projection = settings ? projectBalance(settings) : []
-  const projected = projection.length > 0 ? projection[projection.length - 1].balance : 0
-  const yearsLeft = settings?.date_of_birth ? yearsTo(settings.date_of_birth, settings.retirement_age) : null
+  const num = (v: any, fallback: number) => (v == null || v === '' || Number.isNaN(Number(v)) ? fallback : Number(v))
+  const model = settings
+    ? projectKiwiSaver({
+        dob: settings.date_of_birth,
+        retirementAge: num(settings.retirement_age, 65),
+        annualSalary: num(settings.annual_salary, 0),
+        employeeRate: num(settings.employee_rate, 3.5),
+        employerRate: num(settings.employer_rate, 3.5),
+        voluntaryMonthly: num(settings.voluntary_monthly, 0),
+        expectedReturn: num(settings.expected_return, 5.5),
+        currentBalance: num(settings.current_balance, 0),
+        inflation: real ? DEFAULT_INFLATION : null,
+      })
+    : null
+  const projection = model?.points ?? []
+  const projected = model?.finalBalance ?? 0
+  const contrib = model?.contributions ?? null
+  const needsDetails = !!settings && !model
   const fundColor = FUND_TYPES[settings?.fund_type]?.color ?? '#0ea5e9'
 
   const milestones = [
@@ -218,10 +200,6 @@ export default function KiwiSaverPage() {
     { label: '$500k', value: 500000 },
     { label: '$1M',   value: 1000000 },
   ]
-
-  const monthlyEmployee = settings?.annual_salary ? settings.annual_salary * (settings.employee_rate / 100) / 12 : 0
-  const monthlyEmployer = settings?.annual_salary ? settings.annual_salary * (settings.employer_rate / 100) / 12 : 0
-  const totalMonthly = monthlyEmployee + monthlyEmployer + (Number(settings?.voluntary_monthly) || 0) + GOVT_MTC_MONTHLY
 
   if (loading) return <div style={{ padding: 32, color: 'var(--text3)' }}>Loading…</div>
 
@@ -324,7 +302,7 @@ export default function KiwiSaverPage() {
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Expected annual return (%)</label>
               <input type="number" value={form.expected_return || 5.5} onChange={e => setForm((f: any) => ({ ...f, expected_return: Number(e.target.value) }))} step={0.5} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
-              <span style={{ fontSize: 10, color: 'var(--text3)' }}>Historical NZ avg: balanced ≈ 5.5%, growth ≈ 7%</span>
+              <span style={{ fontSize: 10, color: 'var(--text3)' }}>After fees and tax. Balanced ≈ 5.5%, growth ≈ 7% are rough long-run guides, not promises.</span>
             </div>
           </div>
         </div>
@@ -332,6 +310,38 @@ export default function KiwiSaverPage() {
 
       {settings && (
         <>
+          {/* Akahu supplies the balance but not age or pay, so ask for the two things the projection needs. */}
+          {needsDetails && !editing && (
+            <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 14, padding: '18px 20px', marginBottom: 20 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Add two details to see your retirement projection</p>
+              <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 14 }}>
+                Your provider shares your balance, but not your age or pay. These are saved to your account only and used to work out your projection.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Date of birth</label>
+                  <input type="date" value={form.date_of_birth || ''} onChange={e => setForm((f: any) => ({ ...f, date_of_birth: e.target.value }))} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Annual salary before tax (NZD)</label>
+                  <input type="number" min={0} value={form.annual_salary || ''} onChange={e => setForm((f: any) => ({ ...f, annual_salary: Number(e.target.value) }))} placeholder="e.g. 70000" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
+                </div>
+              </div>
+              <button
+                onClick={save}
+                disabled={saving || !form.date_of_birth || !(Number(form.annual_salary) > 0)}
+                style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--primary)', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving || !form.date_of_birth || !(Number(form.annual_salary) > 0) ? 0.5 : 1 }}
+              >
+                {saving ? 'Saving…' : 'Show my projection'}
+              </button>
+              {isSynced && (
+                <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, lineHeight: 1.5 }}>
+                  Assuming a {FUND_TYPES[settings.fund_type]?.label ?? 'Balanced'} fund at {settings.expected_return}% a year, because your provider doesn&apos;t tell us which fund you&apos;re in. Use Edit to change it.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Summary cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
             {/* Current balance */}
@@ -351,44 +361,56 @@ export default function KiwiSaverPage() {
             {/* Projected at retirement */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Projected at {settings.retirement_age}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{projected > 0 ? fmt(projected) : '—'}</div>
-              {settings.date_of_birth && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>{fmtAge(settings.date_of_birth, settings.retirement_age)} away</div>}
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{model ? fmt(projected) : '—'}</div>
+              {model
+                ? <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>{fmtAge(settings.date_of_birth, settings.retirement_age)} away · {real ? "today's money" : 'future dollars'}</div>
+                : <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>needs date of birth and salary</div>}
             </div>
             {/* Monthly contributions */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Monthly Into KiwiSaver</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{settings.annual_salary ? fmt(totalMonthly) : '—'}</div>
-              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>incl. govt contribution ~{fmt(GOVT_MTC_MONTHLY)}/mo</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{contrib ? fmt(contrib.total) : '—'}</div>
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
+                {contrib ? (contrib.govt > 0 ? `incl. govt contribution ~${fmt(contrib.govt)}/mo` : 'no govt contribution applies') : 'needs date of birth and salary'}
+              </div>
             </div>
           </div>
 
           <SnapshotHistory kind="kiwisaver" title="KiwiSaver balance history" valueLabel="Balance" investedLabel="Balance less returns" refreshKey={historyKey} />
 
           {/* Contribution breakdown */}
-          {settings.annual_salary > 0 && (
+          {contrib && model && (
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 20px', marginBottom: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Monthly contribution breakdown</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {[
-                  { label: `You (${settings.employee_rate}%)`, amount: monthlyEmployee, color: fundColor },
-                  { label: `Employer (${settings.employer_rate}%)`, amount: monthlyEmployer, color: '#10b981' },
-                  { label: 'Govt contribution', amount: GOVT_MTC_MONTHLY, color: '#f59e0b' },
-                  ...(settings.voluntary_monthly > 0 ? [{ label: 'Voluntary top-up', amount: Number(settings.voluntary_monthly), color: '#8b5cf6' }] : []),
+                  { label: `You (${settings.employee_rate}%)`, amount: contrib.employee, color: fundColor },
+                  { label: `Employer (${settings.employer_rate}%, after tax)`, amount: contrib.employerNet, color: '#10b981' },
+                  ...(contrib.govt > 0 ? [{ label: 'Govt contribution', amount: contrib.govt, color: '#f59e0b' }] : []),
+                  ...(contrib.voluntary > 0 ? [{ label: 'Voluntary top-up', amount: contrib.voluntary, color: '#8b5cf6' }] : []),
                 ].map(row => (
                   <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: row.color, flexShrink: 0 }} />
                     <span style={{ fontSize: 12, color: 'var(--text2)', flex: 1 }}>{row.label}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmt(row.amount)}</span>
                     <div style={{ width: 120, height: 5, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(100, (row.amount / totalMonthly) * 100)}%`, background: row.color, borderRadius: 3 }} />
+                      <div style={{ height: '100%', width: `${Math.min(100, (row.amount / contrib.total) * 100)}%`, background: row.color, borderRadius: 3 }} />
                     </div>
                   </div>
                 ))}
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2, display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Total</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{fmt(totalMonthly)}/mo</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{fmt(contrib.total)}/mo</span>
                 </div>
               </div>
+              <p style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.6, marginTop: 10 }}>
+                Your employer pays {fmt(contrib.employerGross)}/mo, but {parseFloat((contrib.esctRate * 100).toFixed(1))}% of it goes in tax (employer superannuation contribution tax) before reaching your account, so {fmt(contrib.employerNet)} arrives.
+              </p>
+              {model.govtShortfallAnnual > 1 && (
+                <p style={{ fontSize: 11, color: 'var(--amber)', lineHeight: 1.6, marginTop: 6 }}>
+                  You&apos;re missing out on about {fmt(model.govtShortfallAnnual)} a year of government money. Your own contributions are {fmt(model.memberAnnual)}/yr; reaching {fmt(GOVT_MTC_FULL_AT)}/yr gets the full {fmt(GOVT_MTC_MAX)}.
+                </p>
+              )}
             </div>
           )}
 
@@ -397,7 +419,14 @@ export default function KiwiSaverPage() {
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Projected growth</span>
-                <span style={{ fontSize: 11, color: 'var(--text3)' }}>at {settings.expected_return}% p.a.</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>at {settings.expected_return}% p.a.{real ? `, ${DEFAULT_INFLATION}% inflation` : ''}</span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {([[true, 'Today’s money'], [false, 'Future dollars']] as [boolean, string][]).map(([v, label]) => (
+                      <button key={label} onClick={() => setReal(v)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border)', background: real === v ? 'var(--primary-light)' : 'transparent', color: real === v ? 'var(--primary)' : 'var(--text2)' }}>{label}</button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <ProjectionChart points={projection} color={fundColor} />
             </div>
@@ -433,7 +462,9 @@ export default function KiwiSaverPage() {
 
           {/* Govt MTC note */}
           <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '12px 16px', fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--text2)' }}>Government contribution:</strong> The government adds 25c for every $1 you put in, up to a max of $260.72/year (since 1 July 2025) — as long as you contribute at least $1,042.86/year and earn $180,000 or less. This is automatically included in your projection.
+            <strong style={{ color: 'var(--text2)' }}>Government contribution:</strong> The government adds 25c for every $1 you put in (your own contributions, not your employer’s), up to a max of $260.72/year since 1 July 2025. You get the maximum by contributing at least $1,042.86/year. It isn’t paid if you earn over $180,000 or are 65 or older, and the projection follows those rules.
+            <br /><br />
+            <strong style={{ color: 'var(--text2)' }}>About the projection:</strong> it&apos;s an estimate, not a forecast. It assumes your pay, contribution rates and return stay the same. &quot;Today’s money&quot; takes off {DEFAULT_INFLATION}% a year for inflation and assumes your pay rises with it. Enter an expected return after fees and tax (PIR); real returns vary year to year and can be negative.
           </div>
         </>
       )}
