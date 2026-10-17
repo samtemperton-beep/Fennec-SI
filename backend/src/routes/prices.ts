@@ -2,6 +2,7 @@ import { Router } from 'express';
 import axios from 'axios';
 import { fetchPrices, fetchQuote, fetchChart, searchSymbols } from '../services/yahoo';
 import { requireAuth } from '../middleware/auth';
+import { getUsdNzd } from '../services/fx';
 
 const router = Router();
 
@@ -68,6 +69,14 @@ router.get('/market-ticker', async (req, res) => {
 
   res.set('Cache-Control', 'public, max-age=60');
   res.json(results);
+});
+
+// GET /api/prices/fx — USD→NZD rate for showing NZD equivalents of USD values
+router.get('/fx', async (_req, res) => {
+  const fx = await getUsdNzd();
+  if (!fx) return res.status(503).json({ error: 'Exchange rate unavailable' });
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json(fx);
 });
 
 router.get('/search', requireAuth, async (req, res) => {

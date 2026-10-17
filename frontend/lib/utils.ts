@@ -9,6 +9,12 @@ export function fmt(n: number, decimals = 2) {
   return n?.toFixed(decimals) ?? '—'
 }
 
+// Unambiguous money formatting for mixed-currency screens: an NZ locale renders
+// USD as "US$1,234.00" and NZD as plain "$1,234.00", so the two can't be confused.
+export function fmtMoney(n: number, currency: string, decimals = 2) {
+  return n.toLocaleString('en-NZ', { style: 'currency', currency, minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
 export function fmtCurrency(n: number, currency = 'USD') {
   if (!n && n !== 0) return '—'
   return new Intl.NumberFormat('en-US', {
