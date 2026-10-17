@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { runAkahuSync } from './akahuSync';
 import { recordNetWorth } from './networth';
+import { syncFinanceForUser } from './financeSync';
 
 // Background Akahu sync, so value history keeps building when nobody has the
 // app open. Akahu refreshes personal apps about once a day; syncing every few
@@ -34,16 +35,26 @@ export async function syncAllUsers(supabase: SupabaseClient): Promise<SyncAllRes
   let ok = 0;
   let failed = 0;
   for (const id of ids) {
+    // Investments/KiwiSaver and bank accounts sync independently: a problem with
+    // one never stops the other from refreshing.
+    let userFailed = false;
     try {
       await runAkahuSync(supabase, id, premium.has(id));
-      // Best-effort: a net worth history point must never fail the sync.
-      await recordNetWorth(supabase, id).catch((e) => console.error('[scheduled sync] net worth snapshot failed:', e?.message ?? e));
-      ok++;
     } catch (e: any) {
-      failed++;
+      userFailed = true;
       // Never log tokens; the user id prefix and message are enough to diagnose.
-      console.error(`[scheduled sync] user ${id.slice(0, 8)} failed: ${e?.message ?? e}`);
+      console.error(`[scheduled sync] user ${id.slice(0, 8)} portfolio sync failed: ${e?.message ?? e}`);
     }
+    try {
+      await syncFinanceForUser(supabase, id);
+    } catch (e: any) {
+      userFailed = true;
+      console.error(`[scheduled sync] user ${id.slice(0, 8)} bank sync failed: ${e?.message ?? e}`);
+    }
+    // Best-effort, and after both syncs so the history point uses fresh balances.
+    await recordNetWorth(supabase, id).catch((e) => console.error('[scheduled sync] net worth snapshot failed:', e?.message ?? e));
+    if (userFailed) failed++;
+    else ok++;
   }
   return { users: ids.length, ok, failed };
 }

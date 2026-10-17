@@ -1,4 +1,5 @@
 'use client'
+import { localDate } from '@/lib/utils'
 import { useEffect, useMemo, useState } from 'react'
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { createClient } from '@/lib/supabase'
@@ -92,7 +93,7 @@ export function SnapshotHistory({
   const visible = useMemo(() => {
     const days = RANGES.find(r => r.label === range)?.days ?? Infinity
     if (!isFinite(days) || points.length === 0) return points
-    const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+    const cutoff = localDate(new Date(Date.now() - days * 86400000))
     return points.filter(p => p.date >= cutoff)
   }, [points, range])
 

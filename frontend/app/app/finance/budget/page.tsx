@@ -1,5 +1,6 @@
 'use client'
 export const dynamic = 'force-dynamic'
+import { localDate } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -43,8 +44,8 @@ export default function BudgetPage() {
       supabase.from('fin_categories').select('id, name, monthly_budget').eq('scope', 'household').order('name'),
       supabase.from('fin_transactions')
         .select('category_id, amount')
-        .gte('date', start.toISOString().slice(0, 10))
-        .lte('date', end.toISOString().slice(0, 10))
+        .gte('date', localDate(start))
+        .lte('date', localDate(end))
         .lt('amount', 0),
     ])
     setCategories(cats || [])

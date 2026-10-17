@@ -1,5 +1,6 @@
 'use client'
 export const dynamic = 'force-dynamic'
+import { localDate } from '@/lib/utils'
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -9,7 +10,7 @@ import { toast } from 'sonner'
 const supabase = createClient()
 const currency = (n: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n)
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' })
-const isoDate = (d: Date) => d.toISOString().split('T')[0]
+const isoDate = (d: Date) => localDate(d)
 
 const STATUS: Record<string, { label: string; color: string; bg: string }> = {
   draft:   { label: 'Draft',   color: '#6B7280', bg: '#6B728022' },

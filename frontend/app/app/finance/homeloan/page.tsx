@@ -1,5 +1,6 @@
 'use client'
 export const dynamic = 'force-dynamic'
+import { localDate } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -26,7 +27,7 @@ interface LoanDetails {
 
 const DEFAULT: LoanDetails = {
   address: '', balance: 0, interest_rate: 6.5, loan_term_years: 30,
-  start_date: new Date().toISOString().split('T')[0], monthly_payment: null,
+  start_date: localDate(), monthly_payment: null,
   rv: null, market_estimate: null, original_drawdown: null, purchase_price: null,
 }
 

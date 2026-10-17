@@ -1,4 +1,6 @@
 'use client'
+import { localDate } from '@/lib/utils'
+import { householdSpending } from '@/lib/spending'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -39,19 +41,19 @@ export default function DashboardPage() {
       supabase.from('profiles').select('networth_excluded').eq('id', user.id).single()
         .then(({ data }) => { if (Array.isArray(data?.networth_excluded)) setExcluded(data.networth_excluded) })
 
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-      // fin_goals and fin_transactions are household-scoped by RLS (goals have no user_id
+      const monthStart = localDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+      // fin_goals and the spending tables are household-scoped by RLS (goals have no user_id
       // column), so they're read the same way the Finance pages read them.
-      const [{ data: p }, { data: txns }, { data: g }, nw] = await Promise.all([
+      const [{ data: p }, spend, { data: g }, nw] = await Promise.all([
         supabase.from('profiles').select('username, enabled_features').eq('id', user.id).single(),
-        supabase.from('fin_transactions').select('amount').gte('date', monthStart).lt('amount', 0),
+        householdSpending(supabase, monthStart, localDate()),
         supabase.from('fin_goals').select('id, name, target_amount, current_amount').eq('status', 'active').order('created_at').limit(3),
         api.getNetWorth().catch((e: Error) => { setNetWorthError(e.message); return null }),
       ])
 
       setProfile(p)
       setNetWorth(nw)
-      if (txns) setMonthSpend(txns.reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0))
+      if (spend) setMonthSpend(spend.total)
       setGoals(g ?? [])
       setLoading(false)
 
@@ -136,7 +138,7 @@ export default function DashboardPage() {
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
             {loading || monthSpend === null ? '—' : fmt(monthSpend)}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>spending so far</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>household spending so far · transfers between your accounts excluded</div>
         </div>
 
         {/* Savings goals */}

@@ -1,4 +1,5 @@
 'use client'
+import { localDate } from '@/lib/utils'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -62,7 +63,7 @@ export function NetWorthCard({ data, loading, error, excluded, onToggle }: {
     if (!Number.isFinite(days)) return history
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - days)
-    const cut = cutoff.toISOString().slice(0, 10)
+    const cut = localDate(cutoff)
     return history.filter(p => p.date >= cut)
   }, [data, range, excluded])
 

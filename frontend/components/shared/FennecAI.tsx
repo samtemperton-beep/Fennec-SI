@@ -1,4 +1,5 @@
 'use client'
+import { localDate } from '@/lib/utils'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { IconX, IconSend, IconRefresh } from '@tabler/icons-react'
 import { createClient } from '@/lib/supabase'
@@ -259,7 +260,7 @@ async function loadFinanceContext(): Promise<Partial<FennecContext>> {
   if (!user) return {}
 
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const monthStart = localDate(new Date(now.getFullYear(), now.getMonth(), 1))
 
   const [{ data: accounts }, { data: txns }, { data: goals }, { data: ks }] = await Promise.all([
     supabase.from('fin_accounts').select('name, type, current_balance, owner'),
