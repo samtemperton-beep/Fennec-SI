@@ -6,14 +6,17 @@ import { toast } from 'sonner'
 import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin, IconRefresh } from '@tabler/icons-react'
 
 // ── NZ KiwiSaver constants ───────────────────────────────────────────────────
-const GOVT_MTC_MAX = 521.43          // Government member tax credit per year
+// Government contribution: 25c per $1 contributed, max $260.72/yr (halved from 50c / $521.43 on 1 Jul 2025),
+// for members earning $180k or less. https://www.ird.govt.nz/kiwisaver-changes
+const GOVT_MTC_MAX = 260.72
 const GOVT_MTC_MONTHLY = GOVT_MTC_MAX / 12
 
 const PROVIDERS = [
   'Simplicity', 'Fisher Funds', 'Milford', 'SuperLife', 'ANZ',
   'ASB', 'BNZ', 'Westpac', 'Booster', 'Generate', 'Kernel', 'Other',
 ]
-const EMPLOYEE_RATES = [3, 4, 6, 8, 10]
+// Default rate rose from 3% to 3.5% on 1 Apr 2026 (4% from 1 Apr 2028). 3% remains available as a temporary reduction.
+const EMPLOYEE_RATES = [3, 3.5, 4, 6, 8, 10]
 const FUND_TYPES: Record<string, { label: string; defaultReturn: number; color: string }> = {
   conservative: { label: 'Conservative',  defaultReturn: 3.5, color: '#6366f1' },
   balanced:     { label: 'Balanced',       defaultReturn: 5.5, color: '#0ea5e9' },
@@ -151,7 +154,7 @@ export default function KiwiSaverPage() {
       const defaults = {
         provider: '', fund_type: 'balanced', current_balance: 0,
         retirement_age: 65, annual_salary: 0,
-        employee_rate: 3, employer_rate: 3, voluntary_monthly: 0,
+        employee_rate: 3.5, employer_rate: 3.5, voluntary_monthly: 0,
         expected_return: 5.5,
       }
       setSettings(null)
@@ -299,15 +302,15 @@ export default function KiwiSaverPage() {
             {/* Employee rate */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Employee contribution</label>
-              <select value={form.employee_rate || 3} onChange={e => setForm((f: any) => ({ ...f, employee_rate: Number(e.target.value) }))} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}>
+              <select value={form.employee_rate || 3.5} onChange={e => setForm((f: any) => ({ ...f, employee_rate: Number(e.target.value) }))} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}>
                 {EMPLOYEE_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
               </select>
             </div>
             {/* Employer rate */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Employer contribution</label>
-              <input type="number" value={form.employer_rate || 3} onChange={e => setForm((f: any) => ({ ...f, employer_rate: Number(e.target.value) }))} min={3} step={0.5} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
-              <span style={{ fontSize: 10, color: 'var(--text3)' }}>Min 3% — check your employment agreement</span>
+              <input type="number" value={form.employer_rate || 3.5} onChange={e => setForm((f: any) => ({ ...f, employer_rate: Number(e.target.value) }))} min={3} step={0.5} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
+              <span style={{ fontSize: 10, color: 'var(--text3)' }}>Default minimum is 3.5% from 1 Apr 2026 — check your employment agreement</span>
             </div>
             {/* Voluntary top-up */}
             <div>
@@ -352,7 +355,7 @@ export default function KiwiSaverPage() {
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Monthly Into KiwiSaver</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{settings.annual_salary ? fmt(totalMonthly) : '—'}</div>
-              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>incl. govt MTC ~{fmt(GOVT_MTC_MONTHLY)}/mo</div>
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>incl. govt contribution ~{fmt(GOVT_MTC_MONTHLY)}/mo</div>
             </div>
           </div>
 
@@ -364,7 +367,7 @@ export default function KiwiSaverPage() {
                 {[
                   { label: `You (${settings.employee_rate}%)`, amount: monthlyEmployee, color: fundColor },
                   { label: `Employer (${settings.employer_rate}%)`, amount: monthlyEmployer, color: '#10b981' },
-                  { label: 'Govt MTC', amount: GOVT_MTC_MONTHLY, color: '#f59e0b' },
+                  { label: 'Govt contribution', amount: GOVT_MTC_MONTHLY, color: '#f59e0b' },
                   ...(settings.voluntary_monthly > 0 ? [{ label: 'Voluntary top-up', amount: Number(settings.voluntary_monthly), color: '#8b5cf6' }] : []),
                 ].map(row => (
                   <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -425,7 +428,7 @@ export default function KiwiSaverPage() {
 
           {/* Govt MTC note */}
           <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '12px 16px', fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--text2)' }}>Government Member Tax Credit:</strong> The IRD contributes 50c for every $1 you put in, up to a max of $521.43/year — as long as you contribute at least $1,042.86/year. This is automatically included in your projection.
+            <strong style={{ color: 'var(--text2)' }}>Government contribution:</strong> The government adds 25c for every $1 you put in, up to a max of $260.72/year (since 1 July 2025) — as long as you contribute at least $1,042.86/year and earn $180,000 or less. This is automatically included in your projection.
           </div>
         </>
       )}
