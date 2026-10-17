@@ -382,3 +382,48 @@ button.nw-part { border: 1px solid rgba(255,255,255,.25); background: transparen
   border-radius: 4px; border: 1.5px solid rgba(255,255,255,.7); margin-right: 5px; vertical-align: -2px;
 }
 .nw-check.on { background: #fff; border-color: #fff; color: var(--primary); }
+.nw-part-label { display: flex; align-items: center; gap: 2px; }
+.nw-part-arrow { opacity: .5; transition: opacity .15s, transform .15s; }
+a.nw-part:hover .nw-part-arrow { opacity: 1; transform: translate(1px, -1px); }
+
+/* ─── Dashboard notifications ─── */
+.ins-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px 12px; }
+.ins-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ins-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; }
+.ins-title { font-size: 13px; font-weight: 700; color: var(--text); margin: 0; }
+.ins-count { font-size: 10.5px; font-weight: 700; color: var(--amber); background: var(--amber-light); padding: 2px 8px; border-radius: 20px; }
+.ins-filters { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; }
+.ins-filters::-webkit-scrollbar { display: none; }
+.ins-filters button {
+  flex-shrink: 0; border: 1px solid var(--border); background: transparent; color: var(--text2);
+  font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 20px; cursor: pointer;
+}
+.ins-filters button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ins-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ins-item { position: relative; display: flex; align-items: stretch; border-radius: 11px; background: var(--surface2); border-left: 3px solid transparent; }
+.ins-item.dismissed { opacity: .5; }
+.ins-link { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 10px; padding: 10px 6px 10px 10px; text-decoration: none; color: inherit; }
+.ins-sev { flex-shrink: 0; margin-top: 1px; }
+.ins-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ins-item-title { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.35; }
+.ins-item-detail { font-size: 12px; color: var(--text2); line-height: 1.4; }
+.ins-meta { font-size: 10.5px; color: var(--text3); margin-top: 1px; }
+.ins-sev-label { font-weight: 700; }
+.ins-chevron { flex-shrink: 0; align-self: center; color: var(--text3); }
+.ins-link:hover .ins-chevron { color: var(--primary); }
+.ins-dismiss {
+  flex-shrink: 0; width: 34px; border: none; background: transparent; color: var(--text3);
+  cursor: pointer; border-radius: 0 11px 11px 0; display: flex; align-items: center; justify-content: center;
+}
+.ins-dismiss:hover { color: var(--text); background: var(--surface3); }
+.sev-critical { border-left-color: var(--red); }
+.sev-critical .ins-sev, .sev-critical .ins-sev-label { color: var(--red); }
+.sev-warning { border-left-color: var(--amber); }
+.sev-warning .ins-sev, .sev-warning .ins-sev-label { color: var(--amber); }
+.sev-good { border-left-color: var(--green); }
+.sev-good .ins-sev, .sev-good .ins-sev-label { color: var(--green); }
+.sev-info { border-left-color: var(--primary-mid); }
+.sev-info .ins-sev, .sev-info .ins-sev-label { color: var(--primary); }
+.ins-empty { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); padding: 10px 2px; }
+.ins-foot { display: flex; gap: 14px; margin-top: 8px; }
+.ins-foot button { border: none; background: none; color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 0; }

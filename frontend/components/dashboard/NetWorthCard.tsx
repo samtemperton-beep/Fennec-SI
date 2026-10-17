@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { IconAdjustmentsHorizontal, IconCheck } from '@tabler/icons-react'
+import { IconAdjustmentsHorizontal, IconArrowUpRight, IconCheck } from '@tabler/icons-react'
 import type { NetWorthBreakdown, NetWorthResponse } from '@/lib/api'
 
 export type NetWorthPart = 'bank' | 'investments' | 'kiwisaver' | 'property' | 'debt'
@@ -42,7 +42,7 @@ function shortDate(d: string) {
 }
 
 // Snapshots store every component, so any combination can be re-totalled — history included.
-function totalOf(b: NetWorthBreakdown, excluded: NetWorthPart[]) {
+export function totalOf(b: NetWorthBreakdown, excluded: NetWorthPart[]) {
   return PARTS.reduce((s, p) => (excluded.includes(p.key) ? s : s + b[p.key]), 0)
 }
 
@@ -167,6 +167,7 @@ export function NetWorthCard({ data, loading, error, excluded, onToggle }: {
                   <span className="nw-part-label">
                     {editing && <span className={`nw-check ${isOff ? '' : 'on'}`} aria-hidden>{!isOff && <IconCheck size={10} />}</span>}
                     {p.label}
+                    {!editing && <IconArrowUpRight size={11} className="nw-part-arrow" aria-hidden />}
                   </span>
                   <span className="nw-part-value">{value === 0 && p.key === 'property' ? '—' : fmt(value, { compact: Math.abs(value) >= 100000 })}</span>
                   {note && <span className="nw-part-note">{note}</span>}
@@ -183,7 +184,7 @@ export function NetWorthCard({ data, loading, error, excluded, onToggle }: {
                   {body}
                 </button>
               ) : (
-                <Link key={p.key} href={p.href} className={`nw-part ${isOff ? 'off' : ''}`}>
+                <Link key={p.key} href={p.href} className={`nw-part ${isOff ? 'off' : ''}`} title={`Open ${p.label}`}>
                   {body}
                 </Link>
               )

@@ -3,7 +3,7 @@ import axios from 'axios';
 const FINNHUB = 'https://finnhub.io/api/v1';
 const key = () => process.env.FINNHUB_API_KEY || '';
 
-export async function fetchPrices(tickers: string[]): Promise<Record<string, { price: number; name?: string }>> {
+export async function fetchPrices(tickers: string[]): Promise<Record<string, { price: number; name?: string; changePct?: number }>> {
   const results = await Promise.all(
     tickers.map(async t => {
       try {
@@ -11,7 +11,8 @@ export async function fetchPrices(tickers: string[]): Promise<Record<string, { p
           axios.get(`${FINNHUB}/quote?symbol=${t}&token=${key()}`, { timeout: 8000 }),
           axios.get(`${FINNHUB}/stock/profile2?symbol=${t}&token=${key()}`, { timeout: 8000 }),
         ]);
-        return [t, { price: q.c ?? 0, name: p.name || undefined }] as [string, { price: number; name?: string }];
+        // dp = percent change since the previous close
+        return [t, { price: q.c ?? 0, name: p.name || undefined, changePct: Number.isFinite(q.dp) ? q.dp : undefined }] as [string, { price: number; name?: string; changePct?: number }];
       } catch {
         return [t, { price: 0 }] as [string, { price: number }];
       }

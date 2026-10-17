@@ -1,10 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { api, type NetWorthResponse } from '@/lib/api'
-import { NetWorthCard, type NetWorthPart } from '@/components/dashboard/NetWorthCard'
+import { gatherInsights, netWorthTrendInsights, sortInsights, type Insight } from '@/lib/insights'
+import { NetWorthCard, totalOf, type NetWorthPart } from '@/components/dashboard/NetWorthCard'
+import { InsightsFeed } from '@/components/dashboard/InsightsFeed'
 import {
   IconBuildingBank, IconTarget, IconArrowRight,
   IconChartBar, IconArrowsExchange, IconWallet, IconNewSection,
@@ -24,6 +26,8 @@ export default function DashboardPage() {
   const [excluded, setExcluded] = useState<NetWorthPart[]>([])
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [insights, setInsights] = useState<Insight[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
@@ -39,7 +43,7 @@ export default function DashboardPage() {
       // fin_goals and fin_transactions are household-scoped by RLS (goals have no user_id
       // column), so they're read the same way the Finance pages read them.
       const [{ data: p }, { data: txns }, { data: g }, nw] = await Promise.all([
-        supabase.from('profiles').select('username').eq('id', user.id).single(),
+        supabase.from('profiles').select('username, enabled_features').eq('id', user.id).single(),
         supabase.from('fin_transactions').select('amount').gte('date', monthStart).lt('amount', 0),
         supabase.from('fin_goals').select('id, name, target_amount, current_amount').eq('status', 'active').order('created_at').limit(3),
         api.getNetWorth().catch((e: Error) => { setNetWorthError(e.message); return null }),
@@ -50,6 +54,12 @@ export default function DashboardPage() {
       if (txns) setMonthSpend(txns.reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0))
       setGoals(g ?? [])
       setLoading(false)
+
+      // Notifications load after the headline numbers so they never hold the page up.
+      gatherInsights({ supabase, userId: user.id, netWorth: nw, enabledFeatures: p?.enabled_features ?? null })
+        .then(setInsights)
+        .catch(() => setInsights([]))
+        .finally(() => setInsightsLoading(false))
     }
     load()
   }, [])
@@ -72,6 +82,12 @@ export default function DashboardPage() {
   }
 
   const noData = !loading && netWorth?.current && !netWorth.current.hasData
+
+  // The net worth trend item follows the include/exclude toggles, so it's derived here.
+  const allInsights = useMemo(() => {
+    const history = (netWorth?.history ?? []).map(p => ({ date: p.date, total: totalOf(p, excluded) }))
+    return sortInsights([...insights, ...netWorthTrendInsights(history)])
+  }, [insights, netWorth, excluded])
 
   const quickLinks = [
     { href: '/app/portfolio', label: 'Portfolio', icon: IconChartBar, section: 'Investing' },
@@ -103,6 +119,10 @@ export default function DashboardPage() {
           <Link href="/app/settings" style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', textDecoration: 'none' }}>Connect Akahu →</Link>
         </div>
       )}
+
+      <div style={{ marginTop: 14 }}>
+        <InsightsFeed insights={allInsights} loading={loading || insightsLoading} />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, margin: '14px 0 24px' }}>
         {/* Monthly spend */}
