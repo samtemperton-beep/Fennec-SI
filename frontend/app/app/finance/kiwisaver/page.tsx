@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
+import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { toast } from 'sonner'
 import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin, IconRefresh } from '@tabler/icons-react'
 
@@ -138,6 +139,7 @@ export default function KiwiSaverPage() {
   const [loading, setLoading] = useState(true)
   const [hasCreds, setHasCreds] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [historyKey, setHistoryKey] = useState(0) // bumped after each sync to reload the history chart
 
   // Fields Akahu owns once an account is linked; the form must not write them back.
   const AKAHU_OWNED = ['provider', 'current_balance', 'akahu_account_id', 'akahu_returns', 'pir', 'akahu_synced_at']
@@ -169,6 +171,7 @@ export default function KiwiSaverPage() {
     try {
       await api.syncAkahu()
       await loadSettings(false)
+      setHistoryKey(k => k + 1)
       if (manual) toast.success('KiwiSaver synced from Akahu')
     } catch (e: any) {
       if (manual) toast.error(e.message)
@@ -358,6 +361,8 @@ export default function KiwiSaverPage() {
               <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>incl. govt contribution ~{fmt(GOVT_MTC_MONTHLY)}/mo</div>
             </div>
           </div>
+
+          <SnapshotHistory kind="kiwisaver" title="KiwiSaver balance history" valueLabel="Balance" investedLabel="Balance less returns" refreshKey={historyKey} />
 
           {/* Contribution breakdown */}
           {settings.annual_salary > 0 && (

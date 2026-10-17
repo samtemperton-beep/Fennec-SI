@@ -14,6 +14,7 @@ import { getBrokerById, getBrokerTradeUrl, type Broker } from '@/lib/brokers'
 import Link from 'next/link'
 import { PortfolioGoal } from '@/components/portfolio/PortfolioGoal'
 import { AkahuSyncBar } from '@/components/portfolio/AkahuSyncBar'
+import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
 import { VerifyPortfolioModal } from '@/components/premium/VerifyPortfolioModal'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
@@ -85,6 +86,7 @@ export default function PortfolioPage() {
   const [syncing, setSyncing] = useState(false)
   const [syncPreview, setSyncPreview] = useState<{ format: string; toAdd: string[]; toUpdate: string[]; toRemove: string[]; total: number } | null>(null)
   const [previewing, setPreviewing] = useState(false)
+  const [historyKey, setHistoryKey] = useState(0) // bumped after each Akahu sync to reload the history chart
   const supabase = createClient()
 
   const userIdRef = useCallback((uid: string) => {
@@ -310,7 +312,7 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <AkahuSyncBar onSynced={() => { if (userId) loadHoldings(userId) }} />
+      <AkahuSyncBar onSynced={() => { if (userId) loadHoldings(userId); setHistoryKey(k => k + 1) }} />
 
       {/* Summary card with ring chart */}
       {!loading && totalValue > 0 && (
@@ -403,6 +405,8 @@ export default function PortfolioPage() {
           </div>
         </div>
       )}
+
+      <SnapshotHistory kind="broker" title="Portfolio value history" valueLabel="Holdings value" investedLabel="Cost basis" refreshKey={historyKey} />
 
       {!loading && !isPremium && holdings.length >= 8 && holdings.length < 10 && (
         <div style={{ marginBottom: 16, padding: '8px 14px', borderRadius: 8, background: 'var(--amber-light)', border: '1px solid var(--amber)', fontSize: 12, color: 'var(--amber)' }}>

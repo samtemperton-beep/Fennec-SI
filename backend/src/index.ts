@@ -16,6 +16,7 @@ import socialRouter from './routes/social';
 import financeRouter from './routes/finance';
 import akahuRouter from './routes/akahu';
 import gmailRouter from './routes/gmail';
+import { startScheduledSync } from './services/scheduler';
 
 dotenv.config();
 
@@ -56,6 +57,10 @@ app.use('/api/gmail', gmailRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));
 
-app.listen(PORT, () => console.log(`Fennec SI backend running on :${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Fennec SI backend running on :${PORT}`);
+  // Daily-ish background sync that builds value history. Opt-in per environment.
+  if (process.env.ENABLE_SCHEDULED_SYNC === 'true') startScheduledSync();
+});
 
 export default app;
