@@ -138,11 +138,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       setUser(data.user)
       if (data.user) {
         const { data: p } = await supabase.from('profiles')
-          .select('username, avatar_color, avatar_emoji, avatar_url, location, profession, is_premium, is_admin')
+          .select('username, avatar_color, avatar_emoji, avatar_url, location, profession, is_premium, is_admin, onboarding_complete, enabled_features')
           .eq('id', data.user.id).single()
         setProfile(p)
         if (p?.is_premium) setIsPremium(true)
         if (p?.is_admin) setIsAdmin(true)
+        // Redirect new users to onboarding
+        if (p && p.onboarding_complete === false) {
+          router.push('/onboarding')
+        }
       }
     })
   }, [])
@@ -150,6 +154,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   async function signOut() {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  // Which top-level sections the user has enabled (null = all, for backwards compat)
+  const enabledFeatures: string[] | null = profile?.enabled_features ?? null
+  const SECTION_FEATURE_MAP: Record<SectionKey, string> = {
+    dashboard: 'dashboard',
+    investing: 'investments',
+    finance: 'finance',
+    community: 'community',
+  }
+  const sectionVisible = (key: SectionKey) => {
+    if (!enabledFeatures) return true
+    if (key === 'dashboard') return true // always show
+    return enabledFeatures.includes(SECTION_FEATURE_MAP[key])
   }
 
   const section = SECTIONS[activeSection]
@@ -181,7 +199,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Section switcher */}
       <div style={{ padding: '8px 8px 6px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 3 }}>
-        {(Object.entries(SECTIONS) as [SectionKey, typeof SECTIONS[SectionKey]][]).map(([key, s]) => {
+        {(Object.entries(SECTIONS) as [SectionKey, typeof SECTIONS[SectionKey]][]).filter(([key]) => sectionVisible(key)).map(([key, s]) => {
           const Icon = s.icon
           const isActive = activeSection === key
           return (
