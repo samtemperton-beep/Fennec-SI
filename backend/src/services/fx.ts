@@ -50,3 +50,29 @@ export async function getUsdNzd(): Promise<FxRate | null> {
     return cached?.value ?? null;
   }
 }
+
+// Other currencies → NZD (e.g. AUD for ASX holdings). Same Yahoo feed and
+// caching as above; "AUDNZD=X" is NZD per 1 AUD.
+const otherCache = new Map<string, { rate: number; fetchedAt: number }>();
+
+/** NZD per 1 unit of `currency`, or null if no rate is available. NZD → 1. */
+export async function getRateToNzd(currency: string): Promise<number | null> {
+  const cur = currency.toUpperCase();
+  if (cur === 'NZD') return 1;
+  if (cur === 'USD') return (await getUsdNzd())?.rate ?? null;
+  const hit = otherCache.get(cur);
+  if (hit && Date.now() - hit.fetchedAt < TTL_MS) return hit.rate;
+  try {
+    const { data } = await axios.get(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(cur)}NZD=X?interval=1d&range=5d`,
+      { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } }
+    );
+    const rate = Number(data?.chart?.result?.[0]?.meta?.regularMarketPrice);
+    if (!Number.isFinite(rate) || rate <= 0) throw new Error(`implausible ${cur}/NZD rate`);
+    otherCache.set(cur, { rate, fetchedAt: Date.now() });
+    return rate;
+  } catch (e: any) {
+    console.warn(`[fx] could not refresh ${cur}/NZD:`, e.message);
+    return hit?.rate ?? null;
+  }
+}

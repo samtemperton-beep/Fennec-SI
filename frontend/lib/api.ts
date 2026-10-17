@@ -25,6 +25,26 @@ async function apiFetch(path: string, options: RequestInit = {}) {
   return res.json()
 }
 
+// All values NZD. Mirrors backend/src/services/networth.ts.
+export interface NetWorthBreakdown {
+  total: number
+  bank: number
+  investments: number
+  kiwisaver: number
+  property: number
+  debt: number
+}
+export interface NetWorthResponse {
+  current: NetWorthBreakdown & {
+    propertySource: 'market_estimate' | 'rv' | 'purchase_price' | null
+    bankSyncedAt: string | null
+    missingFx: string[]
+    hasData: boolean
+  }
+  history: (NetWorthBreakdown & { date: string })[]
+  historyAvailable: boolean
+}
+
 export const api = {
   searchStocks: (q: string) =>
     apiFetch(`/api/prices/search?q=${encodeURIComponent(q)}`),
@@ -43,6 +63,9 @@ export const api = {
 
   getFx: (): Promise<{ pair: 'USDNZD'; rate: number; asOf: string }> =>
     apiFetch('/api/prices/fx'),
+
+  getNetWorth: (): Promise<NetWorthResponse> =>
+    apiFetch('/api/networth'),
 
   getNews: (tickers: string[] = []) =>
     apiFetch(`/api/news${tickers.length ? `?tickers=${tickers.join(',')}` : ''}`),

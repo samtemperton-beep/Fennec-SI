@@ -17,6 +17,7 @@ import financeRouter from './routes/finance';
 import akahuRouter from './routes/akahu';
 import gmailRouter from './routes/gmail';
 import { startScheduledSync } from './services/scheduler';
+import networthRouter from './routes/networth';
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ app.use('/api/premium', premiumRouter);
 app.use('/api/social', socialRouter);
 app.use('/api/finance', financeRouter);
 app.use('/api/akahu', akahuRouter);
+app.use('/api/networth', networthRouter);
 app.use('/api/gmail', gmailRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));

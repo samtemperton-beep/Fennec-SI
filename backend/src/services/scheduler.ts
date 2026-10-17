@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { runAkahuSync } from './akahuSync';
+import { recordNetWorth } from './networth';
 
 // Background Akahu sync, so value history keeps building when nobody has the
 // app open. Akahu refreshes personal apps about once a day; syncing every few
@@ -35,6 +36,8 @@ export async function syncAllUsers(supabase: SupabaseClient): Promise<SyncAllRes
   for (const id of ids) {
     try {
       await runAkahuSync(supabase, id, premium.has(id));
+      // Best-effort: a net worth history point must never fail the sync.
+      await recordNetWorth(supabase, id).catch((e) => console.error('[scheduled sync] net worth snapshot failed:', e?.message ?? e));
       ok++;
     } catch (e: any) {
       failed++;
