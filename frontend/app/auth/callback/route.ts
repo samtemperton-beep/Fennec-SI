@@ -2,13 +2,14 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { safeNext } from '@/lib/safeNext'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as 'magiclink' | 'email' | null
-  const next = searchParams.get('next') ?? '/app/portfolio'
+  const next = safeNext(searchParams.get('next'))
 
   const cookieStore = await cookies()
   const supabase = createServerClient(

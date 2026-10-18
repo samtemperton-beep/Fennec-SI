@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { safeNext } from '@/lib/safeNext'
 import { FoxIcon } from '@/components/shared/FoxIcon'
 import { IconMail, IconLoader, IconLock, IconEye, IconEyeOff, IconShieldCheck, IconArrowLeft } from '@tabler/icons-react'
 
@@ -20,13 +21,19 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const supabase = createClient()
 
+  // Where they were heading before being asked to sign in (set by proxy.ts).
+  const nextPath = () => safeNext(new URLSearchParams(window.location.search).get('next'))
+  // OAuth and magic links finish on the server so the session cookie exists
+  // before the first protected page loads.
+  const callbackUrl = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`
+
   async function signInGoogle() {
     if (!agreed) return
     setLoading('google')
     setError('')
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/app/portfolio` },
+      options: { redirectTo: callbackUrl() },
     })
   }
 
@@ -58,7 +65,7 @@ export default function LoginPage() {
       }
     }
     // No MFA or already aal2 — redirect
-    window.location.href = '/app/portfolio'
+    window.location.href = nextPath()
   }
 
   async function signInMagicLink(e: React.FormEvent) {
@@ -68,7 +75,7 @@ export default function LoginPage() {
     setError('')
     const { error: err } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/app/portfolio` },
+      options: { emailRedirectTo: callbackUrl() },
     })
     setLoading(null)
     if (err) { setError(err.message); return }
@@ -89,7 +96,7 @@ export default function LoginPage() {
     })
     setLoading(null)
     if (verifyErr) { setError('Invalid code. Please try again.'); return }
-    window.location.href = '/app/portfolio'
+    window.location.href = nextPath()
   }
 
   const features = [
