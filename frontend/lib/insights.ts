@@ -336,7 +336,11 @@ async function investingInsights({ supabase, userId }: InsightContext, today: st
   for (const h of holdings ?? []) {
     const buy = Number(h.buy_price)
     if (!(buy > 0)) continue
-    const pl = ((priceOf(h.ticker, Number(h.current_price)) - buy) / buy) * 100
+    // No price at all (delisted or unknown ticker, e.g. LICYQ) comes back as 0,
+    // which would read as a 100% loss. Skip it rather than raise a false alarm.
+    const price = priceOf(h.ticker, Number(h.current_price))
+    if (!(price > 0)) continue
+    const pl = ((price - buy) / buy) * 100
     if (pl <= -stopLoss) {
       out.push({
         id: `stoploss:${h.ticker}`, severity: 'critical', section: 'investing',
