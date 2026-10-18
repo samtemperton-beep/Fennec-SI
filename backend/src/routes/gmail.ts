@@ -100,7 +100,7 @@ router.get('/auth-url', requireAuth, (req: any, res) => {
 router.get('/callback', async (req, res) => {
   const { code, state, error } = req.query as any;
   const c = config();
-  const back = (qs: string) => res.redirect(`${c.frontendUrl}/app/finance/inbox?${qs}`);
+  const back = (qs: string) => res.redirect(`${c.frontendUrl}/app/finance/bills?${qs}`);
 
   if (error) return back(`gmail_error=${encodeURIComponent(error)}`);
   const userId = typeof state === 'string' ? readState(state) : null;

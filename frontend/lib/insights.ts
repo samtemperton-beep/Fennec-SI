@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { api, type NetWorthResponse } from '@/lib/api'
 import { GOVT_MTC_FULL_AT, GOVT_MTC_MAX, GOVT_MTC_MAX_AGE, currentAge } from '@/lib/kiwisaver'
+import { matchEmailsToBills, isPayable, type Bill, type EmailItem } from '@/lib/bills'
 
 // Dashboard notifications: one pass over every part of the app, turned into a
 // short list of "how things are tracking" items. Each source is independent and
@@ -62,10 +63,19 @@ function whenDue(iso: string, today: string) {
 
 async function billInsights({ supabase }: InsightContext, today: string): Promise<Insight[]> {
   const horizon = isoLocal(addDays(new Date(), 7))
-  const { data, error } = await supabase
-    .from('fin_bills').select('id, name, amount, next_due_date')
-    .eq('is_active', true).lte('next_due_date', horizon).order('next_due_date')
-  if (error || !data?.length) return []
+  const [{ data: bills }, emailItems] = await Promise.all([
+    supabase.from('fin_bills').select('*').eq('is_active', true).order('next_due_date'),
+    // Bills found in email (optional add-on; ignored if Gmail isn't connected).
+    api.gmailItems().then(r => r.items).catch(() => [] as EmailItem[]),
+  ])
+  const openEmails = emailItems.filter(e => !e.paid && !e.dismissed && isPayable(e) && e.due_date)
+  // An email that belongs to a recurring bill updates that bill's amount rather than adding a second bill.
+  const { attached, standalone } = matchEmailsToBills((bills ?? []) as Bill[], openEmails)
+  const data = [
+    ...(bills ?? []).map((b: any) => ({ id: b.id as string, name: b.name as string, amount: Number(attached.get(b.id)?.amount ?? b.amount), next_due_date: b.next_due_date as string })),
+    ...standalone.map(e => ({ id: `email-${e.id}`, name: e.vendor, amount: Number(e.amount ?? 0), next_due_date: e.due_date! })),
+  ].filter(b => b.next_due_date <= horizon).sort((a, b) => a.next_due_date.localeCompare(b.next_due_date))
+  if (!data.length) return []
 
   const out: Insight[] = []
   const overdue = data.filter(b => b.next_due_date < today)
@@ -76,7 +86,7 @@ async function billInsights({ supabase }: InsightContext, today: string): Promis
       id: `bill-overdue:${b.id}:${b.next_due_date}`,
       severity: 'warning', section: 'finance',
       title: `${b.name} was due ${niceDate(b.next_due_date)}`,
-      detail: `${money(Number(b.amount))}. If it's paid, update the due date on Bills.`,
+      detail: `${money(Number(b.amount))}. If it's paid, tick it off on Bills.`,
       href: '/app/finance/bills',
     })
   }

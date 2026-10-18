@@ -147,6 +147,20 @@ export const api = {
   getNotificationPrefs: () =>
     apiFetch('/api/alerts/prefs'),
 
+  // ── Gmail (bills found in email) ──
+  gmailStatus: (): Promise<{ connected: boolean; email: string | null; lastScanned: string | null; configured: boolean }> =>
+    apiFetch('/api/gmail/status'),
+  gmailItems: (): Promise<{ items: import('./bills').EmailItem[] }> =>
+    apiFetch('/api/gmail/items'),
+  gmailScan: (): Promise<{ scanned: number; items: unknown[]; settled?: number }> =>
+    apiFetch('/api/gmail/scan', { method: 'POST', body: JSON.stringify({}) }),
+  gmailAuthUrl: (): Promise<{ url: string }> =>
+    apiFetch('/api/gmail/auth-url'),
+  gmailDisconnect: () =>
+    apiFetch('/api/gmail/disconnect', { method: 'DELETE' }),
+  gmailUpdateItem: (id: string, patch: { dismissed?: boolean; paid?: boolean }) =>
+    apiFetch(`/api/gmail/items/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+
   saveNotificationPrefs: (prefs: object) =>
     apiFetch('/api/alerts/prefs', { method: 'PUT', body: JSON.stringify(prefs) }),
 

@@ -530,3 +530,4 @@ a.nw-part:hover .nw-part-arrow { opacity: 1; transform: translate(1px, -1px); }
 
 /* Centre every app page: page roots set their own max-width, this centres them. */
 .app-page > * { margin-left: auto; margin-right: auto; }
+.bills-group { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin: 0 0 8px; font-family: 'Syne', sans-serif; }
