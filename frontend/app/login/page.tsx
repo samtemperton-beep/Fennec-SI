@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { safeNext } from '@/lib/safeNext'
 import { FoxIcon } from '@/components/shared/FoxIcon'
@@ -26,6 +26,26 @@ export default function LoginPage() {
   // OAuth and magic links finish on the server so the session cookie exists
   // before the first protected page loads.
   const callbackUrl = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`
+
+  // Already signed in (e.g. back from Google) but 2FA not done yet: go straight
+  // to the code step. proxy.ts sends people here for exactly this.
+  useEffect(() => {
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(async ({ data }) => {
+      if (data?.nextLevel !== 'aal2' || data.currentLevel === 'aal2') return
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      const totp = factors?.totp?.[0]
+      if (totp) {
+        setFactorId(totp.id)
+        setStep('mfa')
+      }
+    })
+  }, [])
+
+  async function cancelMfa() {
+    // Leave no half-signed-in session behind.
+    await supabase.auth.signOut()
+    setStep('login'); setTotpCode(''); setError(''); setFactorId('')
+  }
 
   async function signInGoogle() {
     if (!agreed) return
@@ -225,8 +245,8 @@ export default function LoginPage() {
                   Verify
                 </button>
               </form>
-              <button onClick={() => { setStep('login'); setTotpCode(''); setError('') }} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 13, cursor: 'pointer', margin: '16px auto 0' }}>
-                <IconArrowLeft size={13} /> Back to sign in
+              <button onClick={cancelMfa} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 13, cursor: 'pointer', margin: '16px auto 0' }}>
+                <IconArrowLeft size={13} /> Sign out and use a different account
               </button>
             </div>
           )}

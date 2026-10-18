@@ -10,12 +10,28 @@ const supabase = createClient(
   { realtime: { transport: ws as any } }
 );
 
+/** The assurance level claim from a Supabase access token ('aal1' or 'aal2'). */
+function tokenAal(token: string): string | null {
+  try {
+    return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).aal ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return res.status(401).json({ error: 'Invalid token' });
+
+  // Two-factor: once a user has a verified authenticator, only sessions that
+  // completed the code step (aal2) may use the API. The token has already been
+  // validated by getUser above, so reading its claims here is safe.
+  if (user.factors?.some(f => f.status === 'verified') && tokenAal(token) !== 'aal2') {
+    return res.status(401).json({ error: 'Two-factor verification required', code: 'mfa_required' });
+  }
 
   const { data: profile } = await supabase
     .from('profiles')

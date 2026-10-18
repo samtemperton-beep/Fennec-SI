@@ -45,7 +45,23 @@ export async function proxy(request: NextRequest) {
     return redirectTo(url)
   }
 
-  if (user && pathname === '/login') {
+  // Two-factor: a user with an authenticator set up hasn't finished signing in
+  // until they've entered a code (aal2), whether they used a password or Google.
+  let needsMfa = false
+  if (user && (isProtected(pathname) || pathname === '/login')) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    needsMfa = aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2'
+  }
+
+  if (user && needsMfa && isProtected(pathname)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.search = ''
+    url.searchParams.set('next', pathname + search)
+    return redirectTo(url)
+  }
+
+  if (user && !needsMfa && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/app/dashboard'
     url.search = ''
