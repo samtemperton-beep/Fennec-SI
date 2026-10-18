@@ -93,7 +93,7 @@ export default function LandingPage() {
     <div style={{ background: 'var(--bg)', color: 'var(--text)', minHeight: '100vh' }}>
 
       {/* ── Nav ── */}
-      <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', maxWidth: 1200, margin: '0 auto' }}>
+      <nav className="landing-nav" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ background: 'var(--primary)', borderRadius: 10, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FoxIcon size={32} />
@@ -104,11 +104,11 @@ export default function LandingPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <a href="#features" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Features</a>
-          <a href="#pricing" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Pricing</a>
-          <Link href="/app/community" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Community</Link>
+          <a href="#features" className="landing-nav-extra" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Features</a>
+          <a href="#pricing" className="landing-nav-extra" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Pricing</a>
+          <Link href="/app/community" className="landing-nav-extra" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Community</Link>
           <Link href="/login" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Sign in</Link>
-          <Link href="/login" style={{ background: 'var(--primary)', color: 'white', padding: '8px 18px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+          <Link href="/login" className="landing-nav-cta" style={{ background: 'var(--primary)', color: 'white', padding: '8px 18px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
             Get Started Free
           </Link>
         </div>
@@ -154,7 +154,7 @@ export default function LandingPage() {
 
       {/* ── Dashboard preview strip ── */}
       <section style={{ maxWidth: 860, margin: '0 auto', padding: '0 32px 60px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div className="landing-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Net Worth', value: '$189,240', sub: 'portfolio + bank + KiwiSaver', color: 'var(--primary)' },
             { label: 'Portfolio', value: '$94,580', sub: '+17.2% all time', color: '#10b981' },
@@ -234,7 +234,7 @@ export default function LandingPage() {
         <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 28, fontWeight: 700, textAlign: 'center', marginBottom: 40 }}>
           Simple, transparent pricing
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="landing-pricing" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
             <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20, marginBottom: 4 }}>Free</p>
             <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 36, fontWeight: 800, marginBottom: 20 }}>

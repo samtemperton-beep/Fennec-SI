@@ -1,7 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4. The old v3 directives (@tailwind base/components/utilities)
+   loaded no theme, so every utility that needs one (spacing like gap-2/mb-8,
+   animate-spin, and all responsive md:/sm:/lg: classes) was silently missing.
+   Theme + utilities only: Tailwind's reset (preflight) is deliberately left
+   out, because the app has never had it and it would restyle everything. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 
 /* ─── Light mode (default) ─── */
 :root, [data-theme="light"] {
@@ -531,3 +536,15 @@ a.nw-part:hover .nw-part-arrow { opacity: 1; transform: translate(1px, -1px); }
 /* Centre every app page: page roots set their own max-width, this centres them. */
 .app-page > * { margin-left: auto; margin-right: auto; }
 .bills-group { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin: 0 0 8px; font-family: 'Syne', sans-serif; }
+
+/* Landing page header on phones: keep the logo, Sign in and the main button. */
+@media (max-width: 640px) {
+  .landing-nav { padding: 12px 16px !important; }
+  .landing-nav > div:last-child { gap: 14px !important; }
+  .landing-nav-extra { display: none !important; }
+  .landing-nav-cta { padding: 7px 12px !important; font-size: 13px !important; white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  .landing-stats { grid-template-columns: repeat(2, 1fr) !important; }
+  .landing-pricing { grid-template-columns: 1fr !important; }
+}

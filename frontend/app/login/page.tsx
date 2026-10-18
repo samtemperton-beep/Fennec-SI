@@ -141,12 +141,15 @@ export default function LoginPage() {
   ]
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 480px' }}
+    // Columns and the left panel's visibility come from the classes only: inline
+    // display / gridTemplateColumns would override them and squash both columns
+    // side by side on a phone.
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', display: 'grid' }}
       className="grid-cols-1 md:grid-cols-[1fr_480px]">
 
-      {/* ── Left panel ── */}
+      {/* ── Left panel (wide screens only) ── */}
       <div style={{
-        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        flexDirection: 'column', justifyContent: 'center',
         padding: '60px 48px', borderRight: '1px solid var(--border)',
         background: 'linear-gradient(135deg,rgba(44,110,106,.07) 0%,var(--bg) 60%)',
         position: 'relative', overflow: 'hidden',
