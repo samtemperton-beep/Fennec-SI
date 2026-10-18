@@ -511,3 +511,22 @@ a.nw-part:hover .nw-part-arrow { opacity: 1; transform: translate(1px, -1px); }
 }
 .dl-toggle.on { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
 .dl-reset { margin-top: 12px; border: none; background: none; color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; }
+
+/* ─── Email inbox ─── */
+.inbox-page { padding: 24px 28px; max-width: 1040px; margin: 0 auto; }
+.inbox-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+.inbox-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 16px; }
+.inbox-row p { margin: 0; }
+.inbox-action {
+  width: 26px; height: 24px; display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--text3); border-radius: 6px; cursor: pointer;
+}
+.inbox-action:hover { background: var(--surface2); color: var(--text); }
+@media (max-width: 640px) {
+  .inbox-page { padding: 16px 14px 32px; }
+  .inbox-tiles { gap: 8px; }
+  .inbox-row { padding: 10px 10px 10px 12px; gap: 10px; }
+}
+
+/* Centre every app page: page roots set their own max-width, this centres them. */
+.app-page > * { margin-left: auto; margin-right: auto; }

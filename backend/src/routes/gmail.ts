@@ -6,6 +6,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
 import { encryptToken, decryptToken, isEncrypted } from '../services/tokenCrypto';
 import { DEFAULT_MODEL } from '../services/claude';
+import { reconcileInboxItems } from '../services/inboxReconcile';
 
 // Node 20 has no native WebSocket, which supabase-js's realtime client needs at
 // construction time. Without this transport the process throws on import and
@@ -249,6 +250,20 @@ const ITEM_TYPES = new Set(['invoice', 'bill', 'rates', 'receipt', 'statement', 
 const ITEM_CATEGORIES = new Set(['business', 'household', 'personal']);
 const numOrNull = (v: any) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 const dateOrNull = (v: any) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
+const normRef = (s: string | null | undefined) => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+/** "Sam <sam@x.com>" -> "sam@x.com" */
+const emailAddress = (header: string) => (header.match(/<([^>]+)>/)?.[1] ?? header).trim().toLowerCase();
+/** Loose company-name match: ignores case, punctuation and a trailing Ltd/Limited. */
+const sameName = (a: any, b: string) => {
+  const x = normRef(String(a ?? '')).replace(/(ltd|limited)$/, '');
+  const y = normRef(b).replace(/(ltd|limited)$/, '');
+  return !!x && !!y && (x === y || x.includes(y) || y.includes(x));
+};
+/** RFC 2822 Date header -> YYYY-MM-DD in NZ time, or null. */
+const emailDate = (header: string) => {
+  const d = new Date(header);
+  return Number.isNaN(d.getTime()) ? null : new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(d);
+};
 
 // ── POST /api/gmail/scan ──────────────────────────────────────────────────────
 // Scan inbox for financial emails, parse with Claude, return structured items
@@ -280,24 +295,43 @@ router.post('/scan', requireAuth, async (req: any, res) => {
       id: m.id,
       subject: getHeader(m, 'subject'),
       from: getHeader(m, 'from'),
+      to: getHeader(m, 'to'),
       date: getHeader(m, 'date'),
       body: extractBody(m),
     }));
 
+    // Who the user is, so invoices they SENT aren't mistaken for bills to pay.
+    const [{ data: tokenRow }, { data: biz }, { data: ownInvoices }] = await Promise.all([
+      supabase.from('gmail_tokens').select('gmail_email').eq('user_id', userId).maybeSingle(),
+      supabase.from('business_settings').select('business_name, business_email').eq('user_id', userId).maybeSingle(),
+      supabase.from('business_invoices').select('invoice_number, client_name').eq('user_id', userId),
+    ]);
+    const ownEmails = [tokenRow?.gmail_email, biz?.business_email, req.user.email]
+      .filter((e): e is string => typeof e === 'string' && e.includes('@'))
+      .map(e => e.toLowerCase());
+    const businessName: string | null = biz?.business_name || null;
+    const invoiceByRef = new Map((ownInvoices ?? []).map((i: any) => [normRef(i.invoice_number), i.client_name as string]));
+
     const prompt = `You are a financial data extractor for a NZ personal finance app.
+
+About the user (use this to work out which way the money flows):
+- Their own email addresses: ${ownEmails.join(', ') || 'unknown'}
+- Their own business: ${businessName || 'unknown'}
 
 Analyse these emails and extract financial items. For each email, identify:
 - Type: "invoice" | "bill" | "rates" | "receipt" | "statement" | "mortgage" | "insurance" | "subscription" | "other"
 - Category: "business" | "household" | "personal"
-- Amount (numeric, NZD, excl GST if stated separately)
+- Direction: "payable" if the user has to pay it, or "receivable" if someone owes the user. An invoice issued BY the user's own business (including a copy the user sent or cc'd to themselves) is "receivable".
+- Vendor: the business that issued the document
+- Counterparty: who the money goes to (payable) or comes from (receivable). For an invoice the user's business issued, this is the customer it was billed to.
+- Amount: the total to be paid, in NZD, INCLUDING GST
 - GST amount if shown
 - Due date (ISO format if present)
 - Description (brief, what it's for)
-- Vendor/sender name
-- Reference number if present
+- Reference / invoice number if present
 - Already paid: true/false (look for "payment confirmed", "direct debit", "paid" language)
 
-Return a JSON array only, no markdown. Each item: { emailId, type, category, amount, gst, dueDate, description, vendor, reference, paid }
+Return a JSON array only, no markdown. Each item: { emailId, type, category, direction, vendor, counterparty, amount, gst, dueDate, description, reference, paid }
 Skip emails that contain no extractable financial data (newsletters, marketing etc).
 
 Emails:
@@ -317,48 +351,107 @@ ${JSON.stringify(emailSummaries, null, 2)}`;
       if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
     } catch (_) {}
 
-    // The model answers in camelCase; the table (and the Inbox page) use snake_case.
-    const knownIds = new Set(allMessages.map(m => m.id));
+    const byId = new Map(allMessages.map(m => [m.id, m]));
     const scannedAt = new Date().toISOString();
+    const str = (v: any, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+
+    // The model answers in camelCase; the table (and the Inbox page) use snake_case.
     const rows = parsed
-      .filter(i => i && typeof i.emailId === 'string' && knownIds.has(i.emailId))
-      .map(i => ({
-        user_id: userId,
-        email_id: i.emailId,
-        type: ITEM_TYPES.has(i.type) ? i.type : 'other',
-        category: ITEM_CATEGORIES.has(i.category) ? i.category : 'personal',
-        amount: numOrNull(i.amount),
-        gst: numOrNull(i.gst),
-        due_date: dateOrNull(i.dueDate),
-        description: typeof i.description === 'string' ? i.description.slice(0, 500) : null,
-        vendor: typeof i.vendor === 'string' ? i.vendor.slice(0, 200) : 'Unknown',
-        reference: typeof i.reference === 'string' ? i.reference.slice(0, 200) : null,
-        paid: i.paid === true,
-        scanned_at: scannedAt,
-      }));
+      .filter(i => i && typeof i.emailId === 'string' && byId.has(i.emailId))
+      .map(i => {
+        const msg = byId.get(i.emailId);
+        const reference = str(i.reference, 200);
+        let direction: 'payable' | 'receivable' = i.direction === 'receivable' ? 'receivable' : 'payable';
+        let counterparty = str(i.counterparty, 200);
+        let category = ITEM_CATEGORIES.has(i.category) ? i.category : 'personal';
+
+        // Firm rules override the model:
+        // 1. The reference is one of the user's own Fennec invoices -> it's owed to them.
+        const ownClient = reference ? invoiceByRef.get(normRef(reference)) : undefined;
+        if (ownClient !== undefined) {
+          direction = 'receivable';
+          counterparty = ownClient || counterparty;
+          category = 'business';
+        // 2. Sent from the user's own address and issued by their business -> also theirs.
+        } else if (ownEmails.includes(emailAddress(getHeader(msg, 'from'))) && businessName && sameName(i.vendor, businessName)) {
+          direction = 'receivable';
+          category = 'business';
+        }
+
+        return {
+          user_id: userId,
+          email_id: i.emailId,
+          type: ITEM_TYPES.has(i.type) ? i.type : 'other',
+          category,
+          direction,
+          counterparty,
+          amount: numOrNull(i.amount),
+          gst: numOrNull(i.gst),
+          due_date: dateOrNull(i.dueDate),
+          email_date: emailDate(getHeader(msg, 'date')),
+          description: str(i.description, 500),
+          vendor: str(i.vendor, 200) ?? 'Unknown',
+          reference,
+          paid: i.paid === true,
+          scanned_at: scannedAt,
+        };
+      });
 
     if (rows.length) {
-      const { error: saveErr } = await supabase.from('gmail_scanned_items').upsert(rows, { onConflict: 'user_id,email_id' });
+      // A rescan must not undo a bank match the user already has.
+      const { data: existing } = await supabase.from('gmail_scanned_items')
+        .select('email_id, paid').eq('user_id', userId).in('email_id', rows.map(r => r.email_id));
+      const alreadyPaid = new Set((existing ?? []).filter((e: any) => e.paid).map((e: any) => e.email_id));
+      for (const r of rows) if (alreadyPaid.has(r.email_id)) r.paid = true;
+
+      let { error: saveErr } = await supabase.from('gmail_scanned_items').upsert(rows, { onConflict: 'user_id,email_id' });
+      if (saveErr && /column/i.test(saveErr.message)) {
+        // inbox_reconcile_migration.sql not run yet: save what the old table can hold.
+        const legacy = rows.map(({ direction, counterparty, email_date, ...rest }) => rest);
+        ({ error: saveErr } = await supabase.from('gmail_scanned_items').upsert(legacy, { onConflict: 'user_id,email_id' }));
+      }
       if (saveErr) throw new Error(`Couldn't save scanned items: ${saveErr.message}`);
     }
 
     await supabase.from('gmail_tokens').update({ last_scanned_at: scannedAt }).eq('user_id', userId);
+    const settled = await reconcileInboxItems(supabase, userId).catch(() => 0);
 
-    res.json({ items: rows, scanned: allMessages.length });
+    res.json({ items: rows, scanned: allMessages.length, settled });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });
 
 // ── GET /api/gmail/items ──────────────────────────────────────────────────────
-// Return previously scanned items
+// Return previously scanned items, after checking the bank for any that have
+// since been paid.
 router.get('/items', requireAuth, async (req: any, res) => {
+  await reconcileInboxItems(supabase, req.user.id).catch(() => 0);
   const { data } = await supabase.from('gmail_scanned_items')
     .select('*')
     .eq('user_id', req.user.id)
     .order('scanned_at', { ascending: false })
     .limit(100);
   res.json({ items: data || [] });
+});
+
+// ── PATCH /api/gmail/items/:id ────────────────────────────────────────────────
+// Dismiss / restore an item, or mark it paid or unpaid by hand.
+router.patch('/items/:id', requireAuth, async (req: any, res) => {
+  const { dismissed, paid } = req.body ?? {};
+  const update: Record<string, any> = {};
+  if (typeof dismissed === 'boolean') update.dismissed = dismissed;
+  if (typeof paid === 'boolean') {
+    update.paid = paid;
+    // Unmarking releases the bank transaction so it can match something else.
+    if (!paid) Object.assign(update, { matched_transaction_id: null, paid_date: null, matched_at: null });
+  }
+  if (!Object.keys(update).length) return res.status(400).json({ error: 'Nothing to update' });
+  const { data, error } = await supabase.from('gmail_scanned_items')
+    .update(update).eq('id', req.params.id).eq('user_id', req.user.id).select().maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'Not found' });
+  res.json({ item: data });
 });
 
 export default router;

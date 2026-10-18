@@ -391,7 +391,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <div key={pathname} className={slideDir ? `swipe-in-${slideDir}` : undefined}>
+        <div key={pathname} className={`app-page${slideDir ? ` swipe-in-${slideDir}` : ''}`}>
           {children}
         </div>
       </main>
