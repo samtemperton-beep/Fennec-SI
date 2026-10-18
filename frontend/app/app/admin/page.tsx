@@ -20,6 +20,7 @@ const AI_SECTIONS = [
   { key: 'model_top10', label: "Today's Picks", desc: 'Top 10 stock picks generation' },
   { key: 'model_opportunities', label: 'Discover / Opportunities', desc: 'Hidden gem opportunities' },
   { key: 'model_summary', label: 'Dashboard Daily Summary', desc: 'Fennec daily briefing on the dashboard' },
+  { key: 'model_inbox', label: 'Email Inbox Scanner', desc: 'Extracts bills and invoices from Gmail' },
   { key: 'model_news', label: 'News Digest', desc: 'AI news analysis & digest' },
   { key: 'model_ipo', label: 'IPO Analysis', desc: 'IPO scoring and analysis' },
   { key: 'model_deep_dive', label: 'Deep Dive', desc: 'In-depth stock research (premium)' },
