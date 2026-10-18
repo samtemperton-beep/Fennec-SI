@@ -17,6 +17,7 @@ import { AkahuSyncBar, type BrokerAccount } from '@/components/portfolio/AkahuSy
 import { UnmatchedHoldings } from '@/components/portfolio/UnmatchedHoldings'
 import { PortfolioBalance } from '@/components/portfolio/PortfolioBalance'
 import { DividendIncome } from '@/components/portfolio/DividendIncome'
+import { PerformanceVsMarket } from '@/components/portfolio/PerformanceVsMarket'
 import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
 import { VerifyPortfolioModal } from '@/components/premium/VerifyPortfolioModal'
@@ -466,6 +467,8 @@ export default function PortfolioPage() {
       )}
 
       <SnapshotHistory kind="broker" title="Portfolio value history" valueLabel="Holdings value" investedLabel="Cost basis" refreshKey={historyKey} />
+
+      <PerformanceVsMarket refreshKey={historyKey} />
 
       {!loading && holdings.length > 0 && <PortfolioBalance holdings={holdings} riskLevel={riskLevel} />}
 
