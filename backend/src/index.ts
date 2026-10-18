@@ -28,12 +28,15 @@ const PORT = process.env.PORT || 4000;
 // express-rate-limit can read the real client IP from X-Forwarded-For
 app.set('trust proxy', 1);
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
+// Exact matches only. A prefix match would also accept look-alike hosts such as
+// https://fennec-si-app.vercel.app.example.com. Trailing slashes are ignored.
+const normaliseOrigin = (o: string) => o.trim().replace(/\/+$/, '').toLowerCase();
+const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',').map(normaliseOrigin).filter(Boolean));
 
 app.use(helmet());
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.some(o => origin.startsWith(o.trim()))) return cb(null, true);
+    if (!origin || allowedOrigins.has(normaliseOrigin(origin))) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,

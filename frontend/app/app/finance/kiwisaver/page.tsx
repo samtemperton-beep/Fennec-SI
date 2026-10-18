@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { projectRange, EMPLOYEE_RATES, FUND_RETURNS, RANGE_SPREAD, GOVT_MTC_MAX, GOVT_MTC_FULL_AT, DEFAULT_INFLATION, type ProjectionPoint, type ProjectionInput } from '@/lib/kiwisaver'
 import { WhatIf } from '@/components/kiwisaver/WhatIf'
+import { SalaryCalculator } from '@/components/kiwisaver/SalaryCalculator'
 import { toast } from 'sonner'
 import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin, IconRefresh } from '@tabler/icons-react'
 
@@ -186,6 +187,27 @@ export default function KiwiSaverPage() {
     setSaving(false)
   }
 
+  // From the salary calculator. With the settings form open (or nothing saved yet),
+  // fill the form so the user's other unsaved edits aren't overwritten; otherwise save it.
+  async function applyCalculatedSalary(salary: number) {
+    setForm((f: any) => ({ ...f, annual_salary: salary }))
+    if (editing || !settings) {
+      if (!editing) setEditing(true)
+      toast.success('Salary filled in. Save your details to update the projection.')
+      return
+    }
+    const { data, error } = await supabase.from('fin_kiwisaver')
+      .update({ annual_salary: salary, last_updated: new Date().toISOString() })
+      .eq('user_id', settings.user_id).select().single()
+    if (error || !data) {
+      toast.error(`Could not save: ${error?.message ?? 'unknown error'}`)
+      return
+    }
+    setSettings(data)
+    setForm(data)
+    toast.success('Projection updated with your new salary')
+  }
+
   const num = (v: any, fallback: number) => (v == null || v === '' || Number.isNaN(Number(v)) ? fallback : Number(v))
   const projectionInput: ProjectionInput | null = useMemo(() => settings ? {
     dob: settings.date_of_birth,
@@ -318,6 +340,15 @@ export default function KiwiSaverPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {!loading && (
+        <SalaryCalculator
+          defaultKiwiSaverRate={num(settings?.employee_rate ?? form.employee_rate, 3.5)}
+          employerRate={num(settings?.employer_rate ?? form.employer_rate, 3.5)}
+          currentSalary={editing || !settings ? num(form.annual_salary, 0) || null : num(settings.annual_salary, 0) || null}
+          onUseSalary={applyCalculatedSalary}
+        />
       )}
 
       {settings && (
