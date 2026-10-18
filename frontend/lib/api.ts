@@ -64,6 +64,9 @@ export const api = {
   getProfiles: (tickers: string[]): Promise<{ profiles: Record<string, { status: 'ok' | 'empty' | 'error'; industry: string | null; name: string | null }> }> =>
     apiFetch(`/api/prices/profiles?tickers=${encodeURIComponent(tickers.join(','))}`),
 
+  getDividends: (symbols: string[]): Promise<{ dividends: Record<string, { status: 'ok' | 'unknown' | 'error'; currency: string | null; payments: { date: string; amount: number }[] }> }> =>
+    apiFetch(`/api/prices/dividends?symbols=${encodeURIComponent(symbols.join(','))}`),
+
   getFxRates: (currencies: string[]): Promise<{ base: 'NZD'; rates: Record<string, number | null> }> =>
     apiFetch(`/api/prices/fx-rates?currencies=${encodeURIComponent(currencies.join(','))}`),
 

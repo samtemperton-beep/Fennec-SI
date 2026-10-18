@@ -4,6 +4,7 @@ import { fetchPrices, fetchQuote, fetchChart, searchSymbols } from '../services/
 import { requireAuth } from '../middleware/auth';
 import { getUsdNzd, getRateToNzd } from '../services/fx';
 import { getProfiles } from '../services/profiles';
+import { getDividends } from '../services/dividends';
 
 const router = Router();
 
@@ -97,6 +98,15 @@ router.get('/profiles', requireAuth, async (req, res) => {
   if (tickers.length === 0) return res.json({ profiles: {} });
   res.set('Cache-Control', 'private, max-age=3600');
   res.json({ profiles: await getProfiles(tickers) });
+});
+
+// GET /api/prices/dividends?symbols=VIG,AAPL — dividend history (about 2 years) per
+// Yahoo symbol (NZX: .NZ, ASX: .AX), cached 24h. Auth required to protect the shared quota.
+router.get('/dividends', requireAuth, async (req, res) => {
+  const symbols = String(req.query.symbols || '').split(',').filter(Boolean);
+  if (symbols.length === 0) return res.json({ dividends: {} });
+  res.set('Cache-Control', 'private, max-age=3600');
+  res.json({ dividends: await getDividends(symbols) });
 });
 
 router.get('/search', requireAuth, async (req, res) => {
