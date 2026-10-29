@@ -640,7 +640,7 @@ export default function SettingsPage() {
           <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>Two-Factor Authentication</h2>
         </div>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
-          Add an extra layer of security. Every time you sign in, with a password or with Google, youAdd an extra layer of security. After entering your password you&apos;ll be asked for a code from your authenticator app (Google Authenticator, Authy, etc).apos;ll also be asked for a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password).
+          Add an extra layer of security. Every time you sign in, with a password or with Google, you&apos;ll also be asked for a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password).
         </p>
 
         {mfaFactors.length > 0 ? (

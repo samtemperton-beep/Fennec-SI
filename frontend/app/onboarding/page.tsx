@@ -146,7 +146,10 @@ export default function OnboardingPage() {
     if (!userId) return
     setSaving(true)
     try {
-      await supabase.from('profiles').upsert({
+      // Supabase returns errors rather than throwing, so check it: a silent
+      // failure left onboarding_complete false and bounced the user straight
+      // back here from the dashboard.
+      const { error } = await supabase.from('profiles').upsert({
         id: userId,
         username: name.trim() || null,
         risk_level: riskLevel,
@@ -154,6 +157,17 @@ export default function OnboardingPage() {
         enabled_features: [...selectedFeatures],
         onboarding_complete: true,
       })
+      if (error) {
+        setSaving(false)
+        if (error.code === '23505') {
+          // Usernames are unique across Fennec.
+          toast.error(`Someone's already using the name "${name.trim()}". Try adding a surname or initial.`)
+          setStep('welcome')
+        } else {
+          toast.error(`Couldn't save your details: ${error.message}`)
+        }
+        return
+      }
       // Trigger Akahu sync if connected
       if (akahuConnected) api.syncAkahu().catch(() => {})
       router.push('/app/dashboard')

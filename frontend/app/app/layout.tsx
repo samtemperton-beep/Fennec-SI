@@ -182,11 +182,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user)
       if (data.user) {
-        const { data: p } = await supabase.from('profiles')
-          .select('username, avatar_color, avatar_emoji, avatar_url, location, profession, is_premium, is_admin, onboarding_complete, enabled_features')
+        // Every column here must exist: one unknown column fails the whole query,
+        // which used to leave the profile empty (so new users never reached
+        // onboarding). Premium is subscription_tier; there is no is_premium column.
+        const { data: p, error: profileError } = await supabase.from('profiles')
+          .select('username, avatar_color, avatar_emoji, avatar_url, location, profession, subscription_tier, is_admin, onboarding_complete, enabled_features')
           .eq('id', data.user.id).single()
+        if (profileError) console.error('[layout] profile load failed:', profileError.message)
         setProfile(p)
-        if (p?.is_premium) setIsPremium(true)
+        if (p?.subscription_tier === 'premium') setIsPremium(true)
         if (p?.is_admin) setIsAdmin(true)
         // Redirect new users to onboarding
         if (p && p.onboarding_complete === false) {

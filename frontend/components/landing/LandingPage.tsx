@@ -108,7 +108,7 @@ export default function LandingPage() {
           <a href="#pricing" className="landing-nav-extra" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Pricing</a>
           <Link href="/app/community" className="landing-nav-extra" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Community</Link>
           <Link href="/login" style={{ color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 14, textDecoration: 'none' }}>Sign in</Link>
-          <Link href="/login" className="landing-nav-cta" style={{ background: 'var(--primary)', color: 'white', padding: '8px 18px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+          <Link href="/login?mode=signup" className="landing-nav-cta" style={{ background: 'var(--primary)', color: 'white', padding: '8px 18px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
             Get Started Free
           </Link>
         </div>
@@ -137,7 +137,7 @@ export default function LandingPage() {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
           <Link
-            href="/login"
+            href="/login?mode=signup"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--primary)', color: 'white', padding: '14px 28px', borderRadius: 10, fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, textDecoration: 'none' }}
           >
             Start for free <IconArrowRight size={18} />
@@ -248,7 +248,7 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-            <Link href="/login" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}>
+            <Link href="/login?mode=signup" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}>
               Get started free
             </Link>
           </div>
@@ -269,7 +269,7 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-            <Link href="/login" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}>
+            <Link href="/login?mode=signup" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}>
               Start Premium free for 7 days
             </Link>
           </div>

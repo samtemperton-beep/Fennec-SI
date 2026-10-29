@@ -61,7 +61,9 @@ export async function proxy(request: NextRequest) {
     return redirectTo(url)
   }
 
-  if (user && !needsMfa && pathname === '/login') {
+  // Signed-in visitors skip the login page, except when they've just come back
+  // from a password-reset email and need to choose the new password there.
+  if (user && !needsMfa && pathname === '/login' && request.nextUrl.searchParams.get('mode') !== 'reset') {
     const url = request.nextUrl.clone()
     url.pathname = '/app/dashboard'
     url.search = ''

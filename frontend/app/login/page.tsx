@@ -7,6 +7,10 @@ import { IconMail, IconLoader, IconLock, IconEye, IconEyeOff, IconShieldCheck, I
 
 type Step = 'login' | 'mfa' | 'sent'
 type Method = 'password' | 'magic'
+// signin: existing account · signup: create one · forgot: email a reset link ·
+// newpw: back from that link, choose a new password
+type Mode = 'signin' | 'signup' | 'forgot' | 'newpw'
+type Sent = 'magic' | 'confirm' | 'reset'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -19,13 +23,79 @@ export default function LoginPage() {
   const [loading, setLoading] = useState<'google' | 'password' | 'magic' | 'totp' | null>(null)
   const [agreed, setAgreed] = useState(false)
   const [error, setError] = useState('')
+  const [mode, setMode] = useState<Mode>('signin')
+  const [sent, setSent] = useState<Sent>('magic')
+  const [confirmPw, setConfirmPw] = useState('')
   const supabase = createClient()
+
+  // ?mode=signup (landing page buttons) or ?mode=reset (back from a reset email)
+  useEffect(() => {
+    const m = new URLSearchParams(window.location.search).get('mode')
+    if (m === 'signup') setMode('signup')
+    if (m === 'reset') setMode('newpw')
+  }, [])
+
+  function switchMode(m: Mode) {
+    setMode(m); setError(''); setPassword(''); setConfirmPw(''); setStep('login')
+  }
+
+  async function signUpPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!agreed || !email || !password) return
+    if (password.length < 8) { setError('Use at least 8 characters for your password.'); return }
+    if (password !== confirmPw) { setError("The two passwords don't match."); return }
+    setLoading('password')
+    setError('')
+    const { data, error: err } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: callbackUrl('/onboarding') },
+    })
+    setLoading(null)
+    if (err) { setError(err.message); return }
+    // Supabase hides whether an address is registered: an existing one comes
+    // back as a user with no identities.
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      setError('There is already an account with this email. Sign in instead, or use "Forgot password?".')
+      return
+    }
+    if (data.session) { window.location.href = '/onboarding'; return } // email confirmation turned off
+    setSent('confirm')
+    setStep('sent')
+  }
+
+  async function sendReset(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email) return
+    setLoading('magic')
+    setError('')
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: callbackUrl('/login?mode=reset') })
+    setLoading(null)
+    if (err) { setError(err.message); return }
+    setSent('reset')
+    setStep('sent')
+  }
+
+  async function saveNewPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (password.length < 8) { setError('Use at least 8 characters for your password.'); return }
+    if (password !== confirmPw) { setError("The two passwords don't match."); return }
+    setLoading('password')
+    setError('')
+    const { error: err } = await supabase.auth.updateUser({ password })
+    setLoading(null)
+    if (err) {
+      setError(err.message.includes('session') ? 'This reset link has expired. Request a new one.' : err.message)
+      return
+    }
+    window.location.href = '/app/dashboard'
+  }
 
   // Where they were heading before being asked to sign in (set by proxy.ts).
   const nextPath = () => safeNext(new URLSearchParams(window.location.search).get('next'))
   // OAuth and magic links finish on the server so the session cookie exists
   // before the first protected page loads.
-  const callbackUrl = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`
+  const callbackUrl = (next = nextPath()) => `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
 
   // Already signed in (e.g. back from Google) but 2FA not done yet: go straight
   // to the code step. proxy.ts sends people here for exactly this.
@@ -99,6 +169,7 @@ export default function LoginPage() {
     })
     setLoading(null)
     if (err) { setError(err.message); return }
+    setSent('magic')
     setStep('sent')
   }
 
@@ -261,9 +332,16 @@ export default function LoginPage() {
                 <IconMail size={26} style={{ color: 'var(--primary)' }} />
               </div>
               <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Check your email</p>
-              <p style={{ color: 'var(--text2)', fontSize: 13 }}>We sent a magic link to <strong>{email}</strong></p>
+              <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6 }}>
+                {sent === 'confirm' && <>We sent a link to <strong>{email}</strong>. Click it to confirm your account and you&apos;ll go straight to setting up Fennec.</>}
+                {sent === 'magic' && <>We sent a sign-in link to <strong>{email}</strong>. If you&apos;re new, this creates your account too.</>}
+                {sent === 'reset' && <>If there&apos;s an account for <strong>{email}</strong>, we&apos;ve sent a link to set a new password.</>}
+              </p>
+              <p style={{ color: 'var(--text3)', fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>
+                Open the link on this device, in this browser. It can take a minute to arrive; check your spam folder too.
+              </p>
               <button onClick={() => { setStep('login'); setError('') }} style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontSize: 13, cursor: 'pointer' }}>
-                ← Try a different email
+                ← Use a different email
               </button>
             </div>
           )}
@@ -271,8 +349,38 @@ export default function LoginPage() {
           {/* ── Step: Login ── */}
           {step === 'login' && (
             <>
-              <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 24, marginBottom: 6, textAlign: 'center' }}>Welcome back</h2>
-              <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', marginBottom: 28 }}>Sign in to your Fennec SI account</p>
+              <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 24, marginBottom: 6, textAlign: 'center' }}>
+                {mode === 'signup' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : mode === 'newpw' ? 'Choose a new password' : 'Welcome back'}
+              </h2>
+              <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', marginBottom: 28 }}>
+                {mode === 'signup' ? 'Free to start. No card needed.' : mode === 'forgot' ? "Enter your email and we'll send you a link." : mode === 'newpw' ? 'At least 8 characters.' : 'Sign in to your Fennec account'}
+              </p>
+
+              {mode === 'forgot' && (
+                <form onSubmit={sendReset}>
+                  <label style={fieldLabel}>Email</label>
+                  <input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required autoFocus style={fieldInput} />
+                  {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{error}</p>}
+                  <button type="submit" disabled={!!loading || !email} style={{ ...primaryBtn, opacity: loading || !email ? 0.5 : 1 }}>
+                    {loading ? <IconLoader size={16} className="animate-spin" /> : <IconMail size={16} />} Send reset link
+                  </button>
+                </form>
+              )}
+
+              {mode === 'newpw' && (
+                <form onSubmit={saveNewPassword}>
+                  <label style={fieldLabel}>New password</label>
+                  <input type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus style={fieldInput} />
+                  <label style={fieldLabel}>Type it again</label>
+                  <input type="password" autoComplete="new-password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required style={fieldInput} />
+                  {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{error}</p>}
+                  <button type="submit" disabled={!!loading || !password || !confirmPw} style={{ ...primaryBtn, opacity: loading || !password || !confirmPw ? 0.5 : 1 }}>
+                    {loading ? <IconLoader size={16} className="animate-spin" /> : <IconLock size={16} />} Save password
+                  </button>
+                </form>
+              )}
+
+              {(mode === 'signin' || mode === 'signup') && (<>
 
               {/* Terms */}
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20, cursor: 'pointer' }}>
@@ -299,7 +407,7 @@ export default function LoginPage() {
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
                 )}
-                Continue with Google
+                {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
               </button>
 
               {/* Divider */}
@@ -309,7 +417,26 @@ export default function LoginPage() {
                 <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
               </div>
 
+              {/* Create account with email + password */}
+              {mode === 'signup' && (
+                <form onSubmit={signUpPassword}>
+                  <label style={fieldLabel}>Email</label>
+                  <input type="email" autoComplete="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required style={fieldInput} />
+                  <label style={fieldLabel}>Password</label>
+                  <input type="password" autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={e => setPassword(e.target.value)} required style={fieldInput} />
+                  <label style={fieldLabel}>Type it again</label>
+                  <input type="password" autoComplete="new-password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required style={fieldInput} />
+                  {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{error}</p>}
+                  {!agreed && <p style={{ color: 'var(--text3)', fontSize: 11.5, marginBottom: 10 }}>Tick the box above to agree to the terms first.</p>}
+                  <button type="submit" disabled={!!loading || !email || !password || !confirmPw || !agreed}
+                    style={{ ...primaryBtn, opacity: loading || !email || !password || !confirmPw || !agreed ? 0.5 : 1 }}>
+                    {loading === 'password' ? <IconLoader size={16} className="animate-spin" /> : <IconLock size={16} />} Create account
+                  </button>
+                </form>
+              )}
+
               {/* Method toggle */}
+              {mode === 'signin' && (<>
               <div style={{ display: 'flex', background: 'var(--surface2)', borderRadius: 8, padding: 3, marginBottom: 16, gap: 2 }}>
                 {(['password', 'magic'] as Method[]).map(m => (
                   <button key={m} onClick={() => { setMethod(m); setError('') }}
@@ -350,7 +477,7 @@ export default function LoginPage() {
                     Sign in
                   </button>
                   <div style={{ textAlign: 'center', marginTop: 10 }}>
-                    <a href="/reset-password" style={{ fontSize: 12, color: 'var(--text2)', textDecoration: 'none', fontFamily: 'Syne, sans-serif' }}>Forgot password?</a>
+                    <button type="button" onClick={() => switchMode('forgot')} style={{ fontSize: 12, color: 'var(--text2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>Forgot password?</button>
                   </div>
                 </form>
               )}
@@ -373,15 +500,18 @@ export default function LoginPage() {
                   </button>
                 </form>
               )}
+              </>)}
+              </>)}
             </>
           )}
 
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 24, paddingTop: 20, textAlign: 'center' }}>
             <p style={{ color: 'var(--text2)', fontSize: 13 }}>
-              New to Fennec SI?{' '}
-              <a href="/login" style={{ color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none', marginLeft: 4 }}>
-                Sign up free →
-              </a>
+              {mode === 'signin' ? 'New to Fennec?' : 'Already have an account?'}{' '}
+              <button type="button" onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
+                style={{ color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', marginLeft: 4, fontSize: 13 }}>
+                {mode === 'signin' ? 'Create an account →' : 'Sign in →'}
+              </button>
             </p>
           </div>
         </div>
@@ -389,3 +519,7 @@ export default function LoginPage() {
     </div>
   )
 }
+
+const fieldLabel: React.CSSProperties = { display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }
+const fieldInput: React.CSSProperties = { width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', marginBottom: 10, display: 'block' }
+const primaryBtn: React.CSSProperties = { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'opacity 0.15s' }
