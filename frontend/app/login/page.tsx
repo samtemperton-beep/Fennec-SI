@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { safeNext } from '@/lib/safeNext'
+import { checkEmail } from '@/lib/emailCheck'
 import { FoxIcon } from '@/components/shared/FoxIcon'
 import { IconMail, IconLoader, IconLock, IconEye, IconEyeOff, IconShieldCheck, IconArrowLeft } from '@tabler/icons-react'
 
@@ -26,6 +27,39 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>('signin')
   const [sent, setSent] = useState<Sent>('magic')
   const [confirmPw, setConfirmPw] = useState('')
+  const [suggestion, setSuggestion] = useState<string | null>(null) // "Did you mean ...?"
+  const [keptEmail, setKeptEmail] = useState('') // the user said their address is right as typed
+
+  function changeEmail(value: string) {
+    setEmail(value)
+    setSuggestion(null)
+    setError('')
+  }
+
+  // Instant check when leaving the email box. Quiet about empty or half-typed
+  // addresses; the full check runs on submit.
+  function reviewEmail() {
+    if (!email.trim()) return
+    const c = checkEmail(email)
+    if (!c.ok && 'suggestion' in c && keptEmail !== email) setSuggestion(c.suggestion)
+    else if (!c.ok && 'reason' in c) setError(c.reason)
+  }
+
+  // Full check before anything is sent. Returns false if it should stop.
+  async function emailIsUsable(): Promise<boolean> {
+    const c = checkEmail(email)
+    if (!c.ok && 'reason' in c) { setError(c.reason); return false }
+    if (!c.ok && keptEmail !== email) { setSuggestion(c.suggestion); return false }
+    const domain = c.ok ? c.domain : c.domain
+    try {
+      const r = await fetch(`/api/check-email-domain?domain=${encodeURIComponent(domain)}`)
+      if (r.ok && (await r.json()).canReceive === false) {
+        setError(`We can't find an email service at ${domain}. Check the part after the @.`)
+        return false
+      }
+    } catch { /* a failed lookup must never block sign-up */ }
+    return true
+  }
   const supabase = createClient()
 
   // ?mode=signup (landing page buttons) or ?mode=reset (back from a reset email)
@@ -46,6 +80,7 @@ export default function LoginPage() {
     if (password !== confirmPw) { setError("The two passwords don't match."); return }
     setLoading('password')
     setError('')
+    if (!(await emailIsUsable())) { setLoading(null); return }
     const { data, error: err } = await supabase.auth.signUp({
       email,
       password,
@@ -163,6 +198,7 @@ export default function LoginPage() {
     if (!agreed || !email) return
     setLoading('magic')
     setError('')
+    if (!(await emailIsUsable())) { setLoading(null); return }
     const { error: err } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: callbackUrl() },
@@ -421,7 +457,16 @@ export default function LoginPage() {
               {mode === 'signup' && (
                 <form onSubmit={signUpPassword}>
                   <label style={fieldLabel}>Email</label>
-                  <input type="email" autoComplete="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required style={fieldInput} />
+                  <input type="email" autoComplete="email" placeholder="your@email.com" value={email} onChange={e => changeEmail(e.target.value)} onBlur={reviewEmail} required style={fieldInput} />
+                  {suggestion && (
+                    <div style={{ background: 'var(--primary-light)', borderRadius: 8, padding: '9px 11px', marginBottom: 10, fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5 }}>
+                      Did you mean <strong>{suggestion}</strong>?
+                      <div style={{ display: 'flex', gap: 14, marginTop: 4 }}>
+                        <button type="button" onClick={() => { setEmail(suggestion); setSuggestion(null); setError('') }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}>Yes, fix it</button>
+                        <button type="button" onClick={() => { setKeptEmail(email); setSuggestion(null) }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text2)', fontSize: 12.5, cursor: 'pointer' }}>No, mine is correct</button>
+                      </div>
+                    </div>
+                  )}
                   <label style={fieldLabel}>Password</label>
                   <input type="password" autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={e => setPassword(e.target.value)} required style={fieldInput} />
                   <label style={fieldLabel}>Type it again</label>
@@ -486,11 +531,20 @@ export default function LoginPage() {
               {method === 'magic' && (
                 <form onSubmit={signInMagicLink}>
                   <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
-                  <input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required
+                  <input type="email" placeholder="your@email.com" value={email} onChange={e => changeEmail(e.target.value)} required
                     style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', marginBottom: 10, display: 'block' }}
                     onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                    onBlur={e => { e.target.style.borderColor = 'var(--border)'; reviewEmail() }}
                   />
+                  {suggestion && (
+                    <div style={{ background: 'var(--primary-light)', borderRadius: 8, padding: '9px 11px', marginBottom: 10, fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5 }}>
+                      Did you mean <strong>{suggestion}</strong>?
+                      <div style={{ display: 'flex', gap: 14, marginTop: 4 }}>
+                        <button type="button" onClick={() => { setEmail(suggestion); setSuggestion(null); setError('') }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}>Yes, fix it</button>
+                        <button type="button" onClick={() => { setKeptEmail(email); setSuggestion(null) }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text2)', fontSize: 12.5, cursor: 'pointer' }}>No, mine is correct</button>
+                      </div>
+                    </div>
+                  )}
                   {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{error}</p>}
                   <button type="submit" disabled={!!loading || !email || !agreed}
                     style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 14, cursor: email && agreed ? 'pointer' : 'not-allowed', opacity: loading === 'magic' || !email || !agreed ? 0.5 : 1, transition: 'opacity 0.15s' }}
