@@ -13,14 +13,21 @@ const supabase = createClient(
   { realtime: { transport: ws as any } }
 );
 
+// Emails live on the login, not in profiles.
+async function withEmails<T extends { id: string }>(rows: T[]) {
+  const { data } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+  const emails = new Map((data?.users ?? []).map((u) => [u.id, u.email]));
+  return rows.map((r) => ({ ...r, email: emails.get(r.id) ?? null }));
+}
+
 // GET /api/admin/users — list all users with their tier and usage
 router.get('/users', requireAuth, requireAdmin, async (_req, res) => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, email, subscription_tier, is_admin, usage_count, last_usage_reset, created_at, tier_updated_at')
+    .select('id, username, subscription_tier, is_admin, usage_count, last_usage_reset, created_at, tier_updated_at')
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ users: data });
+  res.json({ users: await withEmails(data ?? []) });
 });
 
 // PATCH /api/admin/users/:id/tier — toggle a user's subscription tier
@@ -32,7 +39,7 @@ router.patch('/users/:id/tier', requireAuth, requireAdmin, async (req, res) => {
   }
   const { error } = await supabase
     .from('profiles')
-    .update({ subscription_tier: tier, is_premium: tier === 'premium', tier_updated_at: new Date().toISOString() })
+    .update({ subscription_tier: tier, tier_updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, tier });
@@ -79,13 +86,13 @@ router.get('/usage-stats', requireAuth, requireAdmin, async (_req, res) => {
   const today = new Date().toISOString().slice(0, 10);
   const { data: profiles, error } = await supabase
     .from('profiles')
-    .select('id, username, email, usage_count, last_usage_reset, subscription_tier, is_admin')
+    .select('id, username, usage_count, last_usage_reset, subscription_tier, is_admin')
     .order('usage_count', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   const list = profiles ?? [];
   const totalToday = list.reduce((s, p) => s + (p.last_usage_reset === today ? (p.usage_count || 0) : 0), 0);
   const totalAllTime = list.reduce((s, p) => s + (p.usage_count || 0), 0);
-  res.json({ totalToday, totalAllTime, perUser: list });
+  res.json({ totalToday, totalAllTime, perUser: await withEmails(list) });
 });
 
 // GET /api/admin/stats — basic platform stats

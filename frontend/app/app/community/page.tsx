@@ -68,7 +68,7 @@ export default function CommunityPage() {
   }
 
   async function fetchLeaderboard() {
-    const { data } = await supabase.from('profiles').select('username, picks_score, total_gain_pct').order('picks_score', { ascending: false }).limit(10)
+    const { data } = await supabase.from('leaderboard_profiles').select('username, picks_score, total_gain_pct').order('picks_score', { ascending: false }).limit(10)
     setLeaderboard(data || [])
   }
 
