@@ -33,7 +33,7 @@ const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
   {
     title: 'Open the Developers page',
     what: [
-      'While signed in to Akahu, open the page called Developers. This is where personal apps live.',
+      'While signed in to Akahu, open the menu (the three lines at the top left) and choose Developers. You can also go straight to my.akahu.nz/developers.',
       'Don’t let the name put you off: you don’t need to be a developer, and you won’t need to write any code.',
     ],
     stuck: [

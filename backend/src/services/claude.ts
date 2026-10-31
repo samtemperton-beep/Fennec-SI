@@ -365,7 +365,7 @@ What they are doing: Fennec connects to banks, brokers and KiwiSaver through Aka
 The steps, from Akahu's documentation:
 1. Go to my.akahu.nz and create an Akahu profile (email address, then follow the prompts).
 2. Connect a first bank account to that profile. This is required before step 3 works.
-3. Sign in to Akahu and open the "Developers" page.
+3. Sign in to Akahu, open the menu (three lines at the top left; it lists Apps, Profile, Developers, Logout) and choose Developers, or go to my.akahu.nz/developers. The "My apps" page is different: it only lists apps they have approved, so it can look empty.
 4. Agree to Akahu's Developer Terms the first time.
 5. Set up multi-factor authentication, which Akahu requires. An authenticator app such as Google Authenticator or Microsoft Authenticator works for that kind of step.
 6. Akahu then shows two tokens: the "User Access Token" and the "App ID Token". If it asks for an app name, "My Finances" is fine.
