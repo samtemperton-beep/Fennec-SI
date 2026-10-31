@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
+import { AkahuGuide } from '@/components/onboarding/AkahuGuide'
+import { SetupHelpChat } from '@/components/onboarding/SetupHelpChat'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconCheck, IconArrowRight, IconPlugConnected, IconUpload, IconExternalLink, IconChartBar, IconWallet, IconNewSection, IconUsers, IconBriefcase } from '@tabler/icons-react'
 import { toast } from 'sonner'
@@ -133,6 +135,10 @@ export default function OnboardingPage() {
 
   async function saveAkahuTokens() {
     if (!appToken || !userToken) return
+    if (appToken.trim().startsWith('user_token_') || userToken.trim().startsWith('app_token_')) {
+      toast.error('Those two tokens look swapped. The App ID Token starts with app_token_ and the User Access Token with user_token_.')
+      return
+    }
     setSavingTokens(true)
     try {
       await api.saveAkahuCredentials(appToken.trim(), userToken.trim())
@@ -330,32 +336,15 @@ export default function OnboardingPage() {
         {step === 'akahu-tokens' && (
           <div className="card" style={{ padding: 28 }}>
             <FennecMessage>
-              You&apos;ll need to create a <strong>personal app</strong> on Akahu to get your tokens. It takes about 2 minutes — here&apos;s how:
+              This is the fiddliest part of setting up, so we&apos;ll go one step at a time. You&apos;ll create a free <strong>personal app</strong> on Akahu, which gives you two tokens to paste in here. Tick off each step as you go.
             </FennecMessage>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-              {[
-                { n: 1, text: 'Go to my.akahu.nz and sign in (or create a free account)' },
-                { n: 2, text: 'Click "Apps" → "New App" → give it any name (e.g. "Fennec SI")' },
-                { n: 3, text: 'In the app, go to "Connections" and link your bank and broker accounts' },
-                { n: 4, text: 'Copy the App Token and User Token from the app dashboard' },
-              ].map(s => (
-                <div key={s.n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{s.n}</div>
-                  <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, margin: 0 }}>{s.text}</p>
-                </div>
-              ))}
-            </div>
-
-            <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, textDecoration: 'none', marginBottom: 20 }}
-            >
-              <IconExternalLink size={14} /> Open my.akahu.nz
-            </a>
+            <AkahuGuide />
+            <SetupHelpChat />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>App Token</label>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>App ID Token</label>
                 <input type="password" placeholder="app_token_..." value={appToken} onChange={e => setAppToken(e.target.value)}
                   style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', display: 'block' }}
                   onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
@@ -363,7 +352,7 @@ export default function OnboardingPage() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>User Token</label>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>User Access Token</label>
                 <input type="password" placeholder="user_token_..." value={userToken} onChange={e => setUserToken(e.target.value)}
                   style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', display: 'block' }}
                   onFocus={e => (e.target.style.borderColor = 'var(--primary)')}

@@ -99,7 +99,7 @@ export default function LeaderboardPage() {
       )}
 
       <p style={{ marginTop: 24, fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>
-        Rankings based on verified holdings only. Updated in real time as prices refresh.
+        Rankings based on verified holdings only. Prices come from each broker through Akahu and update about once a day.
       </p>
     </div>
   )

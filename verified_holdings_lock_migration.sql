@@ -35,3 +35,28 @@ create trigger protect_holding_verification
 
 -- Users could also write their own "verified" record. Only the backend does now.
 drop policy if exists "Users can insert own verifications" on public.portfolio_verifications;
+
+-- ── Leaderboard prices (second run of this file adds this) ───────────────────
+-- The leaderboard ranks on the stored current_price of verified holdings. Only
+-- the backend's Akahu sync may change that, so it can't be inflated from a
+-- browser. The portfolio page still shows live prices on screen.
+create or replace function public.protect_holding_verification()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user in ('authenticated', 'anon') then
+    if tg_op = 'INSERT' then
+      new.is_verified := false;
+    elsif new.shares is distinct from old.shares or new.buy_price is distinct from old.buy_price then
+      new.is_verified := false;
+    else
+      if old.is_verified then
+        new.current_price := old.current_price;
+      end if;
+      new.is_verified := old.is_verified;
+    end if;
+  end if;
+  return new;
+end;
+$$;

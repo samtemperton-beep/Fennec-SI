@@ -107,6 +107,43 @@ router.post('/chat', requireAuth, async (req, res) => {
   res.end();
 });
 
+// Setup help during onboarding. Doesn't use the daily AI quota: someone stuck on
+// sign-up shouldn't be told they've run out. Capped per user per day instead.
+const SETUP_HELP_DAILY_LIMIT = 40;
+const setupHelpUse = new Map<string, { day: string; count: number }>();
+const SECRET_LIKE = /\b(app_token_|user_token_)\S+/gi;
+
+router.post('/setup-help', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  const { messages } = req.body ?? {};
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 30) {
+    return res.status(400).json({ error: 'messages required' });
+  }
+  const clean = messages
+    .filter((m: any) => (m?.role === 'user' || m?.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+    // Tokens should never reach the AI, even if someone pastes one.
+    .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content.slice(0, 1500).replace(SECRET_LIKE, '[token removed]') }));
+  if (clean.length === 0 || clean[clean.length - 1].role !== 'user') {
+    return res.status(400).json({ error: 'messages required' });
+  }
+
+  const day = new Date().toISOString().slice(0, 10);
+  const use = setupHelpUse.get(user.id);
+  const count = use?.day === day ? use.count : 0;
+  if (count >= SETUP_HELP_DAILY_LIMIT) {
+    return res.status(429).json({ error: "That's a lot of questions for one day. You can skip this step and connect from Settings later." });
+  }
+  setupHelpUse.set(user.id, { day, count: count + 1 });
+
+  try {
+    const settings = await getPlatformSettings();
+    res.json({ reply: await claude.setupHelp(clean, settings['model_setup_help']) });
+  } catch (e: any) {
+    console.error('[setup-help]', e?.message ?? e);
+    res.status(502).json({ error: "Fennec can't answer right now. Try again in a moment, or skip this step and connect later." });
+  }
+});
+
 // Dashboard daily briefing. Written once per user per day from a compact
 // snapshot the dashboard sends (net worth, cash flow, notifications), then
 // cached, so opening the dashboard repeatedly never re-spends AI quota. An

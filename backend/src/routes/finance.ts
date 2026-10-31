@@ -47,6 +47,23 @@ router.post('/credentials', requireAuth, async (req: any, res) => {
     return res.status(400).json({ error: 'app_token and user_token required' });
   }
 
+  // Try the tokens before saving, so a bad paste fails here rather than later as
+  // a sync that silently never works. Only a clear rejection blocks saving: if
+  // Akahu can't be reached, the tokens may be fine.
+  try {
+    const check = await fetch('https://api.akahu.io/v1/me', {
+      headers: { Authorization: `Bearer ${user_token.trim()}`, 'X-Akahu-Id': app_token.trim() },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (check.status === 401 || check.status === 403) {
+      return res.status(400).json({
+        error: "Akahu didn't accept those tokens. Check you've copied each one in full, into the right box, with no extra spaces.",
+      });
+    }
+  } catch (e: any) {
+    console.warn('[akahu] could not test tokens:', e?.message ?? e);
+  }
+
   try {
     await saveAkahuCredentials(supabase, userId, app_token, user_token);
   } catch (e: any) {

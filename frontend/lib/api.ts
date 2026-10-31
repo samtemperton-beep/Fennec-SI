@@ -170,6 +170,9 @@ export const api = {
   getAiUsage: () =>
     apiFetch('/api/ai/usage'),
 
+  setupHelp: (messages: { role: 'user' | 'assistant'; content: string }[]): Promise<{ reply: string }> =>
+    apiFetch('/api/ai/setup-help', { method: 'POST', body: JSON.stringify({ messages }) }),
+
   getDailySummary: (facts: object, date: string, refresh = false): Promise<{ summary: string; generatedAt: string; cached: boolean }> =>
     apiFetch('/api/ai/daily-summary', { method: 'POST', body: JSON.stringify({ facts, date, refresh }) }),
 
