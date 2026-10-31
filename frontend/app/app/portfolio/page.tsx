@@ -547,15 +547,7 @@ export default function PortfolioPage() {
         </form>
       </Modal>
 
-      <VerifyPortfolioModal
-        open={verifyOpen}
-        onClose={() => setVerifyOpen(false)}
-        onVerified={(tickers) => {
-          setVerification({ status: 'verified', verified_tickers: tickers })
-          api.getPremiumStatus().then(s => setBadges(s.badges || [])).catch(() => {})
-          toast.success(`${tickers.length} holding${tickers.length !== 1 ? 's' : ''} verified!`)
-        }}
-      />
+      <VerifyPortfolioModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
 
       {/* Import/Sync Holdings Modal — two-step: upload → preview → confirm */}
       <Modal open={syncOpen} onClose={() => { setSyncOpen(false); setCsvText(''); setSyncPreview(null) }} title={holdings.length === 0 ? 'Import Holdings' : 'Sync Holdings'} wide>

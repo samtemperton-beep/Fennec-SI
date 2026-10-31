@@ -56,10 +56,13 @@ const FEATURES = [
   },
 ]
 
+// From Akahu's supported integrations: https://developers.akahu.nz/docs/integrations
+// Grouping is ours. Most of the KiwiSaver group also run non-KiwiSaver funds.
 const AKAHU_SUPPORTED = [
-  'Hatch', 'Sharesies', 'InvestNow', 'Simplicity', 'Kernel', 'ANZ Investments',
-  'ASB Securities', 'BNZ Investments', 'Westpac', 'ANZ', 'ASB', 'BNZ',
-  'Kiwibank', 'TSB', 'Co-operative Bank', 'Heartland Bank',
+  { label: 'Banks', names: ['ANZ', 'ASB', 'BNZ', 'Kiwibank', 'Westpac', 'TSB', 'The Co-operative Bank', 'Heartland', 'NZHL', 'SBS', 'Rabobank (agribusiness accounts)'] },
+  { label: 'Brokers & investing', names: ['Hatch', 'Sharesies', 'Stake', 'Kernel Wealth', 'Sharesight'] },
+  { label: 'KiwiSaver & funds', names: ['Simplicity', 'Milford', 'Booster', 'Fisher Funds', 'Generate', 'SuperLife', 'Pie Funds'] },
+  { label: 'Cards & other', names: ['American Express', 'Gem Visa', 'Wise'] },
 ]
 
 type Step = 'welcome' | 'features' | 'akahu' | 'akahu-tokens' | 'fallback' | 'profile' | 'done'
@@ -284,9 +287,9 @@ export default function OnboardingPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
               {[
                 { icon: '🏦', title: 'Live bank account balances', body: 'ANZ, ASB, BNZ, Kiwibank, Westpac and more — all in one place.' },
-                { icon: '📈', title: 'Real portfolio data from your broker', body: 'Hatch, Sharesies, InvestNow, Kernel and others sync automatically. No manual entry.' },
+                { icon: '📈', title: 'Real portfolio data from your broker', body: 'Hatch, Sharesies, Stake, Kernel and others sync automatically. No manual entry.' },
                 { icon: '🥝', title: 'KiwiSaver balance', body: 'Your retirement savings updated whenever your provider reports it.' },
-                { icon: '✅', title: 'Verified portfolio for the leaderboard', body: 'Direct broker connection = instant verification. No document uploads needed.' },
+                { icon: '✅', title: 'Verified portfolio for the leaderboard', body: 'Akahu is the only way to verify a portfolio, because the data comes straight from your broker. Uploads can be edited, so they don’t count. Premium feature.' },
               ].map(item => (
                 <div key={item.title} style={{ display: 'flex', gap: 12, padding: '12px 14px', borderRadius: 10, background: 'var(--surface2)' }}>
                   <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
@@ -301,7 +304,11 @@ export default function OnboardingPage() {
             {/* Supported apps */}
             <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(44,110,106,0.06)', border: '1px solid rgba(44,110,106,0.2)', marginBottom: 20 }}>
               <p style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'var(--primary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Supported apps</p>
-              <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, margin: 0 }}>{AKAHU_SUPPORTED.join(' · ')}</p>
+              {AKAHU_SUPPORTED.map(g => (
+                <p key={g.label} style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, margin: '0 0 6px' }}>
+                  <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{g.label}:</strong> {g.names.join(' · ')}
+                </p>
+              ))}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
