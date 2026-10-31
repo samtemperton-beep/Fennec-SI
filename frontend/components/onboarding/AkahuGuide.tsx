@@ -37,7 +37,7 @@ const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
       'Don’t let the name put you off: you don’t need to be a developer, and you won’t need to write any code.',
     ],
     stuck: [
-      'Can’t see Developers? Make sure step 2 is finished and you’re signed in, then look through Akahu’s menu.',
+      'Can’t see Developers? Make sure step 2 is finished and you’re signed in, then try my.akahu.nz/developers. The My apps page is different: it only lists apps you’ve approved, so it can look empty.',
     ],
   },
   {
