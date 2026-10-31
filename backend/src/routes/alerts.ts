@@ -116,7 +116,7 @@ router.post('/check', requireAuth, async (req, res) => {
           try {
             const { data: profile } = await supabase.from('profiles').select('username').eq('id', user.id).single();
             await resend.emails.send({
-              from: 'Fennec SI <alerts@fennecsi.app>',
+              from: 'Fennec <alerts@fennecsi.com>',
               to: user.email,
               subject: `Alert: ${alert.ticker} ${alert.type} $${alert.price}`,
               html: `<h2>Fennec SI Alert</h2><p>Hi ${profile?.username || 'there'},</p><p>${alert.ticker} is now $${price.toFixed(2)} — your ${alert.type} $${alert.price} alert was triggered.</p><p><a href="${process.env.FRONTEND_URL}/app/alerts">View alerts</a></p>`,
