@@ -146,16 +146,19 @@ router.get('/status', requireAuth, async (req: any, res) => {
 
 // ── DELETE /api/gmail/disconnect ──────────────────────────────────────────────
 router.delete('/disconnect', requireAuth, async (req: any, res) => {
-  const userId = req.user.id;
-  // Revoke at Google too, so the access is really gone (best-effort).
+  await revokeGmail(req.user.id);
+  res.json({ ok: true });
+});
+
+/** Revokes at Google too, so the access is really gone (best-effort), then removes our copy. */
+export async function revokeGmail(userId: string) {
   try {
     const { data } = await supabase.from('gmail_tokens').select('refresh_token, access_token').eq('user_id', userId).maybeSingle();
     const token = unseal(data?.refresh_token, userId) || unseal(data?.access_token, userId);
     if (token) await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`, { method: 'POST' });
   } catch { /* still remove our copy */ }
   await supabase.from('gmail_tokens').delete().eq('user_id', userId);
-  res.json({ ok: true });
-});
+}
 
 // ── Helper: get a valid access token ─────────────────────────────────────────
 async function getAccessToken(userId: string): Promise<string> {

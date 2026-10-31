@@ -28,7 +28,6 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
-  const [isMember, setIsMember] = useState<boolean | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -37,14 +36,9 @@ export default function AccountsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
-    const { data: member } = await supabase.from('household_members').select('role').eq('user_id', user.id).maybeSingle()
-    setIsMember(!!member)
-
-    if (member) {
-      const { data, error } = await supabase.from('fin_accounts').select('*').order('owner').order('name')
-      if (error) toast.error(error.message)
-      else setAccounts(data || [])
-    }
+    const { data, error } = await supabase.from('fin_accounts').select('*').order('owner').order('name')
+    if (error) toast.error(error.message)
+    else setAccounts(data || [])
     setLoading(false)
   }
 
@@ -76,18 +70,6 @@ export default function AccountsPage() {
   }, {})
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><LoadingSpinner size={32} /></div>
-
-  if (isMember === false) return (
-    <div style={{ padding: 28 }}>
-      <div className="card" style={{ maxWidth: 480, textAlign: 'center', padding: 40 }}>
-        <IconBuildingBank size={36} style={{ color: 'var(--primary)', marginBottom: 16 }} />
-        <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Finance not set up yet</h2>
-        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>
-          Run the <strong>finance_migration.sql</strong> file in your Supabase SQL editor, then add yourself to <code>household_members</code>.
-        </p>
-      </div>
-    </div>
-  )
 
   return (
     <div style={{ padding: 28 }}>

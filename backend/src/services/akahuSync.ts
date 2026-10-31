@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { FREE_MAX_HOLDINGS } from '../middleware/auth';
 import { evaluateAndAwardBadges } from './badges';
-import { fetchAkahuAccounts, mapAkahuAccounts, planHoldingSync } from './akahu';
+import { AkahuTokensRejected, fetchAkahuAccounts, mapAkahuAccounts, planHoldingSync } from './akahu';
+import { setAkahuProblem } from './akahuHealth';
 import { buildSnapshotRows, saveSnapshots } from './snapshots';
 import { loadAkahuCredentials } from './akahuCredentials';
 import { saveVerification } from '../routes/premium';
@@ -46,6 +47,7 @@ export async function runAkahuSync(
   try {
     portfolio = mapAkahuAccounts(await fetchAkahuAccounts(creds.appToken, creds.userToken));
   } catch (e: any) {
+    if (e instanceof AkahuTokensRejected) await setAkahuProblem(supabase, userId, 'tokens');
     throw new SyncError(502, { error: e.message });
   }
 

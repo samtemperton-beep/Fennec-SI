@@ -102,7 +102,7 @@ function TransactionsPageInner() {
     const keyword = pattern.trim().toLowerCase()
     const { error } = await supabase.from('fin_category_rules').upsert(
       { keyword, category_id: creatingRule.categoryId },
-      { onConflict: 'keyword' }
+      { onConflict: 'user_id,keyword' }
     )
     if (error) { toast.error(error.message); setSavingRule(false); return }
 

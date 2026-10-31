@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Avatar } from '@/components/shared/Avatar'
-import { IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconCrown, IconExternalLink, IconShieldCheck, IconShieldOff, IconQrcode, IconCopy } from '@tabler/icons-react'
+import { IconUpload, IconTarget, IconEdit, IconX, IconCrown, IconExternalLink, IconShieldCheck, IconShieldOff, IconQrcode, IconCopy } from '@tabler/icons-react'
 import { BROKERS, getBrokerById, type Broker } from '@/lib/brokers'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
+import { DeleteAccount } from '@/components/settings/DeleteAccount'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
@@ -714,21 +715,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Danger zone */}
-      <div className="card mt-6 mb-8" style={{ border: '1px solid rgba(240,84,84,0.3)' }}>
-        <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--red)', marginBottom: 8 }}>Danger Zone</h2>
-        <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>Permanently delete your account and all associated data.</p>
-        <button onClick={async () => {
-          if (!confirm('Are you sure? This will permanently delete your account and all data.')) return
-          await supabase.from('profiles').delete().eq('id', user.id)
-          await supabase.auth.signOut()
-          window.location.href = '/'
-        }} className="flex items-center gap-2 px-4 py-2 rounded-lg"
-          style={{ background: 'rgba(240,84,84,0.1)', color: 'var(--red)', border: '1px solid rgba(240,84,84,0.3)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}
-        >
-          <IconTrash size={16} /> Delete Account
-        </button>
-      </div>
+      <DeleteAccount />
     </div>
   )
 }
@@ -739,13 +726,29 @@ function AkahuSettings({ supabase }: { supabase: any }) {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [hasCreds, setHasCreds] = useState(false)
+  const [problem, setProblem] = useState<{ problem: string; detail: string | null } | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
 
   useEffect(() => {
     // Only the row's existence is needed; the token columns aren't readable from the browser.
     supabase.from('akahu_credentials').select('user_id').maybeSingle().then(({ data }: any) => {
       if (data) setHasCreds(true)
     })
+    supabase.from('akahu_connection_status').select('problem, detail').maybeSingle().then(({ data }: any) => {
+      if (data) setProblem(data)
+    })
   }, [])
+
+  async function disconnect() {
+    setDisconnecting(true)
+    try {
+      await api.disconnectAkahu()
+      setHasCreds(false); setProblem(null); setConfirming(false); setSaved(false)
+      toast.success('Akahu disconnected')
+    } catch (e: any) { toast.error(e.message) }
+    setDisconnecting(false)
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -754,7 +757,7 @@ function AkahuSettings({ supabase }: { supabase: any }) {
     try {
       // Sent to the server, which encrypts them before they're stored.
       await api.saveAkahuCredentials(appToken.trim(), userToken.trim())
-      setSaved(true); setHasCreds(true); setAppToken(''); setUserToken('')
+      setSaved(true); setHasCreds(true); setProblem(null); setAppToken(''); setUserToken('')
       toast.success('Akahu tokens saved')
     } catch (e: any) { toast.error(e.message) }
     setSaving(false)
@@ -764,18 +767,25 @@ function AkahuSettings({ supabase }: { supabase: any }) {
     <div className="card mt-6" style={{ marginTop: 24 }}>
       <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Akahu Sync</h2>
       <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
-        Connect your NZ bank, Hatch and KiwiSaver accounts via <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Akahu</a>. Your Hatch portfolio and KiwiSaver balance then stay up to date automatically. Create a personal app at my.akahu.nz/apps to get your tokens.
-        {hasCreds && <span style={{ marginLeft: 8, color: 'var(--green)', fontWeight: 600 }}>✓ Connected</span>}
+        Connect your NZ bank, Hatch and KiwiSaver accounts via <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Akahu</a>. Your Hatch portfolio and KiwiSaver balance then stay up to date automatically. Create a personal app at my.akahu.nz/developers to get your tokens.
+        {hasCreds && !problem && <span style={{ marginLeft: 8, color: 'var(--green)', fontWeight: 600 }}>✓ Connected</span>}
       </p>
+      {problem && (
+        <div style={{ background: 'rgba(240,84,84,0.1)', border: '1px solid rgba(240,84,84,0.3)', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text)', lineHeight: 1.55, marginBottom: 14 }}>
+          {problem.problem === 'tokens'
+            ? <>Akahu has stopped accepting your tokens, so nothing is updating. Copy fresh tokens from <a href="https://my.akahu.nz/developers" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>my.akahu.nz/developers</a> and save them below.</>
+            : <><strong>{problem.detail}</strong> needs reconnecting. Sign in at <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>my.akahu.nz</a> and reconnect it. Your tokens stay the same, so there&apos;s nothing to change here.</>}
+        </div>
+      )}
       <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>App Token</label>
+          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>App ID Token</label>
           <input type="password" value={appToken} onChange={e => setAppToken(e.target.value)}
             placeholder={hasCreds ? '••••••••• (saved)' : 'app_token_...'}
             style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }} />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>User Token</label>
+          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>User Access Token</label>
           <input type="password" value={userToken} onChange={e => setUserToken(e.target.value)}
             placeholder={hasCreds ? '••••••••• (saved)' : 'user_token_...'}
             style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }} />
@@ -785,6 +795,28 @@ function AkahuSettings({ supabase }: { supabase: any }) {
           {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Akahu Tokens'}
         </button>
       </form>
+      {hasCreds && (
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+          {!confirming ? (
+            <button onClick={() => setConfirming(true)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--red)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              Disconnect Akahu
+            </button>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }}>
+                This deletes your saved tokens and everything Akahu synced: bank accounts, transactions, account history, Akahu holdings and your synced KiwiSaver balance. Portfolio verification goes too. Holdings you added yourself, bills, goals and your net worth history stay. To cut off access at the source as well, remove your tokens at my.akahu.nz/developers.
+              </p>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button onClick={disconnect} disabled={disconnecting}
+                  style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--red)', color: 'white', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: disconnecting ? 0.6 : 1 }}>
+                  {disconnecting ? 'Disconnecting…' : 'Yes, disconnect and delete'}
+                </button>
+                <button onClick={() => setConfirming(false)} disabled={disconnecting} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

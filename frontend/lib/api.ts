@@ -90,6 +90,10 @@ export const api = {
   saveAkahuCredentials: (appToken: string, userToken: string) =>
     apiFetch('/api/finance/credentials', { method: 'POST', body: JSON.stringify({ app_token: appToken, user_token: userToken }) }),
 
+  disconnectAkahu: () => apiFetch('/api/finance/akahu', { method: 'DELETE' }),
+
+  deleteAccount: () => apiFetch('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) }),
+
   getEarningsCalendar: (tickers: string[]) =>
     apiFetch(`/api/news/earnings?tickers=${tickers.join(',')}`),
 

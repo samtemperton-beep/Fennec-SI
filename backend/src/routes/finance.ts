@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { loadAkahuCredentials, saveAkahuCredentials, credentialsErrorResponse } from '../services/akahuCredentials';
 import { syncFinanceAccounts } from '../services/financeSync';
+import { clearAkahuProblem } from '../services/akahuHealth';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -68,6 +69,18 @@ router.post('/credentials', requireAuth, async (req: any, res) => {
     await saveAkahuCredentials(supabase, userId, app_token, user_token);
   } catch (e: any) {
     return credentialsErrorResponse(res, e);
+  }
+  await clearAkahuProblem(supabase, userId);
+  res.json({ ok: true });
+});
+
+// ── DELETE /api/finance/akahu ────────────────────────────────────────────────
+// Removes the saved tokens and everything they synced. Manual entries stay.
+router.delete('/akahu', requireAuth, async (req: any, res) => {
+  const { error } = await supabase.rpc('disconnect_akahu', { target: req.user.id });
+  if (error) {
+    console.error('[akahu] disconnect failed:', error.message);
+    return res.status(500).json({ error: "We couldn't disconnect Akahu, and nothing was removed. Please try again." });
   }
   res.json({ ok: true });
 });

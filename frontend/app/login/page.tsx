@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { safeNext } from '@/lib/safeNext'
 import { checkEmail } from '@/lib/emailCheck'
+import { checkPassword, PASSWORD_MIN } from '@/lib/password'
 import { FoxIcon } from '@/components/shared/FoxIcon'
 import { IconMail, IconLoader, IconLock, IconEye, IconEyeOff, IconShieldCheck, IconArrowLeft } from '@tabler/icons-react'
 
@@ -76,7 +77,8 @@ export default function LoginPage() {
   async function signUpPassword(e: React.FormEvent) {
     e.preventDefault()
     if (!agreed || !email || !password) return
-    if (password.length < 8) { setError('Use at least 8 characters for your password.'); return }
+    const weak = checkPassword(password, email)
+    if (weak) { setError(weak); return }
     if (password !== confirmPw) { setError("The two passwords don't match."); return }
     setLoading('password')
     setError('')
@@ -113,7 +115,9 @@ export default function LoginPage() {
 
   async function saveNewPassword(e: React.FormEvent) {
     e.preventDefault()
-    if (password.length < 8) { setError('Use at least 8 characters for your password.'); return }
+    const { data: { user: current } } = await supabase.auth.getUser()
+    const weakNew = checkPassword(password, current?.email ?? '')
+    if (weakNew) { setError(weakNew); return }
     if (password !== confirmPw) { setError("The two passwords don't match."); return }
     setLoading('password')
     setError('')
@@ -468,7 +472,7 @@ export default function LoginPage() {
                     </div>
                   )}
                   <label style={fieldLabel}>Password</label>
-                  <input type="password" autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={e => setPassword(e.target.value)} required style={fieldInput} />
+                  <input type="password" autoComplete="new-password" placeholder={`At least ${PASSWORD_MIN} characters`} value={password} onChange={e => setPassword(e.target.value)} required style={fieldInput} />
                   <label style={fieldLabel}>Type it again</label>
                   <input type="password" autoComplete="new-password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required style={fieldInput} />
                   {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{error}</p>}

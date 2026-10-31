@@ -450,13 +450,25 @@ export function netWorthTrendInsights(netWorthHistory: { date: string; total: nu
 }
 
 async function syncInsights({ supabase, userId }: InsightContext): Promise<Insight[]> {
-  const [{ data: status }, { data: accts }] = await Promise.all([
+  const [{ data: connection }, { data: status }, { data: accts }] = await Promise.all([
+    supabase.from('akahu_connection_status').select('problem, detail, updated_at').eq('user_id', userId).maybeSingle(),
     supabase.from('akahu_sync_status').select('synced_at').eq('user_id', userId).maybeSingle(),
     supabase.from('fin_accounts').select('last_synced').eq('user_id', userId).not('akahu_account_id', 'is', null)
       .order('last_synced', { ascending: false }).limit(1),
   ])
   const out: Insight[] = []
   const age = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+  // The cause is known, so say what to do instead of only that the data is old.
+  if (connection) {
+    return [{
+      id: `akahu-${connection.problem}:${connection.detail ?? ''}`, severity: 'critical', section: 'sync',
+      title: connection.problem === 'tokens' ? 'Your Akahu tokens have stopped working' : `${connection.detail} needs reconnecting`,
+      detail: connection.problem === 'tokens'
+        ? 'Your accounts aren\'t updating. Add fresh tokens in Settings.'
+        : 'Reconnect it at my.akahu.nz. Your tokens stay the same.',
+      href: '/app/settings',
+    }]
+  }
   if (status?.synced_at && age(status.synced_at) >= 2) {
     out.push({
       id: `sync-investments:${status.synced_at}`, severity: 'warning', section: 'sync',

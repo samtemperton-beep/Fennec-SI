@@ -80,13 +80,19 @@ const round = (n: number, dp: number) => {
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 
 // ── Akahu API ────────────────────────────────────────────────────────────────
+export class AkahuTokensRejected extends Error {
+  constructor() {
+    super('Akahu rejected your tokens. Re-enter them in Settings → Akahu.');
+  }
+}
+
 export async function fetchAkahuAccounts(appToken: string, userToken: string): Promise<AkahuAccount[]> {
   const res = await fetch(`${AKAHU_BASE}/accounts`, {
     headers: { Authorization: `Bearer ${userToken}`, 'X-Akahu-Id': appToken },
   });
   const body: any = await res.json().catch(() => ({}));
   if (res.status === 401 || res.status === 403) {
-    throw new Error('Akahu rejected your tokens. Re-enter them in Settings → Akahu.');
+    throw new AkahuTokensRejected();
   }
   if (!res.ok || !body.success) {
     throw new Error(`Akahu error: ${body.message ?? res.statusText}`);

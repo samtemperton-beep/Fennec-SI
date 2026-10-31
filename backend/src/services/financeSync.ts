@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadAkahuCredentials, type AkahuCredentials } from './akahuCredentials';
+import { AkahuTokensRejected } from './akahu';
+import { clearAkahuProblem, setAkahuProblem } from './akahuHealth';
 
 // Bank-side Akahu sync: account balances into fin_accounts and new transactions
 // into fin_transactions. Shared by POST /api/finance/sync (the Sync button) and
@@ -13,6 +15,7 @@ function makeAkahuClient(appToken: string, userToken: string) {
 
   async function get(path: string) {
     const res = await fetch(`${AKAHU_BASE}${path}`, { headers });
+    if (res.status === 401 || res.status === 403) throw new AkahuTokensRejected();
     const body: any = await res.json();
     if (!res.ok || !body.success) throw new Error(`Akahu (${path}): ${body.message ?? res.statusText}`);
     return body;
@@ -54,7 +57,13 @@ export async function syncFinanceAccounts(
   const lastSyncedAt: string | undefined = creds.lastSyncedAt ?? undefined;
   const akahu = makeAkahuClient(appToken, userToken);
 
-  const akahuAccounts = await akahu.listAccounts();
+  let akahuAccounts: any[];
+  try {
+    akahuAccounts = await akahu.listAccounts();
+  } catch (e) {
+    if (e instanceof AkahuTokensRejected) await setAkahuProblem(supabase, userId, 'tokens');
+    throw e;
+  }
   let accountsUpserted = 0;
   let txsInserted = 0;
 
@@ -63,6 +72,7 @@ export async function syncFinanceAccounts(
     const { data: existing } = await supabase
       .from('fin_accounts')
       .select('id')
+      .eq('user_id', userId)
       .eq('akahu_account_id', aa._id)
       .maybeSingle();
 
@@ -106,6 +116,13 @@ export async function syncFinanceAccounts(
       txsInserted += count ?? 0;
     }
   }
+
+  // The tokens work, but a bank's own connection can lapse and need renewing.
+  const lapsed = [...new Set(
+    akahuAccounts.filter((a) => a.status === 'INACTIVE').map((a) => (a.connection?.name ?? a.name) as string)
+  )];
+  if (lapsed.length) await setAkahuProblem(supabase, userId, 'connection', lapsed.join(', '));
+  else await clearAkahuProblem(supabase, userId);
 
   // Update last synced timestamp
   await supabase.from('akahu_credentials').update({ last_synced_at: new Date().toISOString() }).eq('user_id', userId);

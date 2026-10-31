@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Avatar } from '@/components/shared/Avatar'
-import { IconSettings, IconTrash, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar, IconCrown, IconSun, IconMoon, IconExternalLink } from '@tabler/icons-react'
+import { IconSettings, IconUpload, IconTarget, IconEdit, IconX, IconArrowLeft, IconChartBar, IconCrown, IconSun, IconMoon, IconExternalLink } from '@tabler/icons-react'
 import { BROKERS, getBrokerById, type Broker } from '@/lib/brokers'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
+import { DeleteAccount } from '@/components/settings/DeleteAccount'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
@@ -608,21 +609,7 @@ export default function SettingsPage() {
         </button>
       </form>
 
-      {/* Danger zone */}
-      <div className="card mt-6 mb-8" style={{ border: '1px solid rgba(240,84,84,0.3)' }}>
-        <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--red)', marginBottom: 8 }}>Danger Zone</h2>
-        <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>Permanently delete your account and all associated data.</p>
-        <button onClick={async () => {
-          if (!confirm('Are you sure? This will permanently delete your account and all data.')) return
-          await supabase.from('profiles').delete().eq('id', user.id)
-          await supabase.auth.signOut()
-          window.location.href = '/'
-        }} className="flex items-center gap-2 px-4 py-2 rounded-lg"
-          style={{ background: 'rgba(240,84,84,0.1)', color: 'var(--red)', border: '1px solid rgba(240,84,84,0.3)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}
-        >
-          <IconTrash size={16} /> Delete Account
-        </button>
-      </div>
+      <DeleteAccount />
     </div>
     </div>
   )
