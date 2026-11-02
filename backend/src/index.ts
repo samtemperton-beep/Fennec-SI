@@ -17,6 +17,7 @@ import financeRouter from './routes/finance';
 import akahuRouter from './routes/akahu';
 import gmailRouter from './routes/gmail';
 import accountRouter from './routes/account';
+import partnerRouter from './routes/partner';
 import { startScheduledSync } from './services/scheduler';
 import networthRouter from './routes/networth';
 
@@ -61,6 +62,7 @@ app.use('/api/akahu', akahuRouter);
 app.use('/api/networth', networthRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/account', accountRouter);
+app.use('/api/partner', partnerRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));
 

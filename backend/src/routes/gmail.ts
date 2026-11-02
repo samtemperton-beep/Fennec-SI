@@ -425,7 +425,7 @@ ${JSON.stringify(emailSummaries, null, 2)}`;
 // ── GET /api/gmail/items ──────────────────────────────────────────────────────
 // Return previously scanned items, after checking the bank for any that have
 // since been paid.
-router.get('/items', requireAuth, async (req: any, res) => {
+router.get('/items', requireAuth, requireFeature('inbox'), async (req: any, res) => {
   await reconcileInboxItems(supabase, req.user.id).catch(() => 0);
   const { data } = await supabase.from('gmail_scanned_items')
     .select('*')
@@ -437,7 +437,7 @@ router.get('/items', requireAuth, async (req: any, res) => {
 
 // ── PATCH /api/gmail/items/:id ────────────────────────────────────────────────
 // Dismiss / restore an item, or mark it paid or unpaid by hand.
-router.patch('/items/:id', requireAuth, async (req: any, res) => {
+router.patch('/items/:id', requireAuth, requireFeature('inbox'), async (req: any, res) => {
   const { dismissed, paid } = req.body ?? {};
   const update: Record<string, any> = {};
   if (typeof dismissed === 'boolean') update.dismissed = dismissed;

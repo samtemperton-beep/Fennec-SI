@@ -8,7 +8,10 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const token_hash = searchParams.get('token_hash')
-  const type = searchParams.get('type') as 'magiclink' | 'email' | null
+  // 'recovery' comes from the reset-password email, which links here with a
+  // token_hash so the link works in any browser (a ?code= link only works in
+  // the browser that asked for the reset).
+  const type = searchParams.get('type') as 'magiclink' | 'email' | 'recovery' | null
   const next = safeNext(searchParams.get('next'))
 
   const cookieStore = await cookies()

@@ -9,7 +9,7 @@ export type Tier = 'free' | 'premium';
 
 export type PlanFeature =
   | 'helper' | 'analyze' | 'summary' | 'news' | 'top10' | 'opportunities'
-  | 'ipo' | 'deep_dive' | 'draft_post' | 'inbox' | 'business' | 'verified';
+  | 'ipo' | 'deep_dive' | 'draft_post' | 'inbox' | 'business' | 'verified' | 'partner';
 
 export type PlanLimit = 'daily_ai_calls' | 'holdings' | 'discover_results';
 
@@ -29,6 +29,7 @@ export const PLAN_FEATURES: Record<PlanFeature, { label: string; desc: string; d
   inbox:         { label: 'Gmail bill scanning',  desc: 'Finds bills and invoices in Gmail',          defaults: { free: false, premium: true } },
   business:      { label: 'Business section',     desc: 'Invoices, business transactions and tax',    defaults: { free: false, premium: true } },
   verified:      { label: 'Verified portfolio',   desc: 'Verified badge and leaderboard ranking',     defaults: { free: false, premium: true } },
+  partner:       { label: 'Partner sharing',      desc: 'Link with a partner to share accounts, bills and goals', defaults: { free: true, premium: true } },
 };
 
 export const PLAN_LIMITS: Record<PlanLimit, { label: string; desc: string; defaults: Record<Tier, number> }> = {

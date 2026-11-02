@@ -8,7 +8,7 @@ import { api } from './api'
 
 export type PlanFeature =
   | 'helper' | 'analyze' | 'summary' | 'news' | 'top10' | 'opportunities'
-  | 'ipo' | 'deep_dive' | 'draft_post' | 'inbox' | 'business' | 'verified'
+  | 'ipo' | 'deep_dive' | 'draft_post' | 'inbox' | 'business' | 'verified' | 'partner'
 export type PlanLimit = 'daily_ai_calls' | 'holdings' | 'discover_results'
 
 export interface Plan {

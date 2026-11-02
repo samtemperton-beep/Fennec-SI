@@ -9,6 +9,7 @@ import { BROKERS, getBrokerById, type Broker } from '@/lib/brokers'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
 import { DeleteAccount } from '@/components/settings/DeleteAccount'
+import { PartnerCard } from '@/components/settings/PartnerCard'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
@@ -633,6 +634,9 @@ export default function SettingsPage() {
 
       {/* Akahu / Finance */}
       <AkahuSettings supabase={supabase} />
+
+      {/* Partner sharing */}
+      <div className="mt-6"><PartnerCard /></div>
 
       {/* Two-Factor Authentication */}
       <div className="card mt-6">

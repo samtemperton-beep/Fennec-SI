@@ -36,7 +36,7 @@ export function DeleteAccount() {
       ) : (
         <div>
           <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }}>
-            This removes your login, portfolio, bank data, Akahu and Gmail connections, posts and everything else in your account. It can&apos;t be undone. If you share a household, joint bills, goals and accounts stay with the other person.
+            This removes your login, portfolio, bank data, Akahu and Gmail connections, posts and everything else in your account. It can&apos;t be undone. If you're linked with a partner, shared bills and goals stay with them.
           </p>
           <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Type DELETE to confirm</label>
           <input value={typed} onChange={e => setTyped(e.target.value)} autoComplete="off"

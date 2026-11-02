@@ -26,7 +26,7 @@ export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', target_amount: '', monthly_contribution: '', target_date: '', owner: 'joint' })
+  const [form, setForm] = useState({ name: '', target_amount: '', monthly_contribution: '', target_date: '', owner: 'me' })
   const [contributing, setContributing] = useState<string | null>(null)
   const [contribAmount, setContribAmount] = useState('')
   const [saving, setSaving] = useState(false)
@@ -53,7 +53,7 @@ export default function GoalsPage() {
       owner: form.owner,
     })
     if (error) { toast.error(error.message) }
-    else { toast.success('Goal created!'); setForm({ name: '', target_amount: '', monthly_contribution: '', target_date: '', owner: 'joint' }); setShowAdd(false); await load() }
+    else { toast.success('Goal created!'); setForm({ name: '', target_amount: '', monthly_contribution: '', target_date: '', owner: 'me' }); setShowAdd(false); await load() }
     setSaving(false)
   }
 
@@ -98,7 +98,7 @@ export default function GoalsPage() {
           <div style={{ flex: 1 }}>
             <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>{g.name}</p>
             <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
-              {g.owner !== 'joint' && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>{g.owner}</span>}
+              {g.owner === 'joint' && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(44,110,106,0.12)', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Shared</span>}
               {g.status === 'paused' && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.15)', color: 'var(--amber)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Paused</span>}
               {isComplete && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(34,197,94,0.15)', color: 'var(--green)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Complete!</span>}
             </div>
@@ -180,7 +180,7 @@ export default function GoalsPage() {
               { label: 'Target Amount (NZD)', el: <input required type="number" min="1" step="0.01" value={form.target_amount} onChange={e => setForm(f => ({ ...f, target_amount: e.target.value }))} placeholder="0.00" style={inp} /> },
               { label: 'Monthly Contribution', el: <input type="number" min="0" step="0.01" value={form.monthly_contribution} onChange={e => setForm(f => ({ ...f, monthly_contribution: e.target.value }))} placeholder="Optional" style={inp} /> },
               { label: 'Target Date', el: <input type="date" value={form.target_date} onChange={e => setForm(f => ({ ...f, target_date: e.target.value }))} style={inp} /> },
-              { label: 'Owner', el: <select value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} style={inp}><option value="joint">Joint</option><option value="me">Me</option><option value="partner">Partner</option></select> },
+              { label: 'Who sees it', el: <select value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} style={inp}><option value="me">Just me</option><option value="joint">Shared with partner</option></select> },
             ].map(({ label, el }) => (
               <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <span style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</span>

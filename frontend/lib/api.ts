@@ -45,6 +45,12 @@ export interface NetWorthResponse {
   historyAvailable: boolean
 }
 
+export interface PartnerInfo { name: string; email: string | null }
+export type PartnerStatus =
+  | { status: 'none' }
+  | { status: 'pending'; code: string }
+  | { status: 'linked'; partner: PartnerInfo; since?: string }
+
 export const api = {
   searchStocks: (q: string) =>
     apiFetch(`/api/prices/search?q=${encodeURIComponent(q)}`),
@@ -91,6 +97,12 @@ export const api = {
     apiFetch('/api/finance/credentials', { method: 'POST', body: JSON.stringify({ app_token: appToken, user_token: userToken }) }),
 
   disconnectAkahu: () => apiFetch('/api/finance/akahu', { method: 'DELETE' }),
+
+  partnerStatus: (): Promise<PartnerStatus> => apiFetch('/api/partner'),
+  partnerInvite: (): Promise<{ code: string }> => apiFetch('/api/partner/invite', { method: 'POST', body: JSON.stringify({}) }),
+  partnerInviteInfo: (code: string): Promise<{ own: boolean; name?: string }> => apiFetch(`/api/partner/invite/${encodeURIComponent(code)}`),
+  partnerAccept: (code: string): Promise<{ ok: true; partner: PartnerInfo }> => apiFetch('/api/partner/accept', { method: 'POST', body: JSON.stringify({ code }) }),
+  partnerUnlink: () => apiFetch('/api/partner', { method: 'DELETE' }),
 
   deleteAccount: () => apiFetch('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) }),
 

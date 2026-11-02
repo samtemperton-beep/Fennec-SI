@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { GmailPanel } from '@/components/bills/GmailPanel'
+import { PremiumLock } from '@/components/premium/PremiumLock'
+import { usePlan } from '@/lib/plan'
 import {
   FREQS, advanceDate, daysUntil, matchEmailsToBills, isPayable, emailName,
   type Bill, type EmailItem, type Freq,
@@ -27,12 +29,13 @@ type Row =
   | { kind: 'bill'; due: string; bill: Bill; email?: EmailItem }
   | { kind: 'email'; due: string | null; email: EmailItem }
 
-const EMPTY_FORM = { name: '', amount: '', frequency: 'monthly' as Freq, next_due_date: '', owner: 'joint' }
+const EMPTY_FORM = { name: '', amount: '', frequency: 'monthly' as Freq, next_due_date: '', owner: 'me' }
 
 function BillsPageInner() {
   const searchParams = useSearchParams()
   const [bills, setBills] = useState<Bill[]>([])
   const [emails, setEmails] = useState<EmailItem[]>([])
+  const { can } = usePlan()
   const [gmail, setGmail] = useState<{ connected: boolean; email: string | null; lastScanned: string | null }>({ connected: false, email: null, lastScanned: null })
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
@@ -112,7 +115,7 @@ function BillsPageInner() {
       amount: item.amount != null ? String(item.amount) : '',
       frequency: 'monthly',
       next_due_date: item.due_date ?? '',
-      owner: 'joint',
+      owner: 'me',
     })
     setFromEmail(item)
     setShowAdd(true)
@@ -178,8 +181,14 @@ function BillsPageInner() {
         </button>
       </div>
 
-      <GmailPanel connected={gmail.connected} email={gmail.email} lastScanned={gmail.lastScanned}
-        scanning={scanning} onConnect={connectGmail} onScan={scan} onDisconnect={disconnectGmail} />
+      {can('inbox') ? (
+        <GmailPanel connected={gmail.connected} email={gmail.email} lastScanned={gmail.lastScanned}
+          scanning={scanning} onConnect={connectGmail} onScan={scan} onDisconnect={disconnectGmail} />
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <PremiumLock compact title="Gmail bill scanning" blurb="Connect Gmail and Fennec finds your bills and invoices, and ticks them off when they're paid." />
+        </div>
+      )}
 
       {showAdd && (
         <form onSubmit={addBill} className="card" style={{ marginBottom: 16, padding: 18 }}>
@@ -191,7 +200,7 @@ function BillsPageInner() {
               { label: 'Amount (NZD)', el: <input required type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" style={inp} /> },
               { label: 'How often', el: <select value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value as Freq }))} style={inp}>{FREQS.map(f => <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</option>)}</select> },
               { label: 'Next due date', el: <input required type="date" value={form.next_due_date} onChange={e => setForm(f => ({ ...f, next_due_date: e.target.value }))} style={inp} /> },
-              { label: 'Owner', el: <select value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} style={inp}><option value="joint">Joint</option><option value="me">Me</option><option value="partner">Partner</option></select> },
+              { label: 'Who sees it', el: <select value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} style={inp}><option value="me">Just me</option><option value="joint">Shared with partner</option></select> },
             ].map(({ label, el }) => (
               <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <span style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</span>
@@ -288,7 +297,7 @@ function BillRow({ bill, email, last, onPaid, onDelete }: { bill: Bill; email?: 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{bill.name}</span>
           {tag(bill.frequency)}
-          {bill.owner !== 'joint' && tag(bill.owner)}
+          {bill.owner === 'joint' && tag('Shared', 'var(--primary)', 'rgba(44,110,106,0.12)')}
           {email && tag('Email received', '#4285F4', 'rgba(66,133,244,0.12)')}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
