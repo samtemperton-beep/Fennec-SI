@@ -270,39 +270,60 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [slideDir, pathname])
 
   const sectionTabs = (Object.entries(SECTIONS) as [SectionKey, Section][])
-    .filter(([key]) => key !== 'dashboard' && sectionVisible(key))
+    .filter(([key]) => sectionVisible(key))
+
+  // Settings and Admin count as the dashboard section, but only the dashboard lights its tab
+  const onDashboard = pathname === '/app/dashboard'
+
+  const logo = (
+    <>
+      <div className="topnav-logo-badge">
+        <FoxIcon size={28} />
+      </div>
+      <div className="topnav-wordmark">
+        <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif', display: 'block', lineHeight: 1.2 }}>Fennec</span>
+        <span style={{ fontSize: 9.5, color: 'var(--text3)', fontStyle: 'italic', lineHeight: 1 }}>spend &amp; invest</span>
+      </div>
+    </>
+  )
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       <header className="topnav">
         <div className="topnav-bar">
-          {/* Logo — doubles as the Dashboard button */}
+          {/* Logo — the Dashboard button on phones; the website has a Dashboard tab */}
+          <div className="topnav-logo topnav-web-only">{logo}</div>
           <Link
             href="/app/dashboard"
-            className={`topnav-logo ${activeSection === 'dashboard' && pathname === '/app/dashboard' ? 'active' : ''}`}
+            className={`topnav-logo topnav-phone-only ${onDashboard ? 'active' : ''}`}
             title="Dashboard"
           >
-            <div className="topnav-logo-badge">
-              <FoxIcon size={28} />
-            </div>
-            <div className="topnav-wordmark">
-              <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif', display: 'block', lineHeight: 1.2 }}>Fennec</span>
-              <span style={{ fontSize: 9.5, color: 'var(--text3)', fontStyle: 'italic', lineHeight: 1 }}>spend &amp; invest</span>
-            </div>
+            {logo}
           </Link>
 
           {/* Main sections */}
           <nav className="topnav-sections">
             {sectionTabs.map(([key, s]) => {
               const Icon = s.icon
+              const isActive = key === 'dashboard' ? onDashboard : activeSection === key
               return (
-                <Link key={key} href={s.defaultHref} title={s.label} className={`topnav-section ${activeSection === key ? 'active' : ''}`}>
+                <Link key={key} href={s.defaultHref} title={s.label} className={`topnav-section ${key === 'dashboard' ? 'topnav-web-only' : ''} ${isActive ? 'active' : ''}`}>
                   <Icon size={18} />
                   <span>{s.label}</span>
                 </Link>
               )
             })}
           </nav>
+
+          {/* Settings — in the account menu on phones */}
+          <Link
+            href="/app/settings"
+            className={`topnav-settings topnav-web-only ${pathname === '/app/settings' ? 'active' : ''}`}
+            title="Settings"
+            aria-label="Settings"
+          >
+            <IconSettings size={20} />
+          </Link>
 
           {/* Account menu */}
           <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
@@ -345,7 +366,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
                 )}
-                <Link href="/app/settings" className={`nav-link mb-1 ${pathname === '/app/settings' ? 'active' : ''}`}>
+                <Link href="/app/settings" className={`nav-link mb-1 topnav-phone-only ${pathname === '/app/settings' ? 'active' : ''}`}>
                   <IconSettings size={15} /> Settings
                 </Link>
                 {isAdmin && (

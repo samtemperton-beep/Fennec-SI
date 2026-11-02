@@ -229,6 +229,24 @@ body {
   border-color: var(--primary);
   color: var(--primary);
 }
+.topnav-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: var(--text2);
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.topnav-settings:hover { background: var(--surface2); color: var(--text); }
+.topnav-settings.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
 .topnav-avatar {
   display: flex;
   border-radius: 999px;
@@ -292,10 +310,20 @@ body {
 }
 .topnav-pill.active svg { opacity: 1; }
 
-@media (max-width: 900px) {
+/* Phones keep the logo as Dashboard and Settings in the account menu */
+@media (min-width: 641px) {
+  .topnav-phone-only { display: none !important; }
+}
+@media (max-width: 960px) {
   .topnav-wordmark { display: none; }
+  .topnav-section { padding: 8px 8px; gap: 5px; font-size: 11px; letter-spacing: .02em; }
+}
+@media (max-width: 760px) {
+  .topnav-section { padding: 8px 10px; }
+  .topnav-section span { display: none; }
 }
 @media (max-width: 640px) {
+  .topnav-web-only { display: none !important; }
   .topnav-bar { gap: 6px; padding: 6px 10px; }
   .topnav-sections { gap: 2px; }
   .topnav-section {
@@ -304,9 +332,10 @@ body {
     gap: 3px;
     padding: 6px 2px;
     font-size: 8.5px;
+    letter-spacing: .04em;
     min-width: 0;
   }
-  .topnav-section span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .topnav-section span { display: inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
   .topnav-subnav { padding: 0 10px 8px; justify-content: flex-start; }
 }
 
