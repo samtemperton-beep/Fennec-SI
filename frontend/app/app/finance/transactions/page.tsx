@@ -71,7 +71,7 @@ function TransactionsPageInner() {
   async function loadTransactions() {
     let q = supabase
       .from('fin_transactions')
-      .select('id, date, description, amount, category_id, category:fin_categories(name), account:fin_accounts(name,owner)')
+      .select('id, date, description, amount, category_id, category:fin_categories(name), account:fin_accounts!inner(name,owner,is_business)')
       .order('date', { ascending: false })
       .limit(200)
     if (debouncedSearch) q = q.ilike('description', `%${debouncedSearch}%`)
@@ -79,6 +79,7 @@ function TransactionsPageInner() {
     if (dateTo) q = q.lte('date', dateTo)
     if (uncatOnly) q = q.is('category_id', null)
     if (accountId) q = q.eq('account_id', accountId)
+    else q = q.eq('account.is_business', false)
     const { data, error } = await q
     if (error) toast.error(error.message)
     else setTransactions((data as any) || [])

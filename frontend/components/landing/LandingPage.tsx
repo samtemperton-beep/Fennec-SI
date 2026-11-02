@@ -48,25 +48,25 @@ const FEATURES = [
   },
 ]
 
+// Matches the default plans in backend/src/services/plans.ts. Update both together.
 const FREE_FEATURES = [
-  'Portfolio tracking (NZ, ASX, US)',
-  '10 AI analyses per day',
-  'Community feed access',
-  'Watchlist up to 20 stocks',
-  'Daily top 10 AI picks',
-  'Household finance overview',
-  'KiwiSaver projection tool',
+  'Portfolio tracking (NZ, ASX, US), up to 10 holdings',
+  'NZ bank sync via Akahu, budgets, bills and goals',
+  'KiwiSaver and home loan tools',
+  'Fennec AI chat, daily briefing and stock analyser (10 AI uses a day)',
+  "Today's top 10 picks and Discover previews",
+  'News digest, IPO analysis and price alerts',
+  'Community, and sharing with a partner',
 ]
 
 const PRO_FEATURES = [
-  'Unlimited AI analyses (Claude)',
-  'Fennec AI — unlimited chat',
-  'NZ bank sync via Akahu',
-  'Portfolio verification & badges',
-  'Leaderboard & premium community',
-  'Real-time price alerts & email',
-  'CSV & screenshot import',
-  'Deep-dive reports & AI drafts',
+  'Everything in Free',
+  'Unlimited AI and unlimited holdings',
+  'Every Discover pick',
+  'Deep-dive stock research and AI post drafts',
+  'Gmail bill scanning',
+  'Business section: invoices, GST and tax',
+  'Verified portfolio badge and leaderboard rank',
 ]
 
 const COMMUNITY_POSTS = [
@@ -173,7 +173,7 @@ export default function LandingPage() {
       {/* ── Community feed ── */}
       <section style={{ maxWidth: 680, margin: '0 auto', padding: '0 32px 64px' }}>
         <p style={{ textAlign: 'center', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
-          Live Community Feed
+          From the community
         </p>
         <div style={{ border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', overflow: 'hidden' }}>
           {COMMUNITY_POSTS.map((p, i) => (
@@ -270,8 +270,9 @@ export default function LandingPage() {
               ))}
             </div>
             <Link href="/login?mode=signup" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 600, textDecoration: 'none' }}>
-              Start Premium free for 7 days
+              Get started free
             </Link>
+            <p style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', marginTop: 8 }}>Premium sign-up is coming soon.</p>
           </div>
         </div>
       </section>
