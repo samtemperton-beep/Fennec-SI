@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { usePathname } from 'next/navigation'
 import { FoxIcon } from './FoxIcon'
 import { usePlan } from '@/lib/plan'
+import { ASKED_FOX_KEY } from '@/components/dashboard/GettingStarted'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
@@ -447,6 +448,7 @@ export function FennecAI() {
     const question = text.trim()
     if (!question || loading) return
     setInput('')
+    try { localStorage.setItem(ASKED_FOX_KEY, '1') } catch { /* private window */ }
 
     const nextMessages: Message[] = [...messages, { role: 'user', content: question }]
     setMessages([...nextMessages, { role: 'assistant', content: '', streaming: true }])

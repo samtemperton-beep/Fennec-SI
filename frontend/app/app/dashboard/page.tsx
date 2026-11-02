@@ -15,6 +15,7 @@ import { DailySummaryCard } from '@/components/dashboard/DailySummaryCard'
 import { GoalsCard } from '@/components/dashboard/GoalsCard'
 import { QuickLinksCard } from '@/components/dashboard/QuickLinksCard'
 import { LayoutEditor } from '@/components/dashboard/LayoutEditor'
+import { GettingStarted } from '@/components/dashboard/GettingStarted'
 import { CARD_INFO, DEFAULT_LAYOUT, normaliseLayout, type CardId, type LayoutItem } from '@/components/dashboard/layout'
 
 export default function DashboardPage() {
@@ -222,6 +223,8 @@ export default function DashboardPage() {
       {editingLayout ? (
         <LayoutEditor layout={layout} onChange={changeLayout} onDone={() => setEditingLayout(false)} />
       ) : (
+        <>
+        <GettingStarted userId={userId} />
         <div className="dash-grid">
           {layout.filter(l => !l.hidden).map(l => (
             <div key={l.id} className={CARD_INFO[l.id].half ? 'dash-cell half' : 'dash-cell'}>
@@ -234,6 +237,7 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        </>
       )}
     </div>
   )

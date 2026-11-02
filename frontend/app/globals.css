@@ -577,3 +577,17 @@ a.nw-part:hover .nw-part-arrow { opacity: 1; transform: translate(1px, -1px); }
   .landing-stats { grid-template-columns: repeat(2, 1fr) !important; }
   .landing-pricing { grid-template-columns: 1fr !important; }
 }
+
+/* Feedback button, bottom left (the fox chat is bottom right) */
+.feedback-fab {
+  position: fixed; bottom: 24px; left: 20px; z-index: 9990;
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 20px;
+  background: var(--surface); color: var(--text2); border: 1px solid var(--border);
+  font-family: Syne, sans-serif; font-weight: 600; font-size: 12px; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.15); opacity: 0.9;
+}
+.feedback-fab:hover { color: var(--text); opacity: 1; }
+@media (max-width: 640px) {
+  .feedback-fab { bottom: 20px; left: 14px; padding: 10px; }
+  .feedback-fab-label { display: none; }
+}

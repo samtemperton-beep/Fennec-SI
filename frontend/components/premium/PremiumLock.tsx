@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import { openFeedback } from '@/components/shared/Feedback'
 import { IconLock } from '@tabler/icons-react'
 
 // Shown in place of a page or panel the account's plan doesn't include.
@@ -14,9 +14,9 @@ export function PremiumLock({ title, blurb, compact = false }: { title: string; 
       </div>
       <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{title} is part of Premium</p>
       <p style={{ color: 'var(--text2)', fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>{blurb}</p>
-      <Link href="/app/settings" style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#1a1a1a', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>
-        ✦ About Premium
-      </Link>
+      <button type="button" onClick={() => openFeedback('premium')} style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#1a1a1a', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>
+        ✦ Request Premium
+      </button>
     </div>
   )
 }

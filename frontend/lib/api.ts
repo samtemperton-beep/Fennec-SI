@@ -104,6 +104,9 @@ export const api = {
   partnerAccept: (code: string): Promise<{ ok: true; partner: PartnerInfo }> => apiFetch('/api/partner/accept', { method: 'POST', body: JSON.stringify({ code }) }),
   partnerUnlink: () => apiFetch('/api/partner', { method: 'DELETE' }),
 
+  sendFeedback: (body: { kind: string; message: string; page: string; screenshot?: { name: string; type: string; data: string } }) =>
+    apiFetch('/api/feedback', { method: 'POST', body: JSON.stringify(body) }),
+
   deleteAccount: () => apiFetch('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) }),
 
   getEarningsCalendar: (tickers: string[]) =>

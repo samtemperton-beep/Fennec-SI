@@ -10,6 +10,7 @@ import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
 import { DeleteAccount } from '@/components/settings/DeleteAccount'
 import { PartnerCard } from '@/components/settings/PartnerCard'
+import { openFeedback } from '@/components/shared/Feedback'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
@@ -515,11 +516,17 @@ export default function SettingsPage() {
                   </p>
                   <p style={{ fontSize: 12, color: 'var(--text2)' }}>
                     {premiumStatus.tier === 'premium'
-                      ? 'Full Claude AI on all features, portfolio verification & leaderboard access'
-                      : 'Upgrade to Premium for full Claude AI, portfolio verification and badges'}
+                      ? 'Unlimited AI, deep dives, Gmail bills, the Business section and a verified portfolio'
+                      : 'Premium adds unlimited AI, deep dives, Gmail bill scanning, the Business section and a verified portfolio'}
                   </p>
                 </div>
               </div>
+              {premiumStatus.tier !== 'premium' && (
+                <button type="button" onClick={() => openFeedback('premium')}
+                  style={{ marginBottom: 12, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#1a1a1a', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>
+                  ✦ Request Premium
+                </button>
+              )}
               {premiumStatus.badges?.length > 0 && (
                 <div>
                   <p style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 8 }}>

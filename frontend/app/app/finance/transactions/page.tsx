@@ -107,9 +107,11 @@ function TransactionsPageInner() {
     )
     if (error) { toast.error(error.message); setSavingRule(false); return }
 
-    // Bulk-apply to matching uncategorised transactions
+    // Bulk-apply to matching uncategorised household transactions
+    const { data: household } = await supabase.from('fin_accounts').select('id').eq('is_business', false)
     const { data: updated } = await supabase.from('fin_transactions')
       .update({ category_id: creatingRule.categoryId })
+      .in('account_id', (household || []).map(a => a.id))
       .ilike('description', `%${keyword}%`)
       .is('category_id', null)
       .select('id')

@@ -9,14 +9,14 @@ import {
   IconSettings, IconLogout, IconTrophy,
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
   IconWallet, IconReceipt, IconTarget, IconLayoutDashboard, IconPigMoney,
-  IconBriefcase, IconCalculator, IconFileInvoice, IconHome,
-} from '@tabler/icons-react'
+  IconBriefcase, IconCalculator, IconFileInvoice, IconHome, IconMessageReport } from '@tabler/icons-react'
 import { FennecAI } from '@/components/shared/FennecAI'
 import { FoxIcon } from '@/components/shared/FoxIcon'
 import { MarketTicker } from '@/components/shared/MarketTicker'
 import { Avatar } from '@/components/shared/Avatar'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { PremiumLock } from '@/components/premium/PremiumLock'
+import { Feedback, openFeedback } from '@/components/shared/Feedback'
 import { usePlan, PlanFeature } from '@/lib/plan'
 
 // ── Section definitions ───────────────────────────────────────────────────────
@@ -385,6 +385,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <IconShield size={15} /> Admin
                   </Link>
                 )}
+                <button onClick={() => { setMenuOpen(false); openFeedback('bug') }} className="nav-link w-full mb-1">
+                  <IconMessageReport size={15} /> Send feedback
+                </button>
                 <button onClick={toggleTheme} className="nav-link w-full mb-1">
                   {theme === 'dark' ? <IconSun size={15} /> : <IconMoon size={15} />}
                   {theme === 'dark' ? 'Light mode' : 'Dark mode'}
@@ -431,6 +434,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
       <FennecAI />
+      <Feedback />
     </div>
   )
 }
