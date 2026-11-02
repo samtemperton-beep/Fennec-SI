@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, getPlatformSettings } from '../middleware/auth';
+import { planFor } from '../services/plans';
 import { evaluateAndAwardBadges } from '../services/badges';
 import { parseCSV } from './import';
 import dotenv from 'dotenv';
@@ -57,6 +58,11 @@ router.get('/status', requireAuth, async (req, res) => {
     badges: badgesRes.data || [],
     verification: verificationRes.data || null,
   });
+});
+
+// GET /api/premium/plan — what this account's plan includes, for the app to show or lock
+router.get('/plan', requireAuth, async (req, res) => {
+  res.json(planFor(await getPlatformSettings(), (req as any).isPremium));
 });
 
 // Portfolios are verified only by the Akahu sync (services/akahuSync.ts), because

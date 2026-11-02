@@ -133,7 +133,7 @@ export default function DashboardPage() {
       const r = await api.getDailySummary(summaryFacts(), localDate(), refresh)
       setSummary({ text: r.summary, at: r.generatedAt })
     } catch (e: any) {
-      setSummaryError(e.message?.includes('limit') ? e.message : 'Fennec couldn’t write today’s briefing just now. Try Refresh in a moment.')
+      setSummaryError(e.message?.includes('limit') || e.message?.includes('Premium') ? e.message : 'Fennec couldn’t write today’s briefing just now. Try Refresh in a moment.')
     } finally {
       setSummaryLoading(false)
       setSummaryRefreshing(false)

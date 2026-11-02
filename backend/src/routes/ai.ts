@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { requireAuth, checkAndIncrementUsage, FREE_DAILY_AI_LIMIT, getPlatformSettings } from '../middleware/auth';
+import { requireAuth, requireFeature, checkAndIncrementUsage, getPlatformSettings } from '../middleware/auth';
+import { limitFor } from '../services/plans';
 import * as claude from '../services/claude';
 import { modelFor, cleanMessages } from '../services/llm';
 import { getCached, setCached } from '../services/cache';
@@ -9,7 +10,7 @@ const router = Router();
 
 // Shared cache: same ticker analysis served to all users of a model for 4 hours.
 // The cache key carries the model, so free and premium only share when they use the same one.
-router.post('/analyze', requireAuth, async (req, res) => {
+router.post('/analyze', requireAuth, requireFeature('analyze'), async (req, res) => {
   const { ticker, data, riskLevel } = req.body;
   const isPremium = (req as any).isPremium;
   const riskBucket = riskLevel ? (riskLevel <= 3 ? 'low' : riskLevel <= 6 ? 'mid' : 'high') : 'mid';
@@ -50,7 +51,7 @@ router.post('/analyze', requireAuth, async (req, res) => {
 });
 
 // Helper: counts toward a free user's daily quota
-router.post('/helper', requireAuth, async (req, res) => {
+router.post('/helper', requireAuth, requireFeature('helper'), async (req, res) => {
   const { messages, context } = req.body;
   const isPremium = (req as any).isPremium;
   const user = (req as any).user;
@@ -59,10 +60,7 @@ router.post('/helper', requireAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  if (!isPremium) {
-    const allowed = await checkAndIncrementUsage(req, res);
-    if (!allowed) return;
-  }
+  if (!await checkAndIncrementUsage(req, res)) return;
 
   try {
     const settings = await getPlatformSettings();
@@ -144,7 +142,7 @@ router.post('/setup-help', requireAuth, async (req, res) => {
 // snapshot the dashboard sends (net worth, cash flow, notifications), then
 // cached, so opening the dashboard repeatedly never re-spends AI quota. An
 // explicit refresh regenerates it and counts toward a free user's daily limit.
-router.post('/daily-summary', requireAuth, async (req, res) => {
+router.post('/daily-summary', requireAuth, requireFeature('summary'), async (req, res) => {
   const user = (req as any).user;
   const isPremium = (req as any).isPremium;
   const { facts, date, refresh } = req.body ?? {};
@@ -159,9 +157,8 @@ router.post('/daily-summary', requireAuth, async (req, res) => {
   if (!refresh) {
     const cached = await getCached(cacheKey);
     if (cached) return res.json({ ...cached, cached: true });
-  } else if (!isPremium) {
-    const allowed = await checkAndIncrementUsage(req, res);
-    if (!allowed) return;
+  } else if (!await checkAndIncrementUsage(req, res)) {
+    return;
   }
 
   try {
@@ -177,7 +174,7 @@ router.post('/daily-summary', requireAuth, async (req, res) => {
 });
 
 // Top 10: free users see results but it counts toward their daily quota (cached so rarely hits)
-router.post('/top10', requireAuth, async (req, res) => {
+router.post('/top10', requireAuth, requireFeature('top10'), async (req, res) => {
   const { market = 'US', timeframe = '12mo', newsContext } = req.body;
   // Rotation seed: changes every 2 hours so regenerate always produces a fresh sector emphasis
   const today = new Date().toISOString().slice(0, 10);
@@ -200,17 +197,20 @@ router.post('/top10', requireAuth, async (req, res) => {
   }
 });
 
-// Opportunities: free users get only 2 results (teaser); premium gets all 6
-router.post('/opportunities', requireAuth, async (req, res) => {
+// Opportunities: the plan's discover_results limit sets how many picks are shown (0 = all)
+router.post('/opportunities', requireAuth, requireFeature('opportunities'), async (req, res) => {
   const { riskLevel = 7, holdings = [], sector = 'All', market = 'US', newsContext, userInterests } = req.body;
   const user = (req as any).user;
   const isPremium = (req as any).isPremium;
-  const model = modelFor(await getPlatformSettings(), 'opportunities', isPremium);
+  const settings = await getPlatformSettings();
+  const model = modelFor(settings, 'opportunities', isPremium);
+  const shown = limitFor(settings, 'discover_results', isPremium);
+  const cut = (list: any[]) => (shown > 0 ? list.slice(0, shown) : list);
   const cacheKey = `opportunities:${user.id}:${sector}:${market}:${riskLevel}:${newsContext ? 'news' : 'base'}:${model}`;
   const cached = await getCached(cacheKey);
   if (cached) {
-    const data = isPremium ? cached : (cached as any[]).slice(0, 2);
-    return res.json({ data, cached: true, limited: !isPremium });
+    const data = cut(cached as any[]);
+    return res.json({ data, cached: true, limited: data.length < (cached as any[]).length });
   }
 
   if (!await checkAndIncrementUsage(req, res)) return;
@@ -218,14 +218,14 @@ router.post('/opportunities', requireAuth, async (req, res) => {
   try {
     const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key, sector, market, newsContext, userInterests, model);
     await setCached(cacheKey, data, newsContext ? 3 : 4);
-    res.json({ data: isPremium ? data : data.slice(0, 2), cached: false, limited: !isPremium });
+    res.json({ data: cut(data), cached: false, limited: cut(data).length < data.length });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });
 
 // News digest: available on free but counts toward quota
-router.post('/news-digest', requireAuth, async (req, res) => {
+router.post('/news-digest', requireAuth, requireFeature('news'), async (req, res) => {
   const { headlines, portfolio } = req.body;
   const fingerprint = (headlines || []).slice(0, 5).join('|').replace(/\s+/g, '').slice(0, 120);
   const model = modelFor(await getPlatformSettings(), 'news', (req as any).isPremium);
@@ -246,7 +246,7 @@ router.post('/news-digest', requireAuth, async (req, res) => {
 });
 
 // IPO analysis: counts toward a free user's quota
-router.post('/ipo-analysis', requireAuth, async (req, res) => {
+router.post('/ipo-analysis', requireAuth, requireFeature('ipo'), async (req, res) => {
   const { ipo } = req.body;
   const isPremium = (req as any).isPremium;
   const model = modelFor(await getPlatformSettings(), 'ipo', isPremium);
@@ -266,17 +266,10 @@ router.post('/ipo-analysis', requireAuth, async (req, res) => {
   }
 });
 
-// Deep dive: premium only
-router.post('/deep-dive', requireAuth, async (req, res) => {
-  if (!(req as any).isPremium) {
-    return res.status(403).json({
-      error: 'Deep Dive is a Premium feature. Upgrade to unlock in-depth AI analysis.',
-      premiumRequired: true,
-    });
-  }
-
+// Deep dive (premium by default)
+router.post('/deep-dive', requireAuth, requireFeature('deep_dive'), async (req, res) => {
   const { ticker, context } = req.body;
-  const model = modelFor(await getPlatformSettings(), 'deep_dive', true);
+  const model = modelFor(await getPlatformSettings(), 'deep_dive', (req as any).isPremium);
   const cacheKey = `deepdive:${ticker}:${model}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
@@ -291,20 +284,13 @@ router.post('/deep-dive', requireAuth, async (req, res) => {
   }
 });
 
-// Draft post: premium only
-router.post('/draft-post', requireAuth, async (req, res) => {
-  if (!(req as any).isPremium) {
-    return res.status(403).json({
-      error: 'AI Post Drafting is a Premium feature.',
-      premiumRequired: true,
-    });
-  }
-
+// Draft post (premium by default)
+router.post('/draft-post', requireAuth, requireFeature('draft_post'), async (req, res) => {
   const { ticker, signal, context } = req.body;
   try {
     const user = (req as any).user;
     const settings = await getPlatformSettings();
-    const text = await claude.draftPost(ticker, signal, context, user.user_metadata?.anthropic_key, modelFor(settings, 'draft_post', true));
+    const text = await claude.draftPost(ticker, signal, context, user.user_metadata?.anthropic_key, modelFor(settings, 'draft_post', (req as any).isPremium));
     res.json({ text });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -313,13 +299,13 @@ router.post('/draft-post', requireAuth, async (req, res) => {
 
 // Usage status: lets frontend show the daily counter
 router.get('/usage', requireAuth, async (req, res) => {
-  const isPremium = (req as any).isPremium;
-  if (isPremium) return res.json({ unlimited: true });
+  const limit = limitFor(await getPlatformSettings(), 'daily_ai_calls', (req as any).isPremium);
+  if (limit === 0) return res.json({ unlimited: true });
 
   const today = new Date().toISOString().slice(0, 10);
   const lastReset: string = (req as any).lastUsageReset ?? '';
   const count = lastReset === today ? ((req as any).usageCount ?? 0) : 0;
-  res.json({ used: count, limit: FREE_DAILY_AI_LIMIT, remaining: Math.max(0, FREE_DAILY_AI_LIMIT - count) });
+  res.json({ used: count, limit, remaining: Math.max(0, limit - count) });
 });
 
 export default router;

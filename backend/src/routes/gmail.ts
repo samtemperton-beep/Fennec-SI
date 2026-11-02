@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, getPlatformSettings } from '../middleware/auth';
+import { requireAuth, requireFeature, getPlatformSettings } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import crypto from 'crypto';
@@ -69,7 +69,7 @@ function config() {
 
 // ── GET /api/gmail/auth-url ───────────────────────────────────────────────────
 // Returns the Google OAuth URL for the frontend to redirect to
-router.get('/auth-url', requireAuth, (req: any, res) => {
+router.get('/auth-url', requireAuth, requireFeature('inbox'), (req: any, res) => {
   const c = config();
   if (c.missing.length) {
     return res.status(500).json({ error: `Gmail isn't set up on the server yet (missing ${c.missing.join(', ')}).` });
@@ -268,7 +268,7 @@ const emailDate = (header: string) => {
 
 // ── POST /api/gmail/scan ──────────────────────────────────────────────────────
 // Scan inbox for financial emails, parse with Claude, return structured items
-router.post('/scan', requireAuth, async (req: any, res) => {
+router.post('/scan', requireAuth, requireFeature('inbox'), async (req: any, res) => {
   const userId: string = req.user.id;
   const { userKey } = req.body ?? {};
 

@@ -168,6 +168,9 @@ export const api = {
   saveNotificationPrefs: (prefs: object) =>
     apiFetch('/api/alerts/prefs', { method: 'PUT', body: JSON.stringify(prefs) }),
 
+  getPlan: (): Promise<import('./plan').Plan> =>
+    apiFetch('/api/premium/plan'),
+
   getPremiumStatus: () =>
     apiFetch('/api/premium/status'),
 

@@ -16,6 +16,8 @@ import { FoxIcon } from '@/components/shared/FoxIcon'
 import { MarketTicker } from '@/components/shared/MarketTicker'
 import { Avatar } from '@/components/shared/Avatar'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
+import { PremiumLock } from '@/components/premium/PremiumLock'
+import { usePlan, PlanFeature } from '@/lib/plan'
 
 // ── Section definitions ───────────────────────────────────────────────────────
 
@@ -126,6 +128,13 @@ function getActiveHref(items: NavItem[], pathname: string): string | null {
   return best
 }
 
+// Whole pages that belong to one plan feature. The backend also refuses their AI calls.
+const LOCKED_PAGES: { prefix: string; feature: PlanFeature; title: string; blurb: string }[] = [
+  { prefix: '/app/finance/business', feature: 'business', title: 'The Business section', blurb: 'Track business income and spending, send invoices and keep on top of GST and tax, alongside your household money.' },
+  { prefix: '/app/top10', feature: 'top10', title: "Today's Picks", blurb: 'A fresh top 10 of stocks with momentum, refreshed through the day.' },
+  { prefix: '/app/opportunities', feature: 'opportunities', title: 'Discover', blurb: 'Under-the-radar companies matched to your risk level and interests.' },
+]
+
 // Swipes that start inside something that scrolls sideways (tables, the ticker,
 // the sub-nav itself) or inside a form control belong to that element, not to page nav.
 function swipeBlocked(target: EventTarget | null, boundary: HTMLElement): boolean {
@@ -157,6 +166,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const subnavRef = useRef<HTMLDivElement>(null)
   const touchRef = useRef<{ x: number; y: number; t: number } | null>(null)
   const supabase = createClient()
+  const { can } = usePlan()
+  const lockedPage = LOCKED_PAGES.find(p => (pathname === p.prefix || pathname.startsWith(p.prefix + '/')) && !can(p.feature))
 
   const activeSection = getActiveSection(pathname)
   const showTicker = activeSection === 'investing'
@@ -416,7 +427,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onTouchEnd={onTouchEnd}
       >
         <div key={pathname} className={`app-page${slideDir ? ` swipe-in-${slideDir}` : ''}`}>
-          {children}
+          {lockedPage ? <div style={{ padding: '0 16px' }}><PremiumLock title={lockedPage.title} blurb={lockedPage.blurb} /></div> : children}
         </div>
       </main>
       <FennecAI />

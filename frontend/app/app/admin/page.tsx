@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import {
   IconShield, IconUsers, IconBrain, IconSettings2,
-  IconRefresh, IconCrown, IconActivity, IconCheck, IconX,
+  IconRefresh, IconCrown, IconActivity, IconCheck, IconX, IconLock,
 } from '@tabler/icons-react'
 
 const GEMINI = 'gemini-2.5-flash'
@@ -19,21 +19,15 @@ const AVAILABLE_MODELS = [
 ]
 
 type Tier = 'free' | 'premium'
-const AI_SECTIONS: { feature: string; label: string; desc: string; premiumOnly?: boolean }[] = [
-  { feature: 'analyze', label: 'Stock Analyzer', desc: 'Individual stock analysis signal' },
-  { feature: 'helper', label: 'AI Helper', desc: 'Floating chat assistant' },
-  { feature: 'top10', label: "Today's Picks", desc: 'Top 10 stock picks generation' },
-  { feature: 'opportunities', label: 'Discover / Opportunities', desc: 'Hidden gem opportunities' },
-  { feature: 'summary', label: 'Dashboard Daily Summary', desc: 'Fennec daily briefing on the dashboard' },
-  { feature: 'inbox', label: 'Email Inbox Scanner', desc: 'Extracts bills and invoices from Gmail' },
-  { feature: 'setup_help', label: 'Onboarding Setup Help', desc: 'Ask Fennec during Akahu setup' },
-  { feature: 'news', label: 'News Digest', desc: 'AI news analysis & digest' },
-  { feature: 'ipo', label: 'IPO Analysis', desc: 'IPO scoring and analysis' },
-  { feature: 'deep_dive', label: 'Deep Dive', desc: 'In-depth stock research', premiumOnly: true },
-  { feature: 'draft_post', label: 'Community Post Draft', desc: 'Drafts a post about a stock signal', premiumOnly: true },
-]
+type PlanInfo = { label: string; desc: string; defaults: Record<Tier, boolean> }
+type LimitInfo = { label: string; desc: string; defaults: Record<Tier, number> }
+
+// AI only, never locked: someone stuck signing up always gets help
+const SETUP_HELP = { label: 'Onboarding Setup Help', desc: 'Ask Fennec during Akahu setup (always included)' }
 
 const settingKey = (feature: string, tier: Tier) => tier === 'premium' ? `model_${feature}` : `model_free_${feature}`
+const planKey = (feature: string, tier: Tier) => `plan_${tier}_${feature}`
+const limitKey = (limit: string, tier: Tier) => `limit_${tier}_${limit}`
 
 function Tag({ children, color }: { children: React.ReactNode; color: string }) {
   return (
@@ -78,6 +72,8 @@ export default function AdminPage() {
   const [modelTier, setModelTier] = useState<Tier>('premium')
   // Each feature's default per tier, from the backend so the two never disagree
   const [modelDefaults, setModelDefaults] = useState<Record<string, Record<Tier, string>>>({})
+  const [planFeatures, setPlanFeatures] = useState<Record<string, PlanInfo>>({})
+  const [planLimits, setPlanLimits] = useState<Record<string, LimitInfo>>({})
   const [resettingTier, setResettingTier] = useState(false)
 
   // Users
@@ -110,12 +106,14 @@ export default function AdminPage() {
   const loadSettings = useCallback(async () => {
     setSettingsLoading(true)
     try {
-      const { settings: list, modelDefaults: defaults } = await api.adminGetSettings()
+      const { settings: list, modelDefaults: defaults, planFeatures: features, planLimits: limits } = await api.adminGetSettings()
       const map: Record<string, string> = {}
       for (const s of list) map[s.key] = s.value
       setSettings(map)
       setPendingModels(map)
       setModelDefaults(defaults ?? {})
+      setPlanFeatures(features ?? {})
+      setPlanLimits(limits ?? {})
     } catch {}
     setSettingsLoading(false)
   }, [])
@@ -136,6 +134,18 @@ export default function AdminPage() {
     loadUsers()
   }, [checking, loadStats, loadSettings, loadUsers])
 
+  // Saves every changed setting in one row (access and model)
+  async function saveRow(rowId: string, keys: string[], values: Record<string, string>) {
+    setSavingKey(rowId)
+    try {
+      for (const k of keys) await api.adminSetSetting(k, values[k])
+      setSettings(prev => ({ ...prev, ...Object.fromEntries(keys.map(k => [k, values[k]])) }))
+      setSavedKey(rowId)
+      setTimeout(() => setSavedKey(null), 2000)
+    } catch (e: any) { window.alert(e.message) }
+    setSavingKey(null)
+  }
+
   async function saveModel(key: string, value: string) {
     setSavingKey(key)
     try {
@@ -148,7 +158,7 @@ export default function AdminPage() {
   }
 
   async function resetModels(tier: Tier) {
-    if (!window.confirm(`Put every feature for ${tier} accounts back to its default model?`)) return
+    if (!window.confirm(`Put every feature, model and limit for ${tier} accounts back to its default?`)) return
     setResettingTier(true)
     try {
       await api.adminResetModels(tier)
@@ -188,7 +198,7 @@ export default function AdminPage() {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: IconActivity },
-    { id: 'models', label: 'AI Models', icon: IconBrain },
+    { id: 'models', label: 'Plans & AI', icon: IconBrain },
     { id: 'users', label: 'Users', icon: IconUsers },
   ] as const
 
@@ -302,42 +312,42 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* MODELS TAB */}
+      {/* PLANS & AI TAB */}
       {tab === 'models' && (
         <div>
           <div style={{ marginBottom: 18 }}>
-            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>AI Model Configuration</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>Plans & AI</h2>
             <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>
-              Choose the model for each AI feature, separately for free and premium accounts. Changes take effect within 60 seconds.
+              Choose what free and premium accounts include, which AI model each feature uses, and each plan&apos;s limits. Changes take effect within 60 seconds.
             </p>
           </div>
 
           {/* Which accounts these choices apply to */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-          <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 10, width: 'fit-content' }}>
-            {(['free', 'premium'] as const).map(t => (
-              <button
-                key={t}
-                onClick={() => setModelTier(t)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13,
-                  background: modelTier === t ? 'var(--surface)' : 'transparent',
-                  color: modelTier === t ? 'var(--text)' : 'var(--text2)',
-                  fontWeight: modelTier === t ? 700 : 400,
-                  boxShadow: modelTier === t ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {t === 'premium' && <IconCrown size={14} color="var(--amber)" />}
-                {t === 'free' ? 'Free accounts' : 'Premium accounts'}
-              </button>
-            ))}
-          </div>
+            <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 10, width: 'fit-content' }}>
+              {(['free', 'premium'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setModelTier(t)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13,
+                    background: modelTier === t ? 'var(--surface)' : 'transparent',
+                    color: modelTier === t ? 'var(--text)' : 'var(--text2)',
+                    fontWeight: modelTier === t ? 700 : 400,
+                    boxShadow: modelTier === t ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t === 'premium' && <IconCrown size={14} color="var(--amber)" />}
+                  {t === 'free' ? 'Free accounts' : 'Premium accounts'}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => resetModels(modelTier)}
               disabled={resettingTier}
-              title="Clears saved choices for these accounts so every feature uses its default"
+              title="Clears saved choices for these accounts so everything uses its default"
               style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, opacity: resettingTier ? 0.5 : 1 }}
             >
               <IconRefresh size={13} />
@@ -349,56 +359,90 @@ export default function AdminPage() {
             <div style={{ color: 'var(--text2)', fontSize: 13, padding: '20px 0' }}>Loading…</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {AI_SECTIONS.map(section => {
-                const key = settingKey(section.feature, modelTier)
-                const fallback = modelDefaults[section.feature]?.[modelTier] ?? HAIKU
+              <h3 style={{ fontSize: 13, fontWeight: 700, margin: '4px 0 2px' }}>Features</h3>
+              {[...Object.entries(planFeatures), ['setup_help', { ...SETUP_HELP, defaults: { free: true, premium: true } }] as [string, PlanInfo]].map(([feature, info]) => {
+                const hasModel = !!modelDefaults[feature]
+                const alwaysOn = feature === 'setup_help'
+                const accessKey = planKey(feature, modelTier)
+                const accessDefault = info.defaults[modelTier] ? 'on' : 'off'
+                const onOff = (v?: string) => (v === 'on' || v === 'off' ? v : accessDefault)
+                const access = alwaysOn ? 'on' : onOff(pendingModels[accessKey])
+                const savedAccess = alwaysOn ? 'on' : onOff(settings[accessKey])
+
+                const modelKey = settingKey(feature, modelTier)
+                const fallback = modelDefaults[feature]?.[modelTier] ?? HAIKU
                 const known = (v?: string) => v && AVAILABLE_MODELS.some(m => m.id === v) ? v : fallback
-                const currentModel = known(pendingModels[key])
-                const savedModel = known(settings[key])
-                const isDirty = currentModel !== savedModel
-                const isSaving = savingKey === key
-                const isSaved = savedKey === key
-                const locked = section.premiumOnly && modelTier === 'free'
+                const currentModel = known(pendingModels[modelKey])
+                const savedModel = known(settings[modelKey])
+
+                const changed = [
+                  ...(access !== savedAccess ? [accessKey] : []),
+                  ...(hasModel && currentModel !== savedModel ? [modelKey] : []),
+                ]
+                const isDirty = changed.length > 0
+                const rowId = `${modelTier}:${feature}`
+                const isSaving = savingKey === rowId
+                const isSaved = savedKey === rowId
+                const included = access === 'on'
                 return (
                   <div
-                    key={key}
+                    key={rowId}
                     style={{
                       background: 'var(--surface2)', border: '1px solid var(--border)',
-                      borderRadius: 12, padding: '16px 18px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                      borderRadius: 12, padding: '14px 18px', opacity: included ? 1 : 0.85,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
                     }}
                   >
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{section.label}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text2)' }}>{section.desc}</div>
+                    <div style={{ flex: '1 1 220px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{info.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text2)' }}>{info.desc}</div>
                     </div>
-                    {locked ? (
-                      <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                        <IconCrown size={13} color="var(--amber)" /> Premium only
-                      </div>
-                    ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        {AVAILABLE_MODELS.map(m => (
-                          <button
-                            key={m.id}
-                            onClick={() => setPendingModels(prev => ({ ...prev, [key]: m.id }))}
-                            title={m.note}
-                            style={{
-                              padding: '6px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-                              fontWeight: currentModel === m.id ? 700 : 400,
-                              border: currentModel === m.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                              background: currentModel === m.id ? 'var(--accent)22' : 'var(--surface)',
-                              color: currentModel === m.id ? 'var(--accent)' : 'var(--text2)',
-                              transition: 'all 0.15s',
-                            }}
-                          >
-                            {m.label}{m.id === fallback && <span style={{ fontSize: 9.5, marginLeft: 4, opacity: 0.7 }}>default</span>}
-                          </button>
-                        ))}
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      {!alwaysOn && (
+                        <div style={{ display: 'flex', gap: 2, background: 'var(--surface)', border: '1px solid var(--border)', padding: 2, borderRadius: 8 }}>
+                          {(['on', 'off'] as const).map(v => (
+                            <button
+                              key={v}
+                              onClick={() => setPendingModels(prev => ({ ...prev, [accessKey]: v }))}
+                              title={v === accessDefault ? 'Default' : undefined}
+                              style={{
+                                padding: '5px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12,
+                                display: 'flex', alignItems: 'center', gap: 4,
+                                fontWeight: access === v ? 700 : 400,
+                                background: access === v ? (v === 'on' ? 'var(--green-light)' : 'rgba(217,119,6,0.12)') : 'transparent',
+                                color: access === v ? (v === 'on' ? 'var(--green)' : '#d97706') : 'var(--text2)',
+                              }}
+                            >
+                              {v === 'off' && <IconLock size={12} />}
+                              {v === 'on' ? 'Included' : 'Locked'}
+                              {v === accessDefault && <span style={{ fontSize: 9.5, opacity: 0.7 }}>default</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {hasModel && (
+                        <div style={{ display: 'flex', gap: 4, opacity: included ? 1 : 0.4 }}>
+                          {AVAILABLE_MODELS.map(m => (
+                            <button
+                              key={m.id}
+                              onClick={() => setPendingModels(prev => ({ ...prev, [modelKey]: m.id }))}
+                              title={m.note}
+                              style={{
+                                padding: '6px 10px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                                fontWeight: currentModel === m.id ? 700 : 400,
+                                border: currentModel === m.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                                background: currentModel === m.id ? 'var(--accent)22' : 'var(--surface)',
+                                color: currentModel === m.id ? 'var(--accent)' : 'var(--text2)',
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              {m.label}{m.id === fallback && <span style={{ fontSize: 9.5, marginLeft: 4, opacity: 0.7 }}>default</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <button
-                        onClick={() => saveModel(key, currentModel)}
+                        onClick={() => saveRow(rowId, changed, { [accessKey]: access, [modelKey]: currentModel })}
                         disabled={isSaving || !isDirty}
                         style={{
                           padding: '6px 14px', borderRadius: 7, fontSize: 12, cursor: isDirty && !isSaving ? 'pointer' : 'default',
@@ -413,21 +457,28 @@ export default function AdminPage() {
                         {isSaved ? <><IconCheck size={13} /> Saved</> : isSaving ? 'Saving…' : 'Save'}
                       </button>
                     </div>
-                    )}
                   </div>
                 )
               })}
 
-              {/* Free limit setting */}
-              <div style={{ marginTop: 14 }}>
-                <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Platform Settings</h3>
-                <FreeLimitEditor
-                  current={settings['free_daily_ai_limit'] || '10'}
-                  onSave={(v) => saveModel('free_daily_ai_limit', v)}
-                  isSaving={savingKey === 'free_daily_ai_limit'}
-                  isSaved={savedKey === 'free_daily_ai_limit'}
-                />
-              </div>
+              <h3 style={{ fontSize: 13, fontWeight: 700, margin: '14px 0 2px' }}>Limits</h3>
+              <p style={{ fontSize: 11, color: 'var(--text2)', margin: '0 0 2px' }}>0 means no limit.</p>
+              {Object.entries(planLimits).map(([limit, info]) => {
+                const key = limitKey(limit, modelTier)
+                const legacy = limit === 'daily_ai_calls' && modelTier === 'free' ? settings['free_daily_ai_limit'] : undefined
+                return (
+                  <LimitEditor
+                    key={key}
+                    label={info.label}
+                    desc={info.desc}
+                    defaultValue={String(info.defaults[modelTier])}
+                    current={settings[key] ?? legacy ?? String(info.defaults[modelTier])}
+                    onSave={(v) => saveModel(key, v)}
+                    isSaving={savingKey === key}
+                    isSaved={savedKey === key}
+                  />
+                )
+              })}
             </div>
           )}
         </div>
@@ -521,7 +572,10 @@ export default function AdminPage() {
   )
 }
 
-function FreeLimitEditor({ current, onSave, isSaving, isSaved }: {
+function LimitEditor({ label, desc, defaultValue, current, onSave, isSaving, isSaved }: {
+  label: string
+  desc: string
+  defaultValue: string
   current: string
   onSave: (v: string) => void
   isSaving: boolean
@@ -538,16 +592,16 @@ function FreeLimitEditor({ current, onSave, isSaving, isSaved }: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
     }}>
       <div>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>Free Daily AI Limit</div>
-        <div style={{ fontSize: 11, color: 'var(--text2)' }}>Max AI calls per day for free-tier users</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 11, color: 'var(--text2)' }}>{desc} · default {defaultValue === '0' ? 'no limit' : defaultValue}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <input
           type="number"
           value={val}
           onChange={e => setVal(e.target.value)}
-          min={1}
-          max={100}
+          min={0}
+          max={100000}
           style={{
             width: 70, padding: '6px 10px', borderRadius: 7, fontSize: 13,
             border: '1px solid var(--border)', background: 'var(--surface)',

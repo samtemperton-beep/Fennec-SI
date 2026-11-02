@@ -23,6 +23,7 @@ import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
 import { VerifyPortfolioModal } from '@/components/premium/VerifyPortfolioModal'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { toast } from 'sonner'
+import { usePlan } from '@/lib/plan'
 
 const RISK_LABELS = ['', 'Very Conservative', 'Conservative', 'Moderate-Conservative', 'Moderate', 'Moderate', 'Moderate-Aggressive', 'Aggressive', 'Aggressive', 'Very Aggressive', 'Maximum Risk']
 const RISK_COLOR = (r: number) => r <= 3 ? 'var(--green)' : r <= 6 ? 'var(--amber)' : 'var(--red)'
@@ -79,6 +80,8 @@ export default function PortfolioPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [riskLevel, setRiskLevel] = useState(5)
   const [isPremium, setIsPremium] = useState(false)
+  const { can, limit } = usePlan()
+  const maxHoldings = limit('holdings') // 0 = no limit
   const [badges, setBadges] = useState<any[]>([])
   const [verification, setVerification] = useState<any>(null)
   const [aiUsage, setAiUsage] = useState<{ used: number; limit: number; unlimited?: boolean } | null>(null)
@@ -228,8 +231,8 @@ export default function PortfolioPage() {
   async function addHolding(e: React.FormEvent) {
     e.preventDefault()
     if (!userId) return
-    if (!isPremium && holdings.length >= 10) {
-      toast.error('Free plan limit: 10 holdings. Upgrade to Premium for unlimited.')
+    if (maxHoldings > 0 && holdings.length >= maxHoldings) {
+      toast.error(`Your plan tracks up to ${maxHoldings} holdings.${isPremium ? '' : ' Premium tracks more.'}`)
       return
     }
     const { data, error } = await supabase.from('holdings').insert({
@@ -343,7 +346,7 @@ export default function PortfolioPage() {
           <button onClick={refreshPrices} disabled={refreshing} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--sh)' }}>
             {refreshing ? <LoadingSpinner size={13} /> : <IconRefresh size={13} />} Refresh
           </button>
-          {isPremium && (
+          {can('verified') && (
             <button onClick={() => setVerifyOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: verification?.status === 'verified' ? 'var(--green-light)' : 'var(--surface)', border: `1px solid ${verification?.status === 'verified' ? 'var(--green)' : 'var(--border)'}`, color: verification?.status === 'verified' ? 'var(--green)' : 'var(--text)', boxShadow: 'var(--sh)' }}>
               <IconShieldCheck size={13} /> {verification?.status === 'verified' ? 'Verified' : 'Verify'}
             </button>
@@ -474,10 +477,10 @@ export default function PortfolioPage() {
 
       {!loading && holdings.length > 0 && <DividendIncome holdings={holdings} nzdPerUsd={fx?.rate} />}
 
-      {!loading && !isPremium && holdings.length >= 8 && holdings.length < 10 && (
+      {!loading && !isPremium && maxHoldings > 0 && holdings.length >= maxHoldings - 2 && holdings.length < maxHoldings && (
         <div style={{ marginBottom: 16, padding: '8px 14px', borderRadius: 8, background: 'var(--amber-light)', border: '1px solid var(--amber)', fontSize: 12, color: 'var(--amber)' }}>
-          {10 - holdings.length} holding slot{10 - holdings.length !== 1 ? 's' : ''} left on the free plan.{' '}
-          <Link href="/app/settings" style={{ color: 'var(--amber)', fontWeight: 700, textDecoration: 'underline' }}>Upgrade to Premium</Link> for unlimited.
+          {maxHoldings - holdings.length} holding slot{maxHoldings - holdings.length !== 1 ? 's' : ''} left on the free plan.{' '}
+          <Link href="/app/settings" style={{ color: 'var(--amber)', fontWeight: 700, textDecoration: 'underline' }}>Premium</Link> tracks more.
         </div>
       )}
 

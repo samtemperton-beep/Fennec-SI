@@ -5,6 +5,7 @@ import { IconX, IconSend, IconRefresh } from '@tabler/icons-react'
 import { createClient } from '@/lib/supabase'
 import { usePathname } from 'next/navigation'
 import { FoxIcon } from './FoxIcon'
+import { usePlan } from '@/lib/plan'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
@@ -383,6 +384,7 @@ function Bubble({ msg }: { msg: Message }) {
 
 export function FennecAI() {
   const pathname = usePathname()
+  const { can } = usePlan()
   const pageConfig = getPageConfig(pathname)
 
   const [open, setOpen] = useState(false)
@@ -457,6 +459,10 @@ export function FennecAI() {
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ messages: nextMessages, context }),
       })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Something went wrong. Please try again.')
+      }
 
       const reader = res.body?.getReader()
       const decoder = new TextDecoder()
@@ -470,8 +476,11 @@ export function FennecAI() {
             if (!line.startsWith('data: ')) continue
             const payload = line.slice(6)
             if (payload === '[DONE]') break
+            let parsed: any = {}
+            try { parsed = JSON.parse(payload) } catch {}
+            if (parsed.error) throw new Error(parsed.error)
             try {
-              const { text: chunk } = JSON.parse(payload)
+              const { text: chunk } = parsed
               if (chunk) {
                 assistantText += chunk
                 setMessages(prev => {
@@ -490,16 +499,19 @@ export function FennecAI() {
         copy[copy.length - 1] = { role: 'assistant', content: assistantText, streaming: false }
         return copy
       })
-    } catch {
+    } catch (e: any) {
       setMessages(prev => {
         const copy = [...prev]
-        copy[copy.length - 1] = { role: 'assistant', content: 'Something went wrong. Please try again.', streaming: false }
+        copy[copy.length - 1] = { role: 'assistant', content: e?.message || 'Something went wrong. Please try again.', streaming: false }
         return copy
       })
     } finally {
       setLoading(false)
     }
   }
+
+  // The plan doesn't include the chat: no fox button at all
+  if (!can('helper')) return null
 
   const hasContext = !!(context?.portfolioSummary || context?.accountsSummary || context?.kiwiSaverSummary || context?.businessPLSummary)
 

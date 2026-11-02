@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { requireAuth, requireAdmin, invalidateSettingsCache } from '../middleware/auth';
 import { MODELS, DEFAULTS } from '../services/llm';
+import { PLAN_FEATURES, PLAN_LIMITS } from '../services/plans';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -64,15 +65,20 @@ router.get('/settings', requireAuth, requireAdmin, async (_req, res) => {
     .select('key, value, description, updated_at')
     .order('key');
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ settings: data ?? [], modelDefaults: DEFAULTS });
+  res.json({ settings: data ?? [], modelDefaults: DEFAULTS, planFeatures: PLAN_FEATURES, planLimits: PLAN_LIMITS });
 });
 
-// DELETE /api/admin/settings/models/:tier — clear saved model choices for free
-// or premium accounts, so every feature goes back to its default
+// DELETE /api/admin/settings/models/:tier — clear saved model choices, features
+// and limits for free or premium accounts, so everything goes back to its default
 router.delete('/settings/models/:tier', requireAuth, requireAdmin, async (req, res) => {
   const tier = String(req.params.tier);
   if (tier !== 'free' && tier !== 'premium') return res.status(400).json({ error: 'tier must be free or premium' });
-  const keys = Object.keys(DEFAULTS).map(f => (tier === 'premium' ? `model_${f}` : `model_free_${f}`));
+  const keys = [
+    ...Object.keys(DEFAULTS).map(f => (tier === 'premium' ? `model_${f}` : `model_free_${f}`)),
+    ...Object.keys(PLAN_FEATURES).map(f => `plan_${tier}_${f}`),
+    ...Object.keys(PLAN_LIMITS).map(l => `limit_${tier}_${l}`),
+    ...(tier === 'free' ? ['free_daily_ai_limit'] : []),
+  ];
   const { error } = await supabase.from('platform_settings').delete().in('key', keys);
   if (error) return res.status(500).json({ error: error.message });
   invalidateSettingsCache();
@@ -88,6 +94,12 @@ router.patch('/settings/:key', requireAuth, requireAdmin, async (req, res) => {
   }
   if (String(key).startsWith('model_') && !MODELS.includes(String(value))) {
     return res.status(400).json({ error: `Unknown model: ${value}` });
+  }
+  if (String(key).startsWith('plan_') && value !== 'on' && value !== 'off') {
+    return res.status(400).json({ error: 'Plan features are on or off' });
+  }
+  if (String(key).startsWith('limit_') && !/^\d{1,6}$/.test(String(value))) {
+    return res.status(400).json({ error: 'Limits are a whole number (0 for no limit)' });
   }
   const { error } = await supabase
     .from('platform_settings')

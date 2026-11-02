@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import dotenv from 'dotenv';
+import { canUse, limitFor, lockedMessage, PlanFeature } from '../services/plans';
 dotenv.config();
 
 const supabase = createClient(
@@ -47,8 +48,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   next();
 }
 
-export const FREE_DAILY_AI_LIMIT = 10;
-export const FREE_MAX_HOLDINGS = 10;
 
 // In-memory cache for platform settings (refreshes every 60s)
 let settingsCache: Record<string, string> = {};
@@ -68,18 +67,26 @@ export function invalidateSettingsCache() {
   settingsCacheAt = 0;
 }
 
-// Checks daily AI quota for free users and increments the counter.
-// Returns false (and sends a 429) if the free limit is hit.
-export async function checkAndIncrementUsage(req: Request, res: Response): Promise<boolean> {
-  if ((req as any).isPremium) return true;
+// Blocks a feature the account's plan doesn't include (set on the admin page).
+export function requireFeature(feature: PlanFeature) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (canUse(await getPlatformSettings(), feature, (req as any).isPremium)) return next();
+    res.status(403).json({ error: lockedMessage(feature), premiumRequired: true });
+  };
+}
 
+// Counts an AI call against the plan's daily limit (0 = no limit; calls are
+// still counted so the admin page shows usage). Returns false, having sent a
+// 429, once the limit is reached.
+export async function checkAndIncrementUsage(req: Request, res: Response): Promise<boolean> {
   const user = (req as any).user;
+  const isPremium = (req as any).isPremium;
   const today = new Date().toISOString().slice(0, 10);
   let count: number = (req as any).usageCount ?? 0;
   const lastReset: string = (req as any).lastUsageReset ?? '';
 
   const settings = await getPlatformSettings();
-  const dailyLimit = parseInt(settings['free_daily_ai_limit'] ?? String(FREE_DAILY_AI_LIMIT), 10);
+  const dailyLimit = limitFor(settings, 'daily_ai_calls', isPremium);
 
   // Reset counter if it's a new day
   if (lastReset !== today) {
@@ -87,9 +94,11 @@ export async function checkAndIncrementUsage(req: Request, res: Response): Promi
     await supabase.from('profiles').update({ usage_count: 0, last_usage_reset: today }).eq('id', user.id);
   }
 
-  if (count >= dailyLimit) {
+  if (dailyLimit > 0 && count >= dailyLimit) {
     res.status(429).json({
-      error: `Free plan limit reached — ${dailyLimit} AI calls per day. Upgrade to Premium for unlimited access.`,
+      error: isPremium
+        ? `You've reached today's limit of ${dailyLimit} AI calls. It resets tomorrow.`
+        : `Free plan limit reached: ${dailyLimit} AI calls per day. Premium raises it.`,
       limitReached: true,
     });
     return false;

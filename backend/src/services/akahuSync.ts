@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { FREE_MAX_HOLDINGS } from '../middleware/auth';
+import { getPlatformSettings } from '../middleware/auth';
+import { canUse, limitFor } from './plans';
 import { evaluateAndAwardBadges } from './badges';
 import { AkahuTokensRejected, fetchAkahuAccounts, mapAkahuAccounts, planHoldingSync } from './akahu';
 import { setAkahuProblem } from './akahuHealth';
@@ -69,16 +70,19 @@ export async function runAkahuSync(
   const unmatched: string[] = [];
   const failed: string[] = [];
   let capped = false;
+  const settings = await getPlatformSettings();
+  const maxHoldings = limitFor(settings, 'holdings', isPremium); // 0 = no limit
+  const verify = canUse(settings, 'verified', isPremium);
 
   // Only touch holdings when Akahu actually returned a broker account. A
   // disconnected broker must not look like "everything was sold".
   if (hasBroker) {
     let incoming = portfolio.holdings; // already sorted by value, largest first
-    if (!isPremium && incoming.length > FREE_MAX_HOLDINGS) {
-      incoming = incoming.slice(0, FREE_MAX_HOLDINGS);
+    if (maxHoldings > 0 && incoming.length > maxHoldings) {
+      incoming = incoming.slice(0, maxHoldings);
       capped = true;
       warnings.push(
-        `Free plan tracks ${FREE_MAX_HOLDINGS} holdings, so your ${FREE_MAX_HOLDINGS} largest by value were synced (of ${portfolio.holdings.length}). Upgrade to Premium to track them all.`
+        `Your plan tracks ${maxHoldings} holdings, so your ${maxHoldings} largest by value were synced (of ${portfolio.holdings.length}).${isPremium ? '' : ' Premium tracks more.'}`
       );
     }
     const { data: existingRows, error: existingErr } = await supabase
@@ -115,7 +119,7 @@ export async function runAkahuSync(
           source: 'akahu',
           price_locked: h.priceLocked,
         };
-        if (isPremium) row.is_verified = true;
+        if (verify) row.is_verified = true;
 
         const current: any = byTicker.get(h.ticker);
         const { error } = current
@@ -184,7 +188,7 @@ export async function runAkahuSync(
   // ── Verification: data straight from the broker is stronger evidence than a
   // CSV the user could have edited, so premium users are verified by it.
   let newBadges: any[] = [];
-  if (isPremium && hasBroker && portfolio.holdings.length > 0) {
+  if (verify && hasBroker && portfolio.holdings.length > 0) {
     const connections = [...new Set(portfolio.brokerAccounts.map((a) => a.connection))].join(', ');
     await saveVerification(userId, {
       status: 'verified',
