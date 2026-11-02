@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { requireAuth, requireAdmin, invalidateSettingsCache } from '../middleware/auth';
-import { MODELS } from '../services/llm';
+import { MODELS, DEFAULTS } from '../services/llm';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -64,7 +64,19 @@ router.get('/settings', requireAuth, requireAdmin, async (_req, res) => {
     .select('key, value, description, updated_at')
     .order('key');
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ settings: data ?? [] });
+  res.json({ settings: data ?? [], modelDefaults: DEFAULTS });
+});
+
+// DELETE /api/admin/settings/models/:tier — clear saved model choices for free
+// or premium accounts, so every feature goes back to its default
+router.delete('/settings/models/:tier', requireAuth, requireAdmin, async (req, res) => {
+  const tier = String(req.params.tier);
+  if (tier !== 'free' && tier !== 'premium') return res.status(400).json({ error: 'tier must be free or premium' });
+  const keys = Object.keys(DEFAULTS).map(f => (tier === 'premium' ? `model_${f}` : `model_free_${f}`));
+  const { error } = await supabase.from('platform_settings').delete().in('key', keys);
+  if (error) return res.status(500).json({ error: error.message });
+  invalidateSettingsCache();
+  res.json({ success: true });
 });
 
 // PATCH /api/admin/settings/:key — update a platform setting

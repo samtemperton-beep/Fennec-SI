@@ -18,20 +18,19 @@ const AVAILABLE_MODELS = [
   { id: SONNET, label: 'Sonnet 4.6', note: 'Best answers, costs the most' },
 ]
 
-// Defaults must match DEFAULTS in backend/src/services/llm.ts.
 type Tier = 'free' | 'premium'
-const AI_SECTIONS: { feature: string; label: string; desc: string; defaults: Record<Tier, string>; premiumOnly?: boolean }[] = [
-  { feature: 'analyze', label: 'Stock Analyzer', desc: 'Individual stock analysis signal', defaults: { premium: HAIKU, free: GEMINI } },
-  { feature: 'helper', label: 'AI Helper', desc: 'Floating chat assistant', defaults: { premium: SONNET, free: GEMINI } },
-  { feature: 'top10', label: "Today's Picks", desc: 'Top 10 stock picks generation', defaults: { premium: HAIKU, free: HAIKU } },
-  { feature: 'opportunities', label: 'Discover / Opportunities', desc: 'Hidden gem opportunities', defaults: { premium: HAIKU, free: HAIKU } },
-  { feature: 'summary', label: 'Dashboard Daily Summary', desc: 'Fennec daily briefing on the dashboard', defaults: { premium: GEMINI, free: GEMINI } },
-  { feature: 'inbox', label: 'Email Inbox Scanner', desc: 'Extracts bills and invoices from Gmail', defaults: { premium: HAIKU, free: HAIKU } },
-  { feature: 'setup_help', label: 'Onboarding Setup Help', desc: 'Ask Fennec during Akahu setup', defaults: { premium: HAIKU, free: HAIKU } },
-  { feature: 'news', label: 'News Digest', desc: 'AI news analysis & digest', defaults: { premium: GEMINI, free: GEMINI } },
-  { feature: 'ipo', label: 'IPO Analysis', desc: 'IPO scoring and analysis', defaults: { premium: GEMINI, free: GEMINI } },
-  { feature: 'deep_dive', label: 'Deep Dive', desc: 'In-depth stock research', defaults: { premium: HAIKU, free: HAIKU }, premiumOnly: true },
-  { feature: 'draft_post', label: 'Community Post Draft', desc: 'Drafts a post about a stock signal', defaults: { premium: HAIKU, free: HAIKU }, premiumOnly: true },
+const AI_SECTIONS: { feature: string; label: string; desc: string; premiumOnly?: boolean }[] = [
+  { feature: 'analyze', label: 'Stock Analyzer', desc: 'Individual stock analysis signal' },
+  { feature: 'helper', label: 'AI Helper', desc: 'Floating chat assistant' },
+  { feature: 'top10', label: "Today's Picks", desc: 'Top 10 stock picks generation' },
+  { feature: 'opportunities', label: 'Discover / Opportunities', desc: 'Hidden gem opportunities' },
+  { feature: 'summary', label: 'Dashboard Daily Summary', desc: 'Fennec daily briefing on the dashboard' },
+  { feature: 'inbox', label: 'Email Inbox Scanner', desc: 'Extracts bills and invoices from Gmail' },
+  { feature: 'setup_help', label: 'Onboarding Setup Help', desc: 'Ask Fennec during Akahu setup' },
+  { feature: 'news', label: 'News Digest', desc: 'AI news analysis & digest' },
+  { feature: 'ipo', label: 'IPO Analysis', desc: 'IPO scoring and analysis' },
+  { feature: 'deep_dive', label: 'Deep Dive', desc: 'In-depth stock research', premiumOnly: true },
+  { feature: 'draft_post', label: 'Community Post Draft', desc: 'Drafts a post about a stock signal', premiumOnly: true },
 ]
 
 const settingKey = (feature: string, tier: Tier) => tier === 'premium' ? `model_${feature}` : `model_free_${feature}`
@@ -77,6 +76,9 @@ export default function AdminPage() {
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [pendingModels, setPendingModels] = useState<Record<string, string>>({})
   const [modelTier, setModelTier] = useState<Tier>('premium')
+  // Each feature's default per tier, from the backend so the two never disagree
+  const [modelDefaults, setModelDefaults] = useState<Record<string, Record<Tier, string>>>({})
+  const [resettingTier, setResettingTier] = useState(false)
 
   // Users
   const [users, setUsers] = useState<any[]>([])
@@ -108,11 +110,12 @@ export default function AdminPage() {
   const loadSettings = useCallback(async () => {
     setSettingsLoading(true)
     try {
-      const { settings: list } = await api.adminGetSettings()
+      const { settings: list, modelDefaults: defaults } = await api.adminGetSettings()
       const map: Record<string, string> = {}
       for (const s of list) map[s.key] = s.value
       setSettings(map)
       setPendingModels(map)
+      setModelDefaults(defaults ?? {})
     } catch {}
     setSettingsLoading(false)
   }, [])
@@ -142,6 +145,16 @@ export default function AdminPage() {
       setTimeout(() => setSavedKey(null), 2000)
     } catch {}
     setSavingKey(null)
+  }
+
+  async function resetModels(tier: Tier) {
+    if (!window.confirm(`Put every feature for ${tier} accounts back to its default model?`)) return
+    setResettingTier(true)
+    try {
+      await api.adminResetModels(tier)
+      await loadSettings()
+    } catch {}
+    setResettingTier(false)
   }
 
   async function toggleTier(userId: string, currentTier: string) {
@@ -300,7 +313,8 @@ export default function AdminPage() {
           </div>
 
           {/* Which accounts these choices apply to */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--surface2)', padding: 4, borderRadius: 10, width: 'fit-content' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', padding: 4, borderRadius: 10, width: 'fit-content' }}>
             {(['free', 'premium'] as const).map(t => (
               <button
                 key={t}
@@ -320,6 +334,16 @@ export default function AdminPage() {
               </button>
             ))}
           </div>
+            <button
+              onClick={() => resetModels(modelTier)}
+              disabled={resettingTier}
+              title="Clears saved choices for these accounts so every feature uses its default"
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, opacity: resettingTier ? 0.5 : 1 }}
+            >
+              <IconRefresh size={13} />
+              {resettingTier ? 'Resetting…' : `Reset ${modelTier} to defaults`}
+            </button>
+          </div>
 
           {settingsLoading ? (
             <div style={{ color: 'var(--text2)', fontSize: 13, padding: '20px 0' }}>Loading…</div>
@@ -327,7 +351,7 @@ export default function AdminPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {AI_SECTIONS.map(section => {
                 const key = settingKey(section.feature, modelTier)
-                const fallback = section.defaults[modelTier]
+                const fallback = modelDefaults[section.feature]?.[modelTier] ?? HAIKU
                 const known = (v?: string) => v && AVAILABLE_MODELS.some(m => m.id === v) ? v : fallback
                 const currentModel = known(pendingModels[key])
                 const savedModel = known(settings[key])
@@ -369,7 +393,7 @@ export default function AdminPage() {
                               transition: 'all 0.15s',
                             }}
                           >
-                            {m.label}
+                            {m.label}{m.id === fallback && <span style={{ fontSize: 9.5, marginLeft: 4, opacity: 0.7 }}>default</span>}
                           </button>
                         ))}
                       </div>

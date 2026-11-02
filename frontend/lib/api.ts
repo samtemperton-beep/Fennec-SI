@@ -205,6 +205,9 @@ export const api = {
   adminGetSettings: () =>
     apiFetch('/api/admin/settings'),
 
+  adminResetModels: (tier: 'free' | 'premium') =>
+    apiFetch(`/api/admin/settings/models/${tier}`, { method: 'DELETE' }),
+
   adminSetSetting: (key: string, value: string) =>
     apiFetch(`/api/admin/settings/${key}`, { method: 'PATCH', body: JSON.stringify({ value }) }),
 

@@ -14,20 +14,23 @@ export type Feature =
   | 'analyze' | 'helper' | 'top10' | 'opportunities' | 'summary' | 'inbox'
   | 'setup_help' | 'news' | 'ipo' | 'deep_dive' | 'draft_post';
 
-// Used until a choice is saved on the admin page. Deep dive and post drafting
-// are premium only, so their free entries are never used.
-const DEFAULTS: Record<Feature, { premium: string; free: string }> = {
-  analyze:       { premium: HAIKU,        free: GEMINI_FLASH },
-  helper:        { premium: SONNET,       free: GEMINI_FLASH },
-  top10:         { premium: HAIKU,        free: HAIKU },
-  opportunities: { premium: HAIKU,        free: HAIKU },
-  summary:       { premium: GEMINI_FLASH, free: GEMINI_FLASH },
-  inbox:         { premium: HAIKU,        free: HAIKU },
-  setup_help:    { premium: HAIKU,        free: HAIKU },
-  news:          { premium: GEMINI_FLASH, free: GEMINI_FLASH },
-  ipo:           { premium: GEMINI_FLASH, free: GEMINI_FLASH },
-  deep_dive:     { premium: HAIKU,        free: HAIKU },
-  draft_post:    { premium: HAIKU,        free: HAIKU },
+// Used until a choice is saved on the admin page, and again after "Reset to
+// defaults". Free runs on the cheapest model that does the job. Premium gets
+// Sonnet where answer quality is the point (the chat, picks, research) and
+// Haiku for short or structured work. Deep dive and post drafting are premium
+// only, so their free entries are never used.
+export const DEFAULTS: Record<Feature, { premium: string; free: string }> = {
+  analyze:       { premium: HAIKU,  free: GEMINI_FLASH },
+  helper:        { premium: SONNET, free: GEMINI_FLASH },
+  top10:         { premium: SONNET, free: GEMINI_FLASH },
+  opportunities: { premium: SONNET, free: GEMINI_FLASH },
+  summary:       { premium: HAIKU,  free: GEMINI_FLASH },
+  inbox:         { premium: HAIKU,  free: GEMINI_FLASH },
+  setup_help:    { premium: HAIKU,  free: GEMINI_FLASH },
+  news:          { premium: HAIKU,  free: GEMINI_FLASH },
+  ipo:           { premium: HAIKU,  free: GEMINI_FLASH },
+  deep_dive:     { premium: SONNET, free: GEMINI_FLASH },
+  draft_post:    { premium: HAIKU,  free: GEMINI_FLASH },
 };
 
 /** Premium choices are saved as model_<feature>, free ones as model_free_<feature>. */
