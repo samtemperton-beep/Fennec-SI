@@ -2,10 +2,9 @@ import { Router } from 'express';
 import { requireAuth, getPlatformSettings } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
-import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
 import { encryptToken, decryptToken, isEncrypted } from '../services/tokenCrypto';
-import { DEFAULT_MODEL } from '../services/claude';
+import { complete, modelFor } from '../services/llm';
 import { reconcileInboxItems } from '../services/inboxReconcile';
 
 // Node 20 has no native WebSocket, which supabase-js's realtime client needs at
@@ -17,7 +16,6 @@ const supabase = createClient(
   { realtime: { transport: ws as any } }
 );
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
 const router = Router();
 
@@ -273,7 +271,6 @@ const emailDate = (header: string) => {
 router.post('/scan', requireAuth, async (req: any, res) => {
   const userId: string = req.user.id;
   const { userKey } = req.body ?? {};
-  const ai = userKey ? new Anthropic({ apiKey: userKey }) : anthropic;
 
   try {
     const token = await getAccessToken(userId);
@@ -341,15 +338,15 @@ Emails:
 ${JSON.stringify(emailSummaries, null, 2)}`;
 
     const settings = await getPlatformSettings();
-    const response = await ai.messages.create({
-      model: settings['model_inbox'] || DEFAULT_MODEL,
-      max_tokens: 4000,
+    const text = await complete({
+      model: modelFor(settings, 'inbox', req.isPremium),
+      maxTokens: 4000,
       messages: [{ role: 'user', content: prompt }],
+      apiKey: typeof userKey === 'string' ? userKey : undefined,
     });
 
     let parsed: any[] = [];
     try {
-      const text = response.content[0].type === 'text' ? response.content[0].text : '';
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
     } catch (_) {}

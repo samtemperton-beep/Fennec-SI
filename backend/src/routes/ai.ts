@@ -1,19 +1,20 @@
 import { Router } from 'express';
 import { requireAuth, checkAndIncrementUsage, FREE_DAILY_AI_LIMIT, getPlatformSettings } from '../middleware/auth';
 import * as claude from '../services/claude';
-import * as gemini from '../services/gemini';
+import { modelFor, cleanMessages } from '../services/llm';
 import { getCached, setCached } from '../services/cache';
 import { fetchQuote } from '../services/yahoo';
 
 const router = Router();
 
-// Shared cache: same ticker analysis served to all users for 4 hours
-// Premium users get Claude analysis (separate cache key)
+// Shared cache: same ticker analysis served to all users of a model for 4 hours.
+// The cache key carries the model, so free and premium only share when they use the same one.
 router.post('/analyze', requireAuth, async (req, res) => {
   const { ticker, data, riskLevel } = req.body;
   const isPremium = (req as any).isPremium;
   const riskBucket = riskLevel ? (riskLevel <= 3 ? 'low' : riskLevel <= 6 ? 'mid' : 'high') : 'mid';
-  const cacheKey = `analyze:${ticker}:${riskBucket}:${isPremium ? 'premium' : 'free'}`;
+  const model = modelFor(await getPlatformSettings(), 'analyze', isPremium);
+  const cacheKey = `analyze:${ticker}:${riskBucket}:${model}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
@@ -40,10 +41,7 @@ router.post('/analyze', requireAuth, async (req, res) => {
         pctFrom52Lo: q.w52Lo ? +((q.price / q.w52Lo - 1) * 100).toFixed(1) : null,
       };
     } catch { /* use whatever data was passed */ }
-    const settings = await getPlatformSettings();
-    const result = isPremium
-      ? await claude.analyzeStock(ticker, enriched, user.user_metadata?.anthropic_key, settings['model_analyze'])
-      : await gemini.analyzeStock(ticker, enriched, riskLevel);
+    const result = await claude.analyzeStock(ticker, enriched, user.user_metadata?.anthropic_key, model, riskLevel);
     await setCached(cacheKey, result, 4);
     res.json(result);
   } catch (e: any) {
@@ -51,7 +49,7 @@ router.post('/analyze', requireAuth, async (req, res) => {
   }
 });
 
-// Helper: free users limited to Gemini; counts toward daily quota
+// Helper: counts toward a free user's daily quota
 router.post('/helper', requireAuth, async (req, res) => {
   const { messages, context } = req.body;
   const isPremium = (req as any).isPremium;
@@ -68,9 +66,7 @@ router.post('/helper', requireAuth, async (req, res) => {
 
   try {
     const settings = await getPlatformSettings();
-    const stream = isPremium
-      ? claude.streamHelper(messages, user.user_metadata?.anthropic_key, context, settings['model_helper'])
-      : gemini.streamHelper(messages, context);
+    const stream = claude.streamHelper(cleanMessages(messages), user.user_metadata?.anthropic_key, context, modelFor(settings, 'helper', isPremium));
     for await (const chunk of stream) {
       res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
     }
@@ -97,7 +93,7 @@ router.post('/chat', requireAuth, async (req, res) => {
 
   try {
     const settings = await getPlatformSettings();
-    for await (const chunk of claude.streamChat(messages, portfolio || [], user.user_metadata?.anthropic_key, settings['model_chat'])) {
+    for await (const chunk of claude.streamChat(cleanMessages(messages), portfolio || [], user.user_metadata?.anthropic_key, settings['model_chat'])) {
       res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
     }
     res.write('data: [DONE]\n\n');
@@ -137,7 +133,7 @@ router.post('/setup-help', requireAuth, async (req, res) => {
 
   try {
     const settings = await getPlatformSettings();
-    res.json({ reply: await claude.setupHelp(clean, settings['model_setup_help']) });
+    res.json({ reply: await claude.setupHelp(clean, modelFor(settings, 'setup_help', (req as any).isPremium)) });
   } catch (e: any) {
     console.error('[setup-help]', e?.message ?? e);
     res.status(502).json({ error: "Fennec can't answer right now. Try again in a moment, or skip this step and connect later." });
@@ -170,9 +166,7 @@ router.post('/daily-summary', requireAuth, async (req, res) => {
 
   try {
     const settings = await getPlatformSettings();
-    const text = isPremium
-      ? await claude.dailySummary(facts, user.user_metadata?.anthropic_key, settings['model_summary'])
-      : await gemini.dailySummary(facts);
+    const text = await claude.dailySummary(facts, user.user_metadata?.anthropic_key, modelFor(settings, 'summary', isPremium));
     if (!text) return res.status(502).json({ error: 'The summary came back empty. Try again shortly.' });
     const result = { summary: text, generatedAt: new Date().toISOString() };
     await setCached(cacheKey, result, 24);
@@ -189,7 +183,8 @@ router.post('/top10', requireAuth, async (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
   const hourBucket = Math.floor(new Date().getUTCHours() / 2);
   const rotationSeed = hourBucket; // 0-11, cycles sector rotation
-  const cacheKey = `top10:${market}:${timeframe}:${today}:${hourBucket}`;
+  const model = modelFor(await getPlatformSettings(), 'top10', (req as any).isPremium);
+  const cacheKey = `top10:${market}:${timeframe}:${today}:${hourBucket}:${model}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
@@ -197,8 +192,7 @@ router.post('/top10', requireAuth, async (req, res) => {
 
   const user = (req as any).user;
   try {
-    const settings = await getPlatformSettings();
-    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key, newsContext, rotationSeed, settings['model_top10']);
+    const data = await claude.generateTop10(market, timeframe, user.user_metadata?.anthropic_key, newsContext, rotationSeed, model);
     await setCached(cacheKey, data, 2); // 2h TTL — resets with each hour bucket
     res.json({ data, cached: false });
   } catch (e: any) {
@@ -211,7 +205,8 @@ router.post('/opportunities', requireAuth, async (req, res) => {
   const { riskLevel = 7, holdings = [], sector = 'All', market = 'US', newsContext, userInterests } = req.body;
   const user = (req as any).user;
   const isPremium = (req as any).isPremium;
-  const cacheKey = `opportunities:${user.id}:${sector}:${market}:${riskLevel}:${newsContext ? 'news' : 'base'}`;
+  const model = modelFor(await getPlatformSettings(), 'opportunities', isPremium);
+  const cacheKey = `opportunities:${user.id}:${sector}:${market}:${riskLevel}:${newsContext ? 'news' : 'base'}:${model}`;
   const cached = await getCached(cacheKey);
   if (cached) {
     const data = isPremium ? cached : (cached as any[]).slice(0, 2);
@@ -221,8 +216,7 @@ router.post('/opportunities', requireAuth, async (req, res) => {
   if (!await checkAndIncrementUsage(req, res)) return;
 
   try {
-    const settings = await getPlatformSettings();
-    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key, sector, market, newsContext, userInterests, settings['model_opportunities']);
+    const data = await claude.generateOpportunities(riskLevel, holdings, user.user_metadata?.anthropic_key, sector, market, newsContext, userInterests, model);
     await setCached(cacheKey, data, newsContext ? 3 : 4);
     res.json({ data: isPremium ? data : data.slice(0, 2), cached: false, limited: !isPremium });
   } catch (e: any) {
@@ -234,7 +228,8 @@ router.post('/opportunities', requireAuth, async (req, res) => {
 router.post('/news-digest', requireAuth, async (req, res) => {
   const { headlines, portfolio } = req.body;
   const fingerprint = (headlines || []).slice(0, 5).join('|').replace(/\s+/g, '').slice(0, 120);
-  const cacheKey = `news:${fingerprint}`;
+  const model = modelFor(await getPlatformSettings(), 'news', (req as any).isPremium);
+  const cacheKey = `news:${fingerprint}:${model}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
@@ -242,8 +237,7 @@ router.post('/news-digest', requireAuth, async (req, res) => {
 
   const user = (req as any).user;
   try {
-    const settings = await getPlatformSettings();
-    const data = await claude.analyzeNews(headlines, portfolio || [], user.user_metadata?.anthropic_key, settings['model_news']);
+    const data = await claude.analyzeNews(headlines, portfolio || [], user.user_metadata?.anthropic_key, model);
     await setCached(cacheKey, data, 2);
     res.json(data);
   } catch (e: any) {
@@ -251,11 +245,12 @@ router.post('/news-digest', requireAuth, async (req, res) => {
   }
 });
 
-// IPO analysis: free gets Gemini, premium gets Claude; both count toward quota
+// IPO analysis: counts toward a free user's quota
 router.post('/ipo-analysis', requireAuth, async (req, res) => {
   const { ipo } = req.body;
   const isPremium = (req as any).isPremium;
-  const cacheKey = `ipo:${ipo?.symbol || ipo?.name}:${isPremium ? 'premium' : 'free'}`;
+  const model = modelFor(await getPlatformSettings(), 'ipo', isPremium);
+  const cacheKey = `ipo:${ipo?.symbol || ipo?.name}:${model}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
 
@@ -263,10 +258,7 @@ router.post('/ipo-analysis', requireAuth, async (req, res) => {
 
   try {
     const user = (req as any).user;
-    const settings = await getPlatformSettings();
-    const data = isPremium
-      ? await claude.analyzeIPO(ipo, user.user_metadata?.anthropic_key, settings['model_ipo'])
-      : await gemini.analyzeIPO(ipo);
+    const data = await claude.analyzeIPO(ipo, user.user_metadata?.anthropic_key, model);
     await setCached(cacheKey, data, 24);
     res.json({ data, cached: false });
   } catch (e: any) {
@@ -284,14 +276,14 @@ router.post('/deep-dive', requireAuth, async (req, res) => {
   }
 
   const { ticker, context } = req.body;
-  const cacheKey = `deepdive:${ticker}`;
+  const model = modelFor(await getPlatformSettings(), 'deep_dive', true);
+  const cacheKey = `deepdive:${ticker}:${model}`;
   const cached = await getCached(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
   const user = (req as any).user;
   try {
-    const settings = await getPlatformSettings();
-    const data = await claude.deepDive(ticker, context, user.user_metadata?.anthropic_key, settings['model_deep_dive']);
+    const data = await claude.deepDive(ticker, context, user.user_metadata?.anthropic_key, model);
     await setCached(cacheKey, data, 6);
     res.json(data);
   } catch (e: any) {
@@ -311,7 +303,8 @@ router.post('/draft-post', requireAuth, async (req, res) => {
   const { ticker, signal, context } = req.body;
   try {
     const user = (req as any).user;
-    const text = await claude.draftPost(ticker, signal, context, user.user_metadata?.anthropic_key);
+    const settings = await getPlatformSettings();
+    const text = await claude.draftPost(ticker, signal, context, user.user_metadata?.anthropic_key, modelFor(settings, 'draft_post', true));
     res.json({ text });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

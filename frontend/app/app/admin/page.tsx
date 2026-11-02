@@ -8,24 +8,33 @@ import {
   IconRefresh, IconCrown, IconActivity, IconCheck, IconX,
 } from '@tabler/icons-react'
 
+const GEMINI = 'gemini-2.5-flash'
+const HAIKU = 'claude-haiku-4-5-20251001'
+const SONNET = 'claude-sonnet-4-6'
+
 const AVAILABLE_MODELS = [
-  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', note: 'Fast & cheap' },
-  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6', note: 'Balanced (recommended)' },
+  { id: GEMINI, label: 'Gemini 2.5 Flash', note: 'Cheapest' },
+  { id: HAIKU, label: 'Haiku 4.5', note: 'Fast & cheap' },
+  { id: SONNET, label: 'Sonnet 4.6', note: 'Best answers, costs the most' },
 ]
 
-const AI_SECTIONS = [
-  { key: 'model_analyze', label: 'Stock Analyzer', desc: 'Individual stock analysis signal' },
-  { key: 'model_helper', label: 'AI Helper', desc: 'Floating chat assistant', defaultModel: 'claude-sonnet-4-6' },
-  { key: 'model_chat', label: 'AI Advisor Chat', desc: 'Portfolio chat advisor' },
-  { key: 'model_top10', label: "Today's Picks", desc: 'Top 10 stock picks generation' },
-  { key: 'model_opportunities', label: 'Discover / Opportunities', desc: 'Hidden gem opportunities' },
-  { key: 'model_summary', label: 'Dashboard Daily Summary', desc: 'Fennec daily briefing on the dashboard' },
-  { key: 'model_inbox', label: 'Email Inbox Scanner', desc: 'Extracts bills and invoices from Gmail' },
-  { key: 'model_setup_help', label: 'Onboarding Setup Help', desc: 'Ask Fennec during Akahu setup' },
-  { key: 'model_news', label: 'News Digest', desc: 'AI news analysis & digest' },
-  { key: 'model_ipo', label: 'IPO Analysis', desc: 'IPO scoring and analysis' },
-  { key: 'model_deep_dive', label: 'Deep Dive', desc: 'In-depth stock research (premium)' },
+// Defaults must match DEFAULTS in backend/src/services/llm.ts.
+type Tier = 'free' | 'premium'
+const AI_SECTIONS: { feature: string; label: string; desc: string; defaults: Record<Tier, string>; premiumOnly?: boolean }[] = [
+  { feature: 'analyze', label: 'Stock Analyzer', desc: 'Individual stock analysis signal', defaults: { premium: HAIKU, free: GEMINI } },
+  { feature: 'helper', label: 'AI Helper', desc: 'Floating chat assistant', defaults: { premium: SONNET, free: GEMINI } },
+  { feature: 'top10', label: "Today's Picks", desc: 'Top 10 stock picks generation', defaults: { premium: HAIKU, free: HAIKU } },
+  { feature: 'opportunities', label: 'Discover / Opportunities', desc: 'Hidden gem opportunities', defaults: { premium: HAIKU, free: HAIKU } },
+  { feature: 'summary', label: 'Dashboard Daily Summary', desc: 'Fennec daily briefing on the dashboard', defaults: { premium: GEMINI, free: GEMINI } },
+  { feature: 'inbox', label: 'Email Inbox Scanner', desc: 'Extracts bills and invoices from Gmail', defaults: { premium: HAIKU, free: HAIKU } },
+  { feature: 'setup_help', label: 'Onboarding Setup Help', desc: 'Ask Fennec during Akahu setup', defaults: { premium: HAIKU, free: HAIKU } },
+  { feature: 'news', label: 'News Digest', desc: 'AI news analysis & digest', defaults: { premium: GEMINI, free: GEMINI } },
+  { feature: 'ipo', label: 'IPO Analysis', desc: 'IPO scoring and analysis', defaults: { premium: GEMINI, free: GEMINI } },
+  { feature: 'deep_dive', label: 'Deep Dive', desc: 'In-depth stock research', defaults: { premium: HAIKU, free: HAIKU }, premiumOnly: true },
+  { feature: 'draft_post', label: 'Community Post Draft', desc: 'Drafts a post about a stock signal', defaults: { premium: HAIKU, free: HAIKU }, premiumOnly: true },
 ]
+
+const settingKey = (feature: string, tier: Tier) => tier === 'premium' ? `model_${feature}` : `model_free_${feature}`
 
 function Tag({ children, color }: { children: React.ReactNode; color: string }) {
   return (
@@ -67,6 +76,7 @@ export default function AdminPage() {
   const [savedKey, setSavedKey] = useState<string | null>(null)
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [pendingModels, setPendingModels] = useState<Record<string, string>>({})
+  const [modelTier, setModelTier] = useState<Tier>('premium')
 
   // Users
   const [users, setUsers] = useState<any[]>([])
@@ -285,9 +295,30 @@ export default function AdminPage() {
           <div style={{ marginBottom: 18 }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>AI Model Configuration</h2>
             <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>
-              Set the Claude model used for each AI feature. Changes take effect within 60 seconds (settings cache TTL).
-              Applies to premium users; free users always use Gemini.
+              Choose the model for each AI feature, separately for free and premium accounts. Changes take effect within 60 seconds.
             </p>
+          </div>
+
+          {/* Which accounts these choices apply to */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--surface2)', padding: 4, borderRadius: 10, width: 'fit-content' }}>
+            {(['free', 'premium'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setModelTier(t)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13,
+                  background: modelTier === t ? 'var(--surface)' : 'transparent',
+                  color: modelTier === t ? 'var(--text)' : 'var(--text2)',
+                  fontWeight: modelTier === t ? 700 : 400,
+                  boxShadow: modelTier === t ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {t === 'premium' && <IconCrown size={14} color="var(--amber)" />}
+                {t === 'free' ? 'Free accounts' : 'Premium accounts'}
+              </button>
+            ))}
           </div>
 
           {settingsLoading ? (
@@ -295,14 +326,18 @@ export default function AdminPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {AI_SECTIONS.map(section => {
-                const currentModel = pendingModels[section.key] || section.defaultModel || 'claude-haiku-4-5-20251001'
-                const savedModel = settings[section.key] || section.defaultModel || 'claude-haiku-4-5-20251001'
+                const key = settingKey(section.feature, modelTier)
+                const fallback = section.defaults[modelTier]
+                const known = (v?: string) => v && AVAILABLE_MODELS.some(m => m.id === v) ? v : fallback
+                const currentModel = known(pendingModels[key])
+                const savedModel = known(settings[key])
                 const isDirty = currentModel !== savedModel
-                const isSaving = savingKey === section.key
-                const isSaved = savedKey === section.key
+                const isSaving = savingKey === key
+                const isSaved = savedKey === key
+                const locked = section.premiumOnly && modelTier === 'free'
                 return (
                   <div
-                    key={section.key}
+                    key={key}
                     style={{
                       background: 'var(--surface2)', border: '1px solid var(--border)',
                       borderRadius: 12, padding: '16px 18px',
@@ -313,12 +348,17 @@ export default function AdminPage() {
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{section.label}</div>
                       <div style={{ fontSize: 11, color: 'var(--text2)' }}>{section.desc}</div>
                     </div>
+                    {locked ? (
+                      <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                        <IconCrown size={13} color="var(--amber)" /> Premium only
+                      </div>
+                    ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                       <div style={{ display: 'flex', gap: 4 }}>
                         {AVAILABLE_MODELS.map(m => (
                           <button
                             key={m.id}
-                            onClick={() => setPendingModels(prev => ({ ...prev, [section.key]: m.id }))}
+                            onClick={() => setPendingModels(prev => ({ ...prev, [key]: m.id }))}
                             title={m.note}
                             style={{
                               padding: '6px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
@@ -334,7 +374,7 @@ export default function AdminPage() {
                         ))}
                       </div>
                       <button
-                        onClick={() => saveModel(section.key, currentModel)}
+                        onClick={() => saveModel(key, currentModel)}
                         disabled={isSaving || !isDirty}
                         style={{
                           padding: '6px 14px', borderRadius: 7, fontSize: 12, cursor: isDirty && !isSaving ? 'pointer' : 'default',
@@ -349,6 +389,7 @@ export default function AdminPage() {
                         {isSaved ? <><IconCheck size={13} /> Saved</> : isSaving ? 'Saving…' : 'Save'}
                       </button>
                     </div>
+                    )}
                   </div>
                 )
               })}

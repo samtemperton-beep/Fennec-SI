@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { requireAuth, requireAdmin, invalidateSettingsCache } from '../middleware/auth';
+import { MODELS } from '../services/llm';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -72,6 +73,9 @@ router.patch('/settings/:key', requireAuth, requireAdmin, async (req, res) => {
   const { value } = req.body;
   if (value === undefined || value === null) {
     return res.status(400).json({ error: 'value is required' });
+  }
+  if (String(key).startsWith('model_') && !MODELS.includes(String(value))) {
+    return res.status(400).json({ error: `Unknown model: ${value}` });
   }
   const { error } = await supabase
     .from('platform_settings')
