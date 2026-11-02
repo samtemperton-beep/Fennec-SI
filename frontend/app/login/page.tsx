@@ -393,7 +393,7 @@ export default function LoginPage() {
                 {mode === 'signup' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : mode === 'newpw' ? 'Choose a new password' : 'Welcome back'}
               </h2>
               <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', marginBottom: 28 }}>
-                {mode === 'signup' ? 'Free to start. No card needed.' : mode === 'forgot' ? "Enter your email and we'll send you a link." : mode === 'newpw' ? 'At least 8 characters.' : 'Sign in to your Fennec account'}
+                {mode === 'signup' ? 'Free to start. No card needed.' : mode === 'forgot' ? "Enter your email and we'll send you a link." : mode === 'newpw' ? `At least ${PASSWORD_MIN} characters.` : 'Sign in to your Fennec account'}
               </p>
 
               {mode === 'forgot' && (
