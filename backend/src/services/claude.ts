@@ -1,6 +1,7 @@
 // The prompt for each AI feature. Despite the file name, each one runs on
 // whichever model it's given: services/llm.ts sends it to Claude or Gemini.
 import { complete, stream, HAIKU, SONNET, Message } from './llm';
+import { APP_GUIDE } from './appGuide';
 
 export const DEFAULT_MODEL = HAIKU;
 export const HELPER_MODEL = SONNET;
@@ -257,7 +258,9 @@ export async function* streamHelper(messages: Message[], apiKey?: string, contex
 - Use **bold** for key figures and terms; bullet points for lists
 - Keep responses focused: 150-250 words unless depth is genuinely needed
 - For NZ-specific questions, use NZD and NZ context by default
-- Always note this is information and analysis, not regulated financial advice`;
+- Always note this is information and analysis, not regulated financial advice (not needed for questions about using the app)
+
+${APP_GUIDE}`;
 
   yield* stream({ model: model || HELPER_MODEL, maxTokens: 1024, system, messages, apiKey });
 }
