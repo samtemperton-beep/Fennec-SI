@@ -7,6 +7,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconHome, IconEdit, IconCheck, IconX, IconSearch, IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { RatesNoticeUpload, type RatesNoticeValues } from '@/components/finance/RatesNoticeUpload'
+import { detectRepayment, summariseInterest, projectPayoff, scheduledMonthly, type LoanTx } from '@/lib/homeloan'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
@@ -30,39 +31,6 @@ const DEFAULT: LoanDetails = {
   address: '', balance: 0, interest_rate: 6.5, loan_term_years: 30,
   start_date: localDate(), monthly_payment: null,
   rv: null, market_estimate: null, original_drawdown: null, purchase_price: null,
-}
-
-function calcAmortisation(balance: number, annualRate: number, termYears: number, startDate: string) {
-  const r = annualRate / 100 / 12
-  const n = termYears * 12
-  if (r === 0) return { monthlyPayment: balance / n, totalInterest: 0, payoffDate: new Date(), schedule: [] }
-
-  const monthlyPayment = balance * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1)
-  let remaining = balance
-  let totalInterest = 0
-  const schedule: { month: number; payment: number; principal: number; interest: number; remaining: number }[] = []
-  const start = new Date(startDate)
-
-  for (let i = 1; i <= n && remaining > 0.01; i++) {
-    const interestPayment = remaining * r
-    const principalPayment = Math.min(monthlyPayment - interestPayment, remaining)
-    remaining -= principalPayment
-    totalInterest += interestPayment
-    if (i <= 360) schedule.push({ month: i, payment: monthlyPayment, principal: principalPayment, interest: interestPayment, remaining: Math.max(0, remaining) })
-  }
-
-  const payoffDate = new Date(start)
-  payoffDate.setMonth(payoffDate.getMonth() + n)
-
-  return { monthlyPayment, totalInterest, payoffDate, schedule }
-}
-
-function YearsToPayoff({ startDate, payoffDate }: { startDate: string; payoffDate: Date }) {
-  const start = new Date(startDate)
-  const months = (payoffDate.getFullYear() - start.getFullYear()) * 12 + (payoffDate.getMonth() - start.getMonth())
-  const years = Math.floor(months / 12)
-  const rem = months % 12
-  return <>{years}y {rem}m</>
 }
 
 // From LINZ (backend/src/services/linz.ts). LINZ doesn't publish sales or values.
@@ -95,7 +63,7 @@ export default function HomeLoanPage() {
   const [fetchingProperty, setFetchingProperty] = useState(false)
   const [propertyError, setPropertyError] = useState('')
   const [notice, setNotice] = useState<RatesNoticeValues | null>(null)
-  const [actualPayment, setActualPayment] = useState<{ amount: number; frequency: string } | null>(null)
+  const [loanTxs, setLoanTxs] = useState<LoanTx[]>([])
 
   useEffect(() => { load() }, [])
 
@@ -119,32 +87,15 @@ export default function HomeLoanPage() {
     const loanAccount = loanAccounts?.[0]
     const liveBalance = loanAccount ? Math.abs(Number(loanAccount.current_balance)) : null
 
-    // Detect actual payment amount + frequency from recent transactions
+    // The loan account's own transactions: repayments (credits) and interest charges.
     if (loanAccount) {
       const { data: txs } = await supabase
         .from('fin_transactions')
-        .select('amount, date')
+        .select('amount, date, description')
         .eq('account_id', loanAccount.id)
-        .lt('amount', 0)
         .order('date', { ascending: false })
-        .limit(20)
-
-      if (txs && txs.length >= 2) {
-        // Find the most common negative amount (the repayment)
-        const amounts = txs.map(t => Math.abs(Number(t.amount)))
-        const freq: Record<string, number> = {}
-        amounts.forEach(a => { const k = a.toFixed(2); freq[k] = (freq[k] || 0) + 1 })
-        const topAmount = parseFloat(Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0])
-
-        // Detect frequency from date gaps
-        const dates = txs.filter(t => Math.abs(Number(t.amount)).toFixed(2) === topAmount.toFixed(2))
-          .map(t => new Date(t.date).getTime()).sort((a, b) => b - a)
-        const gaps = dates.slice(0, -1).map((d, i) => Math.round((d - dates[i + 1]) / 86400000))
-        const avgGap = gaps.length ? gaps.reduce((s, g) => s + g, 0) / gaps.length : 30
-        const frequency = avgGap < 10 ? 'weekly' : avgGap < 20 ? 'fortnightly' : 'monthly'
-
-        setActualPayment({ amount: topAmount, frequency })
-      }
+        .limit(400)
+      setLoanTxs((txs ?? []).map(t => ({ amount: Number(t.amount), date: t.date, description: t.description })))
     }
 
     if (data) {
@@ -208,21 +159,30 @@ export default function HomeLoanPage() {
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><LoadingSpinner size={32} /></div>
 
-  const { monthlyPayment, totalInterest, payoffDate, schedule } = calcAmortisation(
-    loan.balance, loan.interest_rate, loan.loan_term_years, loan.start_date
-  )
-
+  // Repayments and interest from the loan account where there's enough history;
+  // otherwise the scheduled repayment over the rest of the term.
+  const repayment = detectRepayment(loanTxs)
+  const interest = summariseInterest(loanTxs, loan.balance)
+  const rate = interest.impliedRate ?? loan.interest_rate
+  const rateNote = interest.impliedRate ? `${rate}% p.a. from your bank’s interest charges` : `${rate}% p.a. from your loan details`
   const now = new Date()
-  const elapsedMonths = Math.max(0, (now.getFullYear() - new Date(loan.start_date).getFullYear()) * 12 + (now.getMonth() - new Date(loan.start_date).getMonth()))
-  const paidToDate = elapsedMonths > 0 && schedule.length > 0
-    ? schedule.slice(0, Math.min(elapsedMonths, schedule.length))
-    : []
-  const interestPaidToDate = paidToDate.reduce((s, m) => s + m.interest, 0)
-  const principalPaidToDate = paidToDate.reduce((s, m) => s + m.principal, 0)
-  const progressPct = loan.balance > 0 ? Math.min(100, (principalPaidToDate / (loan.balance + principalPaidToDate)) * 100) : 0
+  const start = new Date(loan.start_date)
+  const elapsedMonths = Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()))
+  const remainingTermMonths = Math.max(1, loan.loan_term_years * 12 - elapsedMonths)
+  const payment = repayment
+    ? { amount: repayment.amount, perYear: repayment.perYear, label: `${repayment.frequency[0].toUpperCase()}${repayment.frequency.slice(1)} repayment`, sub: `≈ ${currency.format(repayment.monthly)} a month · from your transactions` }
+    : { amount: loan.monthly_payment || scheduledMonthly(loan.balance, rate, remainingTermMonths), perYear: 12, label: 'Monthly repayment', sub: loan.monthly_payment ? 'from your loan details' : `estimated to clear the loan by the end of its term` }
+  const projection = projectPayoff(loan.balance, rate, payment.amount, payment.perYear, now)
 
-  const equity = loan.market_estimate ? loan.market_estimate - loan.balance : null
-  const lvr = loan.market_estimate ? (loan.balance / loan.market_estimate) * 100 : null
+  // Progress: what's been repaid of the original loan.
+  const principalPaid = loan.original_drawdown ? Math.max(0, loan.original_drawdown - loan.balance) : null
+  const progressPct = loan.original_drawdown && principalPaid !== null ? Math.min(100, (principalPaid / loan.original_drawdown) * 100) : null
+
+  // Equity and LVR against the market estimate, or the council valuation if there isn't one.
+  const valueBasis = loan.market_estimate || loan.rv || null
+  const valueNote = loan.market_estimate ? '' : loan.rv ? ' (using CV)' : ''
+  const equity = valueBasis ? valueBasis - loan.balance : null
+  const lvr = valueBasis ? (loan.balance / valueBasis) * 100 : null
 
   // The council valuation: from LINZ's open valuation roll where the council is
   // in it, otherwise read from a rates notice the person uploads.
@@ -328,10 +288,10 @@ export default function HomeLoanPage() {
       {/* KPI cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[
-          { label: 'Current Balance', value: currency.format(loan.balance), sub: 'Outstanding principal' },
-          { label: actualPayment ? `${actualPayment.frequency.charAt(0).toUpperCase() + actualPayment.frequency.slice(1)} Payment` : 'Monthly Payment', value: actualPayment ? currencyExact.format(actualPayment.amount) : currencyExact.format(monthlyPayment), sub: actualPayment ? `actual from transactions` : `calculated at ${loan.interest_rate}% p.a.` },
-          { label: 'Total Interest', value: currency.format(totalInterest), sub: 'Over full term' },
-          { label: 'Payoff Date', value: payoffDate.toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' }), sub: <YearsToPayoff startDate={loan.start_date} payoffDate={payoffDate} /> },
+          { label: 'Current Balance', value: currency.format(loan.balance), sub: rateNote },
+          { label: payment.label, value: currencyExact.format(payment.amount), sub: payment.sub },
+          { label: 'Interest to Go', value: projection ? currency.format(projection.totalInterest) : '—', sub: projection ? 'if you keep repaying this much' : 'repayment doesn’t cover the interest' },
+          { label: 'Payoff Date', value: projection ? projection.payoffDate.toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' }) : '—', sub: projection ? `${projection.years}y ${projection.months}m from now` : 'add your repayment in Edit' },
         ].map(k => (
           <div key={k.label} className="card" style={{ padding: 18 }}>
             <p style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{k.label}</p>
@@ -345,14 +305,20 @@ export default function HomeLoanPage() {
       <div className="card" style={{ padding: 20, marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Loan Progress</span>
-          <span style={{ fontSize: 12, color: 'var(--text2)' }}>{progressPct.toFixed(1)}% paid off</span>
+          <span style={{ fontSize: 12, color: 'var(--text2)' }}>{progressPct !== null ? `${progressPct.toFixed(1)}% paid off` : 'Add your original drawdown in Edit'}</span>
         </div>
         <div style={{ height: 10, background: 'var(--surface2)', borderRadius: 6, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--primary)', borderRadius: 6, transition: 'width 0.5s' }} />
+          <div style={{ height: '100%', width: `${progressPct ?? 0}%`, background: 'var(--primary)', borderRadius: 6, transition: 'width 0.5s' }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--text3)' }}>Principal paid: {currency.format(principalPaidToDate)}</span>
-          <span style={{ fontSize: 11, color: 'var(--text3)' }}>Interest paid: {currency.format(interestPaidToDate)}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            {principalPaid !== null ? `Repaid: ${currency.format(principalPaid)} of ${currency.format(loan.original_drawdown!)}` : ''}
+          </span>
+          {interest.total > 0 && interest.since && (
+            <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+              Interest charged since {new Date(interest.since).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })}: {currency.format(interest.total)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -366,12 +332,12 @@ export default function HomeLoanPage() {
               { label: 'Original Drawdown', value: loan.original_drawdown },
               { label: 'Rateable Value (RV)', value: loan.rv },
               { label: 'Market Estimate', value: loan.market_estimate },
-              { label: 'Equity', value: equity },
-              { label: 'Loan-to-Value Ratio', value: lvr !== null ? `${lvr.toFixed(1)}%` : null, raw: true },
+              { label: `Equity${valueNote}`, value: equity },
+              { label: `Loan-to-Value Ratio${valueNote}`, value: lvr !== null ? `${lvr.toFixed(1)}%` : null, raw: true },
             ].map(r => (
               <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontSize: 13, color: 'var(--text2)' }}>{r.label}</span>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 14, color: r.value !== null && r.label === 'Equity' ? 'var(--green)' : 'var(--text)' }}>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 14, color: r.value !== null && r.label.startsWith('Equity') ? 'var(--green)' : 'var(--text)' }}>
                   {r.value !== null ? (r.raw ? r.value : currency.format(r.value as number)) : <span style={{ color: 'var(--text3)', fontFamily: 'inherit', fontWeight: 400 }}>—</span>}
                 </span>
               </div>
@@ -425,39 +391,33 @@ export default function HomeLoanPage() {
         </div>
       </div>
 
-      {/* Amortisation table — first 5 years */}
-      <div className="card" style={{ padding: 20 }}>
-        <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Amortisation Schedule (first 5 years)</h2>
+      {/* The next five years at the current repayment */}
+      {projection && <div className="card" style={{ padding: 20 }}>
+        <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 4 }}>The Next 5 Years</h2>
+        <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>If you keep repaying {currencyExact.format(payment.amount)} {repayment?.frequency ?? 'monthly'} at {rate}% p.a.</p>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Year', 'Annual Payment', 'Principal', 'Interest', 'Balance'].map(h => (
+                {['Year', 'Repaid', 'Principal', 'Interest', 'Balance'].map(h => (
                   <th key={h} style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'Syne, sans-serif', fontWeight: 600, color: 'var(--text2)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: Math.min(5, loan.loan_term_years) }, (_, yi) => {
-                const monthsInYear = schedule.slice(yi * 12, yi * 12 + 12)
-                if (!monthsInYear.length) return null
-                const annualPrincipal = monthsInYear.reduce((s, m) => s + m.principal, 0)
-                const annualInterest = monthsInYear.reduce((s, m) => s + m.interest, 0)
-                const endBalance = monthsInYear[monthsInYear.length - 1].remaining
-                return (
-                  <tr key={yi} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>Year {yi + 1}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{currency.format(annualPrincipal + annualInterest)}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>{currency.format(annualPrincipal)}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace', color: 'var(--red)' }}>{currency.format(annualInterest)}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>{currency.format(endBalance)}</td>
-                  </tr>
-                )
-              })}
+              {projection.byYear.slice(0, 5).map(y => (
+                <tr key={y.year} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>{now.getFullYear() + y.year - 1}–{String(now.getFullYear() + y.year).slice(2)}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{currency.format(y.paid)}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>{currency.format(y.principal)}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace', color: 'var(--red)' }}>{currency.format(y.interest)}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>{currency.format(y.endBalance)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
