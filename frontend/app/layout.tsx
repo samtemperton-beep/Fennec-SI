@@ -3,8 +3,8 @@ import "./globals.css";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "Fennec — spend & invest",
-  description: "Your money in one place for New Zealanders: bank accounts, budgets, bills, goals, KiwiSaver and NZ, ASX and US shares, with an AI assistant that knows your numbers.",
+  title: "Fennec SI — Save & Invest",
+  description: "Fennec SI (Save & Invest) puts your money in one place for New Zealanders: bank accounts, budgets, bills, goals, KiwiSaver and NZ, ASX and US shares, with an AI assistant that knows your numbers.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

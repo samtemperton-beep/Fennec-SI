@@ -43,31 +43,47 @@ export async function fetchPrices(tickers: string[]): Promise<Record<string, { p
           axios.get(`${FINNHUB}/quote?symbol=${t}&token=${key()}`, { timeout: 8000 }),
           axios.get(`${FINNHUB}/stock/profile2?symbol=${t}&token=${key()}`, { timeout: 8000 }),
         ]);
+        if (!q.c) throw new Error('no Finnhub price');
         // dp = percent change since the previous close
-        return [t, { price: q.c ?? 0, name: p.name || undefined, changePct: Number.isFinite(q.dp) ? q.dp : undefined }] as [string, { price: number; name?: string; changePct?: number }];
+        return [t, { price: q.c, name: p.name || undefined, changePct: Number.isFinite(q.dp) ? q.dp : undefined }] as [string, { price: number; name?: string; changePct?: number }];
       } catch {
-        return [t, { price: 0 }] as [string, { price: number }];
+        // Finnhub busy or rate limited: Yahoo also has US prices.
+        try {
+          const y = await yahooMeta(t);
+          return [t, { price: y.price, name: y.name, changePct: y.changePct }] as [string, { price: number; name?: string; changePct?: number }];
+        } catch {
+          return [t, { price: 0 }] as [string, { price: number }];
+        }
       }
     })
   );
   return Object.fromEntries(results);
 }
 
+/** A quote from Yahoo alone: price, today's change and 52-week range, without Finnhub's fundamentals. */
+async function yahooQuote(ticker: string) {
+  const y = await yahooMeta(ticker);
+  return {
+    ticker, name: y.name || ticker, price: y.price, change: y.change ?? null, changePct: y.changePct ?? null,
+    volume: null, marketCap: null, pe: null, forwardPE: null, divYield: null,
+    w52Hi: y.w52Hi, w52Lo: y.w52Lo, sector: null, industry: null,
+    exchange: y.exchange, currency: y.currency || (NON_US.test(ticker) ? 'NZD' : 'USD'), avgVolume: null,
+  };
+}
+
 export async function fetchQuote(ticker: string) {
-  if (NON_US.test(ticker)) {
-    const y = await yahooMeta(ticker);
-    return {
-      ticker, name: y.name || ticker, price: y.price, change: y.change ?? null, changePct: y.changePct ?? null,
-      volume: null, marketCap: null, pe: null, forwardPE: null, divYield: null,
-      w52Hi: y.w52Hi, w52Lo: y.w52Lo, sector: null, industry: null,
-      exchange: y.exchange, currency: y.currency || 'NZD', avgVolume: null,
-    };
+  if (NON_US.test(ticker)) return yahooQuote(ticker);
+  let q: any, p: any, metricsRes: any;
+  try {
+    [{ data: q }, { data: p }, metricsRes] = await Promise.all([
+      axios.get(`${FINNHUB}/quote?symbol=${ticker}&token=${key()}`, { timeout: 8000 }),
+      axios.get(`${FINNHUB}/stock/profile2?symbol=${ticker}&token=${key()}`, { timeout: 8000 }),
+      axios.get(`${FINNHUB}/stock/metric?symbol=${ticker}&metric=all&token=${key()}`, { timeout: 8000 }).catch(() => ({ data: {} })),
+    ]);
+  } catch {
+    // Finnhub busy or rate limited: fall back to Yahoo's basic quote.
+    return yahooQuote(ticker);
   }
-  const [{ data: q }, { data: p }, metricsRes] = await Promise.all([
-    axios.get(`${FINNHUB}/quote?symbol=${ticker}&token=${key()}`, { timeout: 8000 }),
-    axios.get(`${FINNHUB}/stock/profile2?symbol=${ticker}&token=${key()}`, { timeout: 8000 }),
-    axios.get(`${FINNHUB}/stock/metric?symbol=${ticker}&metric=all&token=${key()}`, { timeout: 8000 }).catch(() => ({ data: {} })),
-  ]);
   if (!q.c) throw new Error(`No quote found for ${ticker}`);
   const metrics = (metricsRes as any).data?.metric || {};
   return {

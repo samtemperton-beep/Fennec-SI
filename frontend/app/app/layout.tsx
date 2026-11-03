@@ -293,7 +293,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
       <div className="topnav-wordmark">
         <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', fontFamily: 'Plus Jakarta Sans, sans-serif', display: 'block', lineHeight: 1.2 }}>Fennec</span>
-        <span style={{ fontSize: 9.5, color: 'var(--text3)', fontStyle: 'italic', lineHeight: 1 }}>spend &amp; invest</span>
+        <span style={{ fontSize: 9.5, color: 'var(--text3)', fontStyle: 'italic', lineHeight: 1 }}>save &amp; invest</span>
       </div>
     </>
   )

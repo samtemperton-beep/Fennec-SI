@@ -19,7 +19,7 @@ const FEATURES = [
   {
     emoji: '🦊',
     title: 'Fennec AI',
-    desc: 'Context-aware AI adviser that knows your portfolio and finances. Ask anything — it adapts to the page you\'re on.',
+    desc: 'Context-aware AI assistant that knows your portfolio and finances. Ask anything — it adapts to the page you\'re on.',
   },
   {
     emoji: '🥝',
@@ -100,7 +100,7 @@ export default function LandingPage() {
           </div>
           <div>
             <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontWeight: 800, fontSize: 16, display: 'block', lineHeight: 1.1 }}>Fennec</span>
-            <span style={{ fontSize: 9, color: 'var(--text3)', fontStyle: 'italic' }}>spend &amp; invest</span>
+            <span style={{ fontSize: 9, color: 'var(--text3)', fontStyle: 'italic' }}>save &amp; invest</span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
@@ -117,20 +117,20 @@ export default function LandingPage() {
       {/* ── Hero ── */}
       <section style={{ maxWidth: 900, margin: '0 auto', padding: '60px 32px 56px', textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, background: 'var(--primary-light)', border: '1px solid var(--primary)', fontSize: 12, color: 'var(--primary)', marginBottom: 24, fontFamily: 'Syne, sans-serif' }}>
-          ✦ NZ stocks · household finance · AI adviser
+          ✦ Fennec SI · Save &amp; Invest
         </div>
         <h1 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 'clamp(2rem,5vw,3.4rem)', fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
           Your complete<br />
           <span style={{ color: 'var(--primary)' }}>personal financial hub</span>
         </h1>
         <p style={{ color: 'var(--text2)', fontSize: 17, lineHeight: 1.7, marginBottom: 40, maxWidth: 580, margin: '0 auto 40px' }}>
-          Track your NZ, ASX &amp; US investments. Manage household finances and KiwiSaver.
-          Get answers from an AI adviser that knows your full financial picture.
+          Fennec SI helps you save and invest in one place. Track your NZ, ASX &amp; US investments,
+          manage your budget, bills, goals and KiwiSaver, and get answers from an AI assistant that knows your full financial picture.
         </p>
 
         {/* Mini feature pills */}
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 36 }}>
-          {['📈 Stock portfolio', '🏦 Bank sync (Akahu)', '🥝 KiwiSaver tracker', '🎯 Savings goals', '🦊 AI adviser', '🏆 Community'].map(f => (
+          {['📈 Stock portfolio', '🏦 Bank sync (Akahu)', '🥝 KiwiSaver tracker', '🎯 Savings goals', '🦊 AI assistant', '🏆 Community'].map(f => (
             <span key={f} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>{f}</span>
           ))}
         </div>
@@ -218,7 +218,7 @@ export default function LandingPage() {
           <div>
             <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18, color: 'var(--primary)', marginBottom: 8 }}>Meet Fennec AI</h3>
             <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
-              An AI adviser that knows your full financial picture — your holdings, bank balances, KiwiSaver, spending, and goals. It changes focus automatically based on what you're looking at, so answers are always relevant.
+              An AI assistant that knows your full financial picture — your holdings, bank balances, KiwiSaver, spending, and goals. It changes focus automatically based on what you're looking at, so answers are always relevant.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {['"Am I on track for retirement?"', '"Should I rebalance my portfolio?"', '"Where am I overspending?"', '"What\'s my net worth trajectory?"'].map(q => (
@@ -283,7 +283,7 @@ export default function LandingPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <FoxIcon size={22} />
             <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontWeight: 700, fontSize: 14 }}>Fennec</span>
-            <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic' }}>spend &amp; invest</span>
+            <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic' }}>save &amp; invest</span>
           </div>
           <p style={{ color: 'var(--text2)', fontSize: 12 }}>© 2026 Fennec. Not financial advice.</p>
           <div style={{ display: 'flex', gap: 20 }}>

@@ -9,7 +9,7 @@ export const FAQ: FaqTopic[] = [
   {
     topic: 'Getting started',
     items: [
-      { q: 'What is Fennec?', a: 'Fennec is a New Zealand app for spending and investing in one place: bank accounts, budgets, bills, savings goals, KiwiSaver and your share portfolio, with an AI assistant (the fox) that knows your numbers.' },
+      { q: 'What is Fennec?', a: 'Fennec SI (short for Save & Invest) is a New Zealand app for saving and investing in one place: bank accounts, budgets, bills, savings goals, KiwiSaver and your share portfolio, with an AI assistant (the fox) that knows your numbers.' },
       { q: 'How do I sign in?', a: 'With your email and a password, a one-time sign-in link sent to your email, or your Google account.' },
       { q: 'I forgot my password.', a: 'On the sign-in page, choose "Forgot password?" and enter your email. Open the link in the email to choose a new password. You can also sign in with a one-time email link instead.' },
       { q: 'Where should I start?', a: 'The Getting started card on the Dashboard walks you through it: connect your bank, add your investments, set a budget, add a bill or goal, and ask the fox a question.' },

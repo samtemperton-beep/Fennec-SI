@@ -1,7 +1,7 @@
 {
-  "name": "Fennec",
+  "name": "Fennec SI",
   "short_name": "Fennec",
-  "description": "Spend & invest — your money, investments and business in one place",
+  "description": "Save & Invest — your money, investments and business in one place",
   "start_url": "/app/dashboard",
   "scope": "/",
   "display": "standalone",

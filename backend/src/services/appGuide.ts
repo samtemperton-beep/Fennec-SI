@@ -6,6 +6,8 @@ import { FAQ_TEXT } from './faq';
 
 export const APP_GUIDE = `ABOUT THE FENNEC APP (use this when the user asks how Fennec works, where something is, or about privacy):
 
+Name: the app is Fennec SI, where SI stands for Save & Invest. People usually just say Fennec.
+
 Layout: the top bar has five sections. Dashboard; Investing; Finance; Business; Community. The account menu (top right) has Settings, Send feedback, theme and sign out. The fox chat (you) is in the bottom-right corner of every page, and the Feedback button is bottom-left.
 
 Dashboard: cards for net worth, spending, portfolio, bills and goals, plus a daily briefing. "Customise" shows, hides and reorders cards. New users see a Getting started checklist.

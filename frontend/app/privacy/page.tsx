@@ -20,7 +20,7 @@ export default function PrivacyPage() {
         <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 40 }}>Last updated: 3 November 2026</p>
 
         <Section title="1. Who we are">
-          Fennec is a New Zealand app for managing spending and investing in one place, available at fennecsi.com. This policy explains what personal information we collect, how we use and protect it, and your rights under the New Zealand Privacy Act 2020.
+          Fennec SI (short for Save &amp; Invest, and called Fennec in this policy) is a New Zealand app for saving and investing in one place, available at fennecsi.com. This policy explains what personal information we collect, how we use and protect it, and your rights under the New Zealand Privacy Act 2020.
           <br /><br />
           Fennec is currently in testing. Features change often, and we&apos;ll update this policy as they do.
         </Section>

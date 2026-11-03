@@ -275,7 +275,7 @@ export default function LoginPage() {
           </div>
           <div>
             <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18 }}>Fennec</span>
-            <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic', display: 'block', lineHeight: 1, marginTop: 1 }}>Spend &amp; Invest</span>
+            <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic', display: 'block', lineHeight: 1, marginTop: 1 }}>Save &amp; Invest</span>
           </div>
         </div>
 
