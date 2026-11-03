@@ -1,6 +1,8 @@
 // What the Fennec chat knows about the app itself, so it can answer
 // "how do I..." and "who can see my data?" questions. Keep it in step with the
 // pages (frontend/app/app), the plans (services/plans.ts) and the database rules.
+// The FAQ (services/faq.ts) is appended, and is also the public FAQ page.
+import { FAQ_TEXT } from './faq';
 
 export const APP_GUIDE = `ABOUT THE FENNEC APP (use this when the user asks how Fennec works, where something is, or about privacy):
 
@@ -38,5 +40,9 @@ Privacy and data (answer these plainly and accurately):
 - Settings → Delete account permanently removes their data. Shared bills and goals stay with a linked partner.
 - Fennec has one administrator (the founder), who manages plans and settings. The admin page shows usernames, emails, plan and AI usage counts, not anyone's financial data.
 - Fennec is in testing. Report problems with the Feedback button.
+
+FREQUENTLY ASKED QUESTIONS (answer in your own words, using these facts; the full list is public at fennecsi.com/faq):
+
+${FAQ_TEXT}
 
 Don't invent features, buttons or settings that aren't listed here. If unsure where something is, say so and suggest the Feedback button.`;

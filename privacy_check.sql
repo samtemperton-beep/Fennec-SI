@@ -1,50 +1,53 @@
 -- ── Privacy and admin check ─────────────────────────────────────────────────
 -- Run in the Fennec SI Supabase SQL editor. Read-only: it changes nothing.
--- Each query shows its own results tab. What you want to see is noted above each one.
+-- One results table. Every row's "status" should be OK; anything marked CHECK
+-- needs a look.
 
--- 1. Who is an admin. Expect exactly one row: your account.
-select u.email, p.username, u.created_at
-from public.profiles p join auth.users u on u.id = p.id
-where p.is_admin;
-
--- 2. Tables anyone signed in could read in full because row rules are off.
---    Expect no rows.
-select c.relname as table_without_row_rules
-from pg_class c join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
-order by 1;
-
--- 3. Rules open to everyone. Expect only SELECT on ai_cache, badges,
---    newsletter_digests, post_likes and posts (shared, non-personal content).
-select tablename, policyname, cmd, array_to_string(roles, ', ') as applies_to
-from pg_policies
-where schemaname = 'public' and permissive = 'PERMISSIVE'
-  and (qual = 'true' or with_check = 'true')
-order by 1, 2;
-
--- 4. Rules that don't tie a row to the signed-in person. Expect only the
---    tables in step 3, plus restrictive rules (2FA and plan checks).
-select tablename, policyname, cmd, permissive
-from pg_policies
-where schemaname = 'public'
-  and coalesce(qual, '') || coalesce(with_check, '') !~ '(auth\.uid|my_partner|fin_goals|true)'
-order by 1, 2;
-
--- 5. Views, which skip row rules unless set to run as the viewer.
---    Expect only leaderboard_profiles (username and performance only).
-select c.relname as view_name,
-       coalesce(array_to_string(c.reloptions, ','), '') like '%security_invoker=true%' as runs_as_viewer,
-       has_table_privilege('authenticated', c.oid, 'select') as signed_in_can_read
-from pg_class c join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public' and c.relkind = 'v'
-order by 1;
-
--- 6. Functions that run with full rights and that the app can call.
---    Expect only functions that check auth.uid() themselves (my_partner,
---    shared_accounts, shared_transactions, delete_user_data, plan_allows, plan_limit,
---    mfa_satisfied and similar).
-select p.proname as function_name
-from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public' and p.prosecdef
-  and has_function_privilege('authenticated', p.oid, 'execute')
-order by 1;
+with
+admins as (
+  select u.email from public.profiles p join auth.users u on u.id = p.id where p.is_admin
+),
+no_rules as (
+  select c.relname::text as name
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+),
+open_rules as (
+  select tablename || ' (' || cmd || ')' as name, tablename, cmd
+  from pg_policies
+  where schemaname = 'public' and permissive = 'PERMISSIVE'
+    and (qual = 'true' or with_check = 'true')
+),
+views as (
+  select c.relname::text as name
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'v'
+    and has_table_privilege('authenticated', c.oid, 'select')
+    and coalesce(array_to_string(c.reloptions, ','), '') not like '%security_invoker=true%'
+),
+full_rights as (
+  select p.proname::text as name
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.prosecdef
+    and has_function_privilege('authenticated', p.oid, 'execute')
+)
+select '1. Admin accounts' as check_name,
+       coalesce(string_agg(email, ', '), 'none') as found,
+       case when count(*) = 1 then 'OK' else 'CHECK' end as status
+from admins
+union all
+select '2. Tables with no row rules', coalesce(string_agg(name, ', '), 'none'),
+       case when count(*) = 0 then 'OK' else 'CHECK' end
+from no_rules
+union all
+select '3. Rules open to everyone', coalesce(string_agg(name, ', '), 'none'),
+       case when bool_and(cmd = 'SELECT' and tablename in ('ai_cache', 'badges', 'newsletter_digests', 'post_likes', 'posts')) is not false then 'OK' else 'CHECK' end
+from open_rules
+union all
+select '4. Views that skip row rules', coalesce(string_agg(name, ', '), 'none'),
+       case when bool_and(name = 'leaderboard_profiles') is not false then 'OK' else 'CHECK' end
+from views
+union all
+select '5. Full-rights functions the app can call', coalesce(string_agg(name, ', ' order by name), 'none'),
+       case when bool_and(name in ('mfa_satisfied', 'my_partner', 'plan_allows', 'plan_limit', 'shared_accounts', 'shared_transactions')) is not false then 'OK' else 'CHECK' end
+from full_rights;

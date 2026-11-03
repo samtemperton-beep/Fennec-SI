@@ -287,8 +287,8 @@ export default function LandingPage() {
           </div>
           <p style={{ color: 'var(--text2)', fontSize: 12 }}>© 2026 Fennec. Not financial advice.</p>
           <div style={{ display: 'flex', gap: 20 }}>
-            {['Privacy', 'Terms'].map(l => (
-              <a key={l} href="#" style={{ color: 'var(--text2)', fontSize: 12, fontFamily: 'Syne, sans-serif', textDecoration: 'none' }}>{l}</a>
+            {[['FAQ', '/faq'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([l, href]) => (
+              <Link key={l} href={href} style={{ color: 'var(--text2)', fontSize: 12, fontFamily: 'Syne, sans-serif', textDecoration: 'none' }}>{l}</Link>
             ))}
           </div>
         </div>

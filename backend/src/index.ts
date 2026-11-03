@@ -20,6 +20,7 @@ import accountRouter from './routes/account';
 import partnerRouter from './routes/partner';
 import feedbackRouter from './routes/feedback';
 import { startScheduledSync } from './services/scheduler';
+import { FAQ } from './services/faq';
 import networthRouter from './routes/networth';
 
 dotenv.config();
@@ -65,6 +66,8 @@ app.use('/api/gmail', gmailRouter);
 app.use('/api/account', accountRouter);
 app.use('/api/partner', partnerRouter);
 app.use('/api/feedback', feedbackRouter);
+// Public: the FAQ page reads the same list the Fennec chat knows.
+app.get('/api/faq', (_req, res) => res.json(FAQ));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));
 

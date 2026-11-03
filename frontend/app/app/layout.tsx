@@ -9,7 +9,7 @@ import {
   IconSettings, IconLogout, IconTrophy,
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
   IconWallet, IconReceipt, IconTarget, IconLayoutDashboard, IconPigMoney,
-  IconBriefcase, IconCalculator, IconFileInvoice, IconHome, IconMessageReport } from '@tabler/icons-react'
+  IconBriefcase, IconCalculator, IconFileInvoice, IconHome, IconMessageReport, IconHelpCircle } from '@tabler/icons-react'
 import { FennecAI } from '@/components/shared/FennecAI'
 import { FoxIcon } from '@/components/shared/FoxIcon'
 import { MarketTicker } from '@/components/shared/MarketTicker'
@@ -385,6 +385,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <IconShield size={15} /> Admin
                   </Link>
                 )}
+                <Link href="/faq" target="_blank" className="nav-link mb-1">
+                  <IconHelpCircle size={15} /> Help &amp; FAQ
+                </Link>
                 <button onClick={() => { setMenuOpen(false); openFeedback('bug') }} className="nav-link w-full mb-1">
                   <IconMessageReport size={15} /> Send feedback
                 </button>
