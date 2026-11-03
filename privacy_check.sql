@@ -1,4 +1,4 @@
--- ── Privacy and admin check ─────────────────────────────────────────────────
+-- Privacy and admin check
 -- Run in the Fennec SI Supabase SQL editor. Read-only: it changes nothing.
 -- One results table. Every row's "status" should be OK; anything marked CHECK
 -- needs a look.
