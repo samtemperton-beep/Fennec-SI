@@ -125,7 +125,7 @@ export async function runHealthCheck(supabase: SupabaseClient): Promise<CheckRes
 
   // Setup the features depend on.
   checks.push(timed('Setup', 'Server settings', async () => {
-    const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'RESEND_API_KEY', 'FRONTEND_URL', 'BACKEND_URL', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'];
+    const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'RESEND_API_KEY', 'FRONTEND_URL', 'BACKEND_URL', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'FINNHUB_API_KEY', 'LINZ_API_KEY'];
     const missing = required.filter(k => !process.env[k]);
     if (missing.length) throw new Error(`Missing: ${missing.join(', ')}`);
     return 'All set';

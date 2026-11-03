@@ -95,8 +95,10 @@ router.get('/property', requireAuth, async (req: any, res) => {
   const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(userId);
   if (userErr || !user) return res.status(401).json({ error: 'Unauthorised' });
 
-  const linzKey = user.user_metadata?.linz_key;
-  if (!linzKey) return res.status(400).json({ error: 'No LINZ API key. Add it in Settings.' });
+  // One key for everyone, set on the server. A key someone saved in Settings
+  // before that existed still works as a fallback.
+  const linzKey = process.env.LINZ_API_KEY || user.user_metadata?.linz_key;
+  if (!linzKey) return res.status(503).json({ error: "Area sales aren't set up yet." });
 
   try {
     const LINZ = 'https://data.linz.govt.nz/services/wfs';

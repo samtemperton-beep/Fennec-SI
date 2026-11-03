@@ -4,7 +4,7 @@ import { localDate } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { IconHome, IconEdit, IconCheck, IconX, IconSearch, IconRefresh, IconExternalLink } from '@tabler/icons-react'
+import { IconHome, IconEdit, IconCheck, IconX, IconSearch, IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 const supabase = createClient()
@@ -82,7 +82,6 @@ export default function HomeLoanPage() {
   const [loading, setLoading] = useState(true)
   const [propertyData, setPropertyData] = useState<PropertyData | null>(null)
   const [fetchingProperty, setFetchingProperty] = useState(false)
-  const [hasLinzKey, setHasLinzKey] = useState(false)
   const [actualPayment, setActualPayment] = useState<{ amount: number; frequency: string } | null>(null)
 
   useEffect(() => { load() }, [])
@@ -91,8 +90,6 @@ export default function HomeLoanPage() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
-
-    setHasLinzKey(!!user.user_metadata?.linz_key)
 
     // Load saved home loan details
     const { data } = await supabase.from('home_loan').select('*').eq('user_id', user.id).maybeSingle()
@@ -303,14 +300,10 @@ export default function HomeLoanPage() {
         <div className="card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>Property Value</h2>
-            {hasLinzKey ? (
-              <button onClick={fetchPropertyData} disabled={fetchingProperty}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
-                {fetchingProperty ? <LoadingSpinner size={12} /> : <IconRefresh size={12} />} Refresh LINZ
-              </button>
-            ) : (
-              <a href="/app/settings" style={{ fontSize: 11, color: 'var(--primary)', textDecoration: 'none' }}>Add LINZ key →</a>
-            )}
+            <button onClick={fetchPropertyData} disabled={fetchingProperty}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
+              {fetchingProperty ? <LoadingSpinner size={12} /> : <IconRefresh size={12} />} Refresh LINZ
+            </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
@@ -350,11 +343,7 @@ export default function HomeLoanPage() {
           ) : (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
               <IconSearch size={24} style={{ color: 'var(--text3)', marginBottom: 8 }} />
-              <p style={{ fontSize: 13, color: 'var(--text2)' }}>{hasLinzKey ? 'Click "Refresh LINZ" to load area sales' : 'Add your LINZ API key in Settings to see area sales'}</p>
-              <a href="https://data.linz.govt.nz" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 11, color: 'var(--primary)', textDecoration: 'none' }}>
-                Get a LINZ API key <IconExternalLink size={11} />
-              </a>
+              <p style={{ fontSize: 13, color: 'var(--text2)' }}>Click &quot;Refresh LINZ&quot; to load recent sales near your address</p>
             </div>
           )}
         </div>
