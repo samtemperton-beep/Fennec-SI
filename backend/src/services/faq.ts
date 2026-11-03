@@ -26,6 +26,7 @@ export const FAQ: FaqTopic[] = [
       { q: 'Why aren\'t today\'s transactions showing?', a: 'Banks usually send new data to Akahu about once a day, so recent transactions can take until the next day to appear. Fennec checks for new data automatically during the day.' },
       { q: 'How do I categorise transactions?', a: 'On Transactions, pick a category for a transaction. Choose "create a rule" to categorise every matching transaction automatically, now and in future.' },
       { q: 'How does the budget work?', a: 'On Budget, set a monthly limit for the categories you care about. Fennec compares this month\'s spending in each category against its limit.' },
+      { q: 'Can Fennec show my home\'s value?', a: 'The Home Loan page looks up your property\'s council rating valuation (CV). For councils that publish their valuations as open data it appears automatically; for everyone else, upload your rates notice or revaluation letter and Fennec reads the CV off it. A CV is set every three years and isn\'t a market valuation. Recent sale prices aren\'t public data in New Zealand, so Fennec can\'t show them.' },
       { q: 'What are bills and goals?', a: 'Bills are recurring costs like power or insurance, with reminders before they\'re due. Goals are savings targets, with contributions you add as you save. Premium can also find bills in your Gmail.' },
     ],
   },

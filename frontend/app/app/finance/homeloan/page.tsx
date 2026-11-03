@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconHome, IconEdit, IconCheck, IconX, IconSearch, IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { RatesNoticeUpload, type RatesNoticeValues } from '@/components/finance/RatesNoticeUpload'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
@@ -93,6 +94,7 @@ export default function HomeLoanPage() {
   const [propertyData, setPropertyData] = useState<PropertyData | null>(null)
   const [fetchingProperty, setFetchingProperty] = useState(false)
   const [propertyError, setPropertyError] = useState('')
+  const [notice, setNotice] = useState<RatesNoticeValues | null>(null)
   const [actualPayment, setActualPayment] = useState<{ amount: number; frequency: string } | null>(null)
 
   useEffect(() => { load() }, [])
@@ -222,6 +224,48 @@ export default function HomeLoanPage() {
   const equity = loan.market_estimate ? loan.market_estimate - loan.balance : null
   const lvr = loan.market_estimate ? (loan.balance / loan.market_estimate) * 100 : null
 
+  // The council valuation: from LINZ's open valuation roll where the council is
+  // in it, otherwise read from a rates notice the person uploads.
+  const rollValue = propertyData?.valuation?.capital_value ? propertyData.valuation : null
+  const shown = rollValue
+    ? { ...rollValue, source: 'your council’s valuation roll (via LINZ)' }
+    : notice?.capital_value ? { ...notice, source: `your rates notice${notice.council ? ` (${notice.council})` : ''}` } : null
+  // "12 Smith" from "12 Smith Street, Ponsonby": enough to spot a notice for another property.
+  const streetKey = (a: string | null) => (a || '').toLowerCase().match(/\d+[a-z]?\s+[a-z]+/)?.[0] ?? null
+  const otherProperty = !rollValue && notice?.address && streetKey(loan.address) && streetKey(notice.address) !== streetKey(loan.address)
+  const valuationBox = shown?.capital_value ? (
+    <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Council rating valuation (CV)</span>
+        <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 18 }}>{currency.format(shown.capital_value)}</span>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
+        {[shown.land_value && `Land ${currency.format(shown.land_value)}`, shown.improvements_value && `Buildings ${currency.format(shown.improvements_value)}`,
+          shown.valuation_date && `valued ${new Date(shown.valuation_date).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })}`].filter(Boolean).join(' · ')}
+      </p>
+      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>From {shown.source}</p>
+      {otherProperty && (
+        <p style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>This notice is for {notice!.address}, which doesn&apos;t look like the address on your loan.</p>
+      )}
+      {loan.id && loan.rv !== shown.capital_value && (
+        <button onClick={() => applyCouncilValue(shown.capital_value!)}
+          style={{ marginTop: 8, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--primary)', background: 'none', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          Use as rateable value
+        </button>
+      )}
+    </div>
+  ) : (
+    <div style={{ background: 'var(--surface2)', border: '1px dashed var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+      <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8, lineHeight: 1.5 }}>
+        {propertyData
+          ? 'Your council doesn’t publish its valuations as open data. Upload your latest rates notice or revaluation letter and Fennec will read the CV off it.'
+          : 'Upload your latest rates notice or revaluation letter and Fennec will read your council valuation (CV) off it.'}
+      </p>
+      <RatesNoticeUpload onRead={setNotice} />
+      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8 }}>PDF or photo. It&apos;s read once and not kept, and counts as one AI use.</p>
+    </div>
+  )
+
   const inp = (label: string, field: keyof LoanDetails, type = 'text', prefix?: string) => (
     <div>
       <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>{label}</label>
@@ -344,30 +388,9 @@ export default function HomeLoanPage() {
               {fetchingProperty ? <LoadingSpinner size={12} /> : propertyData ? <IconRefresh size={12} /> : <IconSearch size={12} />} {propertyData ? 'Refresh' : 'Look up property'}
             </button>
           </div>
+          {valuationBox}
           {propertyData ? (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {propertyData.valuation?.capital_value ? (() => {
-                const v = propertyData.valuation!
-                const cv = v.capital_value!
-                return (
-                  <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: 'var(--text2)' }}>Council rating valuation (CV)</span>
-                      <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 18 }}>{currency.format(cv)}</span>
-                    </div>
-                    <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
-                      {[v.land_value && `Land ${currency.format(v.land_value)}`, v.improvements_value && `Buildings ${currency.format(v.improvements_value)}`].filter(Boolean).join(' · ')}
-                      {v.valuation_date && ` · valued ${new Date(v.valuation_date).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })}`}
-                    </p>
-                    {loan.id && loan.rv !== cv && (
-                      <button onClick={() => applyCouncilValue(cv)}
-                        style={{ marginTop: 8, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--primary)', background: 'none', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                        Use as rateable value
-                      </button>
-                    )}
-                  </div>
-                )
-              })() : null}
               {[
                 { label: 'Address', value: [propertyData.full_address, propertyData.suburb, propertyData.town].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ') },
                 { label: 'Council', value: propertyData.territorial_authority },
@@ -386,9 +409,7 @@ export default function HomeLoanPage() {
                 </div>
               ))}
               <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, lineHeight: 1.5 }}>
-                {propertyData.valuation?.capital_value
-                  ? 'From LINZ and your council’s valuation roll. A rating valuation is set every three years and isn’t a market valuation.'
-                  : 'From LINZ. Your council hasn’t made its valuation roll open data, so look up your CV on the council’s website using the valuation reference.'}
+                Property details from LINZ. A rating valuation is set by your council every three years and isn&apos;t a market valuation.
               </p>
             </div>
           ) : (
@@ -396,7 +417,7 @@ export default function HomeLoanPage() {
               <IconSearch size={24} style={{ color: 'var(--text3)', marginBottom: 8 }} />
               <p style={{ fontSize: 13, color: propertyError ? 'var(--red)' : 'var(--text2)' }}>
                 {propertyError || (loan.address
-                  ? 'Look up your property to see its legal description, title and land area from LINZ.'
+                  ? 'Look up your property to see its legal description, title, land area and council valuation.'
                   : 'Add your property address in Edit, then look it up here.')}
               </p>
             </div>

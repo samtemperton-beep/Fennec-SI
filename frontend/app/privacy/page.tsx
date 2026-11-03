@@ -36,6 +36,8 @@ export default function PrivacyPage() {
           <br /><br />
           <strong>Broker statements (optional, Premium):</strong> if you verify your portfolio, the statement you upload is read to confirm your holdings and isn&apos;t kept after verification.
           <br /><br />
+          <strong>Rates notices (optional):</strong> if you upload a rates notice or revaluation letter on the Home Loan page, it&apos;s read to find your council valuation and isn&apos;t kept. Only the values you choose to save are stored.
+          <br /><br />
           <strong>Partner sharing (optional):</strong> if you link with a partner, we record the link and what you&apos;ve chosen to share with them.
           <br /><br />
           <strong>Community:</strong> posts and comments you publish, and, if you verify your portfolio, your leaderboard entry.
@@ -68,7 +70,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="5. AI processing">
-          Fennec&apos;s AI features use Anthropic (Claude) and Google (Gemini). When you use one, we send the provider what it needs for that answer: for example your question and a summary of the relevant figures, a holding you&apos;ve asked to analyse, the text of a bill email, or a broker statement you&apos;ve uploaded for verification. We don&apos;t send your password or bank login.
+          Fennec&apos;s AI features use Anthropic (Claude) and Google (Gemini). When you use one, we send the provider what it needs for that answer: for example your question and a summary of the relevant figures, a holding you&apos;ve asked to analyse, the text of a bill email, a rates notice you&apos;ve uploaded, or a broker statement you&apos;ve uploaded for verification. We don&apos;t send your password or bank login.
           <br /><br />
           We use these providers through their business APIs, under their terms for data handling. We don&apos;t use your information to train AI models. AI answers can be wrong, and they&apos;re general information, not financial advice.
         </Section>

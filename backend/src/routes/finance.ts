@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, checkAndIncrementUsage } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { loadAkahuCredentials, saveAkahuCredentials, credentialsErrorResponse } from '../services/akahuCredentials';
 import { syncFinanceAccounts } from '../services/financeSync';
 import { clearAkahuProblem } from '../services/akahuHealth';
 import { lookupProperty, LinzError } from '../services/linz';
+import { readRatesNotice, RatesNoticeError } from '../services/ratesNotice';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -108,6 +109,22 @@ router.get('/property', requireAuth, async (req: any, res) => {
     if (e instanceof LinzError) return res.status(404).json({ error: e.message });
     console.error('[linz] lookup failed:', e?.message ?? e);
     res.status(502).json({ error: "Couldn't reach LINZ just now. Please try again." });
+  }
+});
+
+// ── POST /api/finance/rates-notice ────────────────────────────────────────────
+// Reads the council valuation from an uploaded rates notice, for councils that
+// aren't in LINZ's open valuation roll. Counts as one AI use; nothing is stored.
+router.post('/rates-notice', requireAuth, async (req: any, res) => {
+  const file = req.body?.file;
+  if (!file?.data || !file?.type) return res.status(400).json({ error: 'Choose a file first.' });
+  if (!await checkAndIncrementUsage(req, res)) return;
+  try {
+    res.json(await readRatesNotice({ type: String(file.type), data: String(file.data) }));
+  } catch (e: any) {
+    if (e instanceof RatesNoticeError) return res.status(422).json({ error: e.message });
+    console.error('[rates notice] read failed:', e?.message ?? e);
+    res.status(502).json({ error: "Couldn't read the document just now. Please try again." });
   }
 });
 
