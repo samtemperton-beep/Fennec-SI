@@ -80,6 +80,7 @@ export default function PrivacyPage() {
             <li><strong>Vercel</strong>: hosts the website</li>
             <li><strong>Railway</strong>: hosts the server that syncs data and runs AI requests</li>
             <li><strong>Akahu</strong>: bank and investment account connections</li>
+            <li><strong>Toitū Te Whenua LINZ</strong>: looks up property details and council valuations for the address you enter on the Home Loan page</li>
             <li><strong>Anthropic</strong> and <strong>Google</strong>: AI processing; Google also provides Google sign-in and the Gmail connection</li>
             <li><strong>Resend</strong>: sends account, alert and feedback emails</li>
             <li><strong>Finnhub</strong> and <strong>Yahoo Finance</strong>: market prices and news; we send them share codes only, never personal information</li>

@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { complete, MODELS } from './llm';
 import { emailAdmins, escapeHtml as esc } from './adminEmail';
-import { lookupProperty } from './linz';
+import { lookupProperty, valuationRollCoverage } from './linz';
 
 // The nightly health check. It visits the website and the API the way a visitor
 // would, asks each AI model for a one-word reply, checks the database and the
@@ -34,12 +34,12 @@ export function countServerErrors(req: Request, res: Response, next: NextFunctio
   next();
 }
 
-async function timed(group: string, name: string, fn: () => Promise<string>): Promise<CheckResult> {
+async function timed(group: string, name: string, fn: () => Promise<string>, timeoutMs = TIMEOUT_MS): Promise<CheckResult> {
   const start = Date.now();
   try {
     const detail = await Promise.race([
       fn(),
-      new Promise<string>((_, reject) => setTimeout(() => reject(new Error(`No answer after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS)),
+      new Promise<string>((_, reject) => setTimeout(() => reject(new Error(`No answer after ${timeoutMs / 1000}s`)), timeoutMs)),
     ]);
     return { group, name, ok: true, ms: Date.now() - start, detail };
   } catch (e: any) {
@@ -108,8 +108,18 @@ export async function runHealthCheck(supabase: SupabaseClient): Promise<CheckRes
     if (!key) throw new Error('LINZ_API_KEY is not set');
     const p = await lookupProperty('1 Queen Street, Auckland Central, Auckland', key);
     if (!p.legal_description && !p.title_no) throw new Error(`Found ${p.full_address} but no property boundary for it`);
-    return `${p.full_address}: ${p.legal_description ?? p.title_no}${p.area_sqm ? `, ${p.area_sqm} m²` : ''}`;
+    const cv = p.valuation?.capital_value ? `, CV $${p.valuation.capital_value.toLocaleString('en-NZ')}` : ', no open valuation for this council';
+    return `${p.full_address}: ${p.legal_description ?? p.title_no}${p.area_sqm ? `, ${p.area_sqm} m²` : ''}${cv}`;
   }));
+  // Information only: which councils' valuations Fennec can show.
+  checks.push(timed('Property data', 'Councils with open valuations', async () => {
+    const key = process.env.LINZ_API_KEY;
+    if (!key) throw new Error('LINZ_API_KEY is not set');
+    const list = await valuationRollCoverage(key);
+    if (!list.length) return 'None found in the open valuation roll';
+    const total = list.reduce((s, c) => s + c.properties, 0);
+    return `${list.length} councils, ${total.toLocaleString('en-NZ')} properties: ${list.map(c => `${c.name} (${c.properties.toLocaleString('en-NZ')})`).join(', ')}`;
+  }, 60_000));
 
   // Database and the background bank sync.
   checks.push(timed('Database', 'Reachable', async () => {

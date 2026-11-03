@@ -74,6 +74,14 @@ interface PropertyData {
   title_no: string | null
   area_sqm: number | null
   valuation_reference: string | null
+  valuation: {
+    capital_value: number | null
+    land_value: number | null
+    improvements_value: number | null
+    valuation_date: string | null
+    bedrooms: number | null
+    floor_area_sqm: number | null
+  } | null
 }
 
 export default function HomeLoanPage() {
@@ -164,6 +172,16 @@ export default function HomeLoanPage() {
     setEditing(false)
     toast.success('Loan details saved')
     setSaving(false)
+  }
+
+  // Saves the council's capital value as the loan's rateable value.
+  async function applyCouncilValue(cv: number) {
+    if (!loan.id) return
+    const { error } = await supabase.from('home_loan').update({ rv: cv }).eq('id', loan.id)
+    if (error) { toast.error(error.message); return }
+    setLoan(l => ({ ...l, rv: cv }))
+    setDraft(d => ({ ...d, rv: cv }))
+    toast.success('Rateable value updated')
   }
 
   async function fetchPropertyData() {
@@ -328,12 +346,38 @@ export default function HomeLoanPage() {
           </div>
           {propertyData ? (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {propertyData.valuation?.capital_value ? (() => {
+                const v = propertyData.valuation!
+                const cv = v.capital_value!
+                return (
+                  <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text2)' }}>Council rating valuation (CV)</span>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 18 }}>{currency.format(cv)}</span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
+                      {[v.land_value && `Land ${currency.format(v.land_value)}`, v.improvements_value && `Buildings ${currency.format(v.improvements_value)}`].filter(Boolean).join(' · ')}
+                      {v.valuation_date && ` · valued ${new Date(v.valuation_date).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })}`}
+                    </p>
+                    {loan.id && loan.rv !== cv && (
+                      <button onClick={() => applyCouncilValue(cv)}
+                        style={{ marginTop: 8, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--primary)', background: 'none', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        Use as rateable value
+                      </button>
+                    )}
+                  </div>
+                )
+              })() : null}
               {[
                 { label: 'Address', value: [propertyData.full_address, propertyData.suburb, propertyData.town].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ') },
                 { label: 'Council', value: propertyData.territorial_authority },
                 { label: 'Legal description', value: propertyData.legal_description },
                 { label: 'Title', value: propertyData.title_no },
                 { label: 'Land area', value: propertyData.area_sqm ? `${propertyData.area_sqm.toLocaleString('en-NZ')} m²` : null },
+                ...(propertyData.valuation?.bedrooms || propertyData.valuation?.floor_area_sqm ? [{
+                  label: 'Home',
+                  value: [propertyData.valuation.bedrooms && `${propertyData.valuation.bedrooms} bedrooms`, propertyData.valuation.floor_area_sqm && `${propertyData.valuation.floor_area_sqm} m² floor area`].filter(Boolean).join(', '),
+                }] : []),
                 { label: 'Valuation reference', value: propertyData.valuation_reference },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -342,7 +386,9 @@ export default function HomeLoanPage() {
                 </div>
               ))}
               <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, lineHeight: 1.5 }}>
-                From LINZ. Sales and valuations aren&apos;t public data; your council&apos;s website shows the rating valuation (CV) for your valuation reference.
+                {propertyData.valuation?.capital_value
+                  ? 'From LINZ and your council’s valuation roll. A rating valuation is set every three years and isn’t a market valuation.'
+                  : 'From LINZ. Your council hasn’t made its valuation roll open data, so look up your CV on the council’s website using the valuation reference.'}
               </p>
             </div>
           ) : (

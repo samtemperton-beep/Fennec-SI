@@ -54,7 +54,7 @@ export function HealthPanel() {
             <IconRefresh size={13} /> Refresh
           </button>
           <button onClick={runNow} disabled={running} style={{ border: 'none', borderRadius: 7, padding: '6px 14px', cursor: running ? 'default' : 'pointer', background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, opacity: running ? 0.7 : 1 }}>
-            {running ? <LoadingSpinner size={12} /> : <IconPlayerPlay size={13} />} {running ? 'Checking… (about 20s)' : 'Run check now'}
+            {running ? <LoadingSpinner size={12} /> : <IconPlayerPlay size={13} />} {running ? 'Checking… (up to a minute)' : 'Run check now'}
           </button>
         </div>
       </div>

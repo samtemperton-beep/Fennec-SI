@@ -1,14 +1,17 @@
 // Property details from the LINZ Data Service, for the Home Loan page.
 //
-// LINZ only publishes open property data: addresses, boundaries, titles and land
-// area. Sales and valuations (the District Valuation Roll) are restricted to
-// government agencies, so Fennec doesn't show them; the valuation reference lets
-// people look their CV up on their council's website.
+// LINZ publishes addresses, boundaries and titles openly. Council valuations come
+// from the District Valuation Roll, which is open (CC BY 4.0) only for councils
+// that have agreed to release it; the full roll and all sale prices are
+// government-only. So the rating valuation is shown where it's available, and
+// otherwise the valuation reference lets people look it up on their council's site.
 //
-// Datasets (checked Nov 2026 via data.linz.govt.nz/services/api/v1.x/layers/<id>/):
-//   123113 NZ Addresses           point, field "shape"
-//   122657 NZ Property Boundaries multipolygon, field "geom"
-// Both are NZGD2000 (EPSG:4167), where WFS filters take latitude first.
+// Datasets (checked Nov 2026 via data.linz.govt.nz/services/api/v1.x/{layers,tables}/<id>/):
+//   123113 NZ Addresses                              point, field "shape"
+//   122657 NZ Property Boundaries                    multipolygon, field "geom"
+//   114085 NZ Properties: National District Valuation Roll (open subset, table)
+// Joined on unit_of_property_id. Layers are NZGD2000 (EPSG:4167), where WFS
+// filters take latitude first.
 
 const WFS = (key: string) => `https://data.linz.govt.nz/services;key=${encodeURIComponent(key)}/wfs`;
 const TIMEOUT_MS = 12_000;
@@ -22,6 +25,18 @@ export interface PropertyDetails {
   title_no: string | null;
   area_sqm: number | null;
   valuation_reference: string | null;
+  /** The council's rating valuation, when its roll is open data. */
+  valuation: RatingValuation | null;
+}
+
+export interface RatingValuation {
+  capital_value: number | null;
+  land_value: number | null;
+  improvements_value: number | null;
+  /** The date the valuation applies from (councils revalue every three years). */
+  valuation_date: string | null;
+  bedrooms: number | null;
+  floor_area_sqm: number | null;
 }
 
 /** An error worth showing the person as is (not found, not set up). */
@@ -36,10 +51,14 @@ const ROAD_TYPES: Record<string, string> = {
 // CQL string literal: quotes doubled, and no wildcards from the person's text.
 const cql = (s: string) => s.replace(/'/g, "''").replace(/[%_]/g, ' ').trim();
 
-async function getFeatures(key: string, params: Record<string, string>): Promise<any[]> {
+async function wfs(key: string, params: Record<string, string>) {
   const qs = new URLSearchParams({ service: 'WFS', version: '2.0.0', request: 'GetFeature', outputFormat: 'application/json', ...params });
   const res = await fetch(`${WFS(key)}?${qs}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  const text = await res.text();
+  return { res, text: await res.text() };
+}
+
+async function getFeatures(key: string, params: Record<string, string>): Promise<any[]> {
+  const { res, text } = await wfs(key, params);
   if (res.status === 401 || res.status === 403 || (!res.ok && /api.?key/i.test(text.slice(0, 300)))) {
     throw new Error(`LINZ refused the API key (status ${res.status}).`);
   }
@@ -95,13 +114,39 @@ export async function lookupProperty(address: string, key: string): Promise<Prop
   let prop: any = null;
   if (point) {
     const [lat, lon] = point;
-    const fields = 'legal_description,title_no,area,valuation_reference,territorial_authority';
+    const fields = 'legal_description,title_no,area,valuation_reference,territorial_authority,unit_of_property_id';
     let found = await getFeatures(key, { typeNames: 'layer-122657', count: '1', propertyName: fields, cql_filter: `INTERSECTS(geom,POINT(${lat} ${lon}))` });
     if (!found.length) {
       const d = 0.00025;
       found = await getFeatures(key, { typeNames: 'layer-122657', count: '1', propertyName: fields, cql_filter: `BBOX(geom,${lat - d},${lon - d},${lat + d},${lon + d})` });
     }
     prop = found[0]?.properties ?? null;
+  }
+
+  // 3. The council valuation, if this council's roll is open. Never fails the lookup.
+  let valuation: RatingValuation | null = null;
+  if (prop?.unit_of_property_id) {
+    try {
+      const rows = await getFeatures(key, {
+        typeNames: 'table-114085', count: '1',
+        propertyName: 'capital_value,land_value,improvements_value,current_effective_valuation_date,no_of_bedrooms,building_total_floor_area',
+        cql_filter: `unit_of_property_id = '${cql(String(prop.unit_of_property_id))}'`,
+      });
+      const v = rows[0]?.properties;
+      const num = (x: any) => (Number.isFinite(Number(x)) && Number(x) > 0 ? Number(x) : null);
+      if (v && num(v.capital_value)) {
+        valuation = {
+          capital_value: num(v.capital_value),
+          land_value: num(v.land_value),
+          improvements_value: num(v.improvements_value),
+          valuation_date: v.current_effective_valuation_date ? String(v.current_effective_valuation_date).slice(0, 10) : null,
+          bedrooms: num(v.no_of_bedrooms),
+          floor_area_sqm: num(v.building_total_floor_area),
+        };
+      }
+    } catch (e: any) {
+      console.error('[linz] valuation lookup failed:', e?.message ?? e);
+    }
   }
 
   const area = Number(prop?.area);
@@ -114,5 +159,30 @@ export async function lookupProperty(address: string, key: string): Promise<Prop
     title_no: prop?.title_no || null,
     area_sqm: Number.isFinite(area) && area > 0 ? Math.round(area) : null,
     valuation_reference: prop?.valuation_reference || null,
+    valuation,
   };
+}
+
+/**
+ * Which councils' valuation rolls are open data, for the health check. LINZ
+ * doesn't publish the list, so this counts the open roll by council code.
+ */
+export async function valuationRollCoverage(key: string): Promise<{ code: number; name: string; properties: number }[]> {
+  const codes = Array.from({ length: 90 }, (_, i) => i + 1);
+  const counts: { code: number; properties: number }[] = [];
+  // A few at a time, to be polite to LINZ.
+  for (let i = 0; i < codes.length; i += 10) {
+    await Promise.all(codes.slice(i, i + 10).map(async code => {
+      const { text } = await wfs(key, { typeNames: 'table-114085', resultType: 'hits', cql_filter: `district_ta_code = ${code}` });
+      // GeoServer answers a hits request as XML (numberMatched="N") or JSON ("numberMatched": N).
+      const n = Number(text.match(/numberMatched"?\s*[=:]\s*"?(\d+)/)?.[1] ?? 0);
+      if (n > 0) counts.push({ code, properties: n });
+    }));
+  }
+  // Names from the boundaries layer, whose council id matches the roll's code.
+  return Promise.all(counts.sort((a, b) => b.properties - a.properties).map(async c => {
+    const ids = [String(c.code), String(c.code).padStart(3, '0')].map(id => `territorial_authority_id = '${id}'`).join(' OR ');
+    const f = await getFeatures(key, { typeNames: 'layer-122657', count: '1', propertyName: 'territorial_authority', cql_filter: ids }).catch(() => []);
+    return { ...c, name: f[0]?.properties?.territorial_authority || `Council ${c.code}` };
+  }));
 }
