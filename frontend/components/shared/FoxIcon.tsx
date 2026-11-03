@@ -53,8 +53,8 @@ export function FoxIcon({ size = 40, className, style }: FoxIconProps) {
       <path d="M340 271 Q340 282 351 284" fill="none" stroke="#2B1B12" strokeWidth="2.5" strokeLinecap="round"/>
       {/* Glasses (browline) */}
       <g fill="none" stroke="#2B1B12" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="275" y="167" width="61" height="54" rx="8" fill="#FFFFFF" fillOpacity="0.12" strokeWidth="2.5"/>
-        <rect x="344" y="167" width="61" height="54" rx="8" fill="#FFFFFF" fillOpacity="0.12" strokeWidth="2.5"/>
+        <rect x="275" y="167" width="61" height="54" rx="8" fill="#FFFFFF" fillOpacity="0.12" strokeWidth="4.5"/>
+        <rect x="344" y="167" width="61" height="54" rx="8" fill="#FFFFFF" fillOpacity="0.12" strokeWidth="4.5"/>
         <path d="M273 172 Q274 165 283 165 L330 165 Q338 165 338 172" strokeWidth="9"/>
         <path d="M342 172 Q342 165 350 165 L397 165 Q406 165 407 172" strokeWidth="9"/>
         <path d="M338 170 Q340 166 342 170" strokeWidth="5"/>
