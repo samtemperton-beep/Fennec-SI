@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { complete, MODELS } from './llm';
 import { emailAdmins, escapeHtml as esc } from './adminEmail';
+import { lookupProperty } from './linz';
 
 // The nightly health check. It visits the website and the API the way a visitor
 // would, asks each AI model for a one-word reply, checks the database and the
@@ -100,6 +101,15 @@ export async function runHealthCheck(supabase: SupabaseClient): Promise<CheckRes
       return `Replied "${text.trim().slice(0, 20)}"`;
     }));
   }
+
+  // LINZ property lookup (Home Loan page), on a well-known address.
+  checks.push(timed('Property data', 'LINZ lookup', async () => {
+    const key = process.env.LINZ_API_KEY;
+    if (!key) throw new Error('LINZ_API_KEY is not set');
+    const p = await lookupProperty('1 Queen Street, Auckland Central, Auckland', key);
+    if (!p.legal_description && !p.title_no) throw new Error(`Found ${p.full_address} but no property boundary for it`);
+    return `${p.full_address}: ${p.legal_description ?? p.title_no}${p.area_sqm ? `, ${p.area_sqm} m²` : ''}`;
+  }));
 
   // Database and the background bank sync.
   checks.push(timed('Database', 'Reachable', async () => {

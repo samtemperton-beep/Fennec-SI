@@ -5,6 +5,7 @@ import ws from 'ws';
 import { loadAkahuCredentials, saveAkahuCredentials, credentialsErrorResponse } from '../services/akahuCredentials';
 import { syncFinanceAccounts } from '../services/financeSync';
 import { clearAkahuProblem } from '../services/akahuHealth';
+import { lookupProperty, LinzError } from '../services/linz';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -86,7 +87,8 @@ router.delete('/akahu', requireAuth, async (req: any, res) => {
 });
 
 // ── GET /api/finance/property ─────────────────────────────────────────────────
-// Looks up RV and recent area sales from LINZ for a given NZ property address.
+// Property details from LINZ (address, legal description, title, land area) for
+// the Home Loan page. See services/linz.ts for why there are no sales or values.
 router.get('/property', requireAuth, async (req: any, res) => {
   const userId: string = req.user.id;
   const address = req.query.address as string;
@@ -101,98 +103,11 @@ router.get('/property', requireAuth, async (req: any, res) => {
   if (!linzKey) return res.status(503).json({ error: "Area sales aren't set up yet." });
 
   try {
-    const LINZ = 'https://data.linz.govt.nz/services/wfs';
-    const safe = (s: string) => s.replace(/'/g, "''");
-    const headers = { Authorization: `key ${linzKey}` };
-
-    // 1. NZ Street Address layer (53353) — get coordinates + parcel id
-    const addrParams = new URLSearchParams({
-      service: 'WFS', version: '2.0.0', request: 'GetFeature',
-      typeNames: 'layer-53353',
-      outputFormat: 'application/json', count: '1',
-      CQL_FILTER: `strToLowerCase(full_address) LIKE strToLowerCase('%${safe(address)}%')`,
-    });
-    const addrRes = await fetch(`${LINZ}?${addrParams}`, { headers });
-    const addrText = await addrRes.text();
-    let addrData: any = {};
-    try { addrData = JSON.parse(addrText); } catch {
-      return res.status(502).json({ error: `LINZ returned non-JSON (status ${addrRes.status}). Check your API key has data access scope.` });
-    }
-
-    const addrFeature = addrData?.features?.[0];
-    const coords = addrFeature?.geometry?.coordinates; // [lng, lat]
-
-    // 2. NZ Property Title layer (50804) — legal description, area
-    let titleProps: any = {};
-    try {
-      const titleParams = new URLSearchParams({
-        service: 'WFS', version: '2.0.0', request: 'GetFeature',
-        typeNames: 'layer-50804',
-        outputFormat: 'application/json', count: '1',
-        CQL_FILTER: `strToLowerCase(title_no) IS NOT NULL`,
-        ...(coords ? { CQL_FILTER: `DWITHIN(shape, POINT(${coords[0]} ${coords[1]}), 50, meters)` } : {}),
-      });
-      const titleRes = await fetch(`${LINZ}?${titleParams}`, { headers });
-      const titleData = await titleRes.json() as any;
-      titleProps = titleData?.features?.[0]?.properties || {};
-    } catch (_) {}
-
-    // 3. NZ Property Parcel layer (50772) — area and parcel details
-    let parcelProps: any = {};
-    try {
-      if (coords) {
-        const parcelParams = new URLSearchParams({
-          service: 'WFS', version: '2.0.0', request: 'GetFeature',
-          typeNames: 'layer-50772',
-          outputFormat: 'application/json', count: '1',
-          CQL_FILTER: `DWITHIN(shape, POINT(${coords[0]} ${coords[1]}), 50, meters)`,
-        });
-        const parcelRes = await fetch(`${LINZ}?${parcelParams}`, { headers });
-        const parcelData = await parcelRes.json() as any;
-        parcelProps = parcelData?.features?.[0]?.properties || {};
-      }
-    } catch (_) {}
-
-    // 4. Recent nearby sales — NZ Property Sales (113083)
-    let recentSales: { address: string; price: number; date: string }[] = [];
-    try {
-      if (coords) {
-        const salesParams = new URLSearchParams({
-          service: 'WFS', version: '2.0.0', request: 'GetFeature',
-          typeNames: 'layer-113083',
-          outputFormat: 'application/json', count: '10',
-          CQL_FILTER: `DWITHIN(shape, POINT(${coords[0]} ${coords[1]}), 1000, meters)`,
-          sortBy: 'date_of_contract D',
-        });
-        const salesRes = await fetch(`${LINZ}?${salesParams}`, { headers });
-        if (salesRes.ok) {
-          const salesData = await salesRes.json() as any;
-          recentSales = (salesData?.features || []).map((f: any) => ({
-            address: f.properties?.street_address || f.properties?.full_address || 'Nearby property',
-            price: Number(f.properties?.sale_price || f.properties?.consideration || 0),
-            date: f.properties?.date_of_contract || f.properties?.sale_date || '',
-          })).filter((s: any) => s.price > 10000);
-        }
-      }
-    } catch (_) {}
-
-    const addrProps = addrFeature?.properties || {};
-
-    res.json({
-      rv: null, // LINZ does not publish RV via free WFS — enter manually or via council
-      land_value: null,
-      improvement_value: null,
-      legal_description: titleProps?.title_no ? `Title ${titleProps.title_no}` : null,
-      area_sqm: parcelProps?.area || addrProps?.parcel_area || null,
-      full_address: addrProps?.full_address || null,
-      suburb: addrProps?.suburb_locality || null,
-      town: addrProps?.town_city || null,
-      recent_sales: recentSales,
-      source: 'LINZ Data Service (land.govt.nz)',
-      debug: { addrFound: !!addrFeature, coords },
-    });
+    res.json(await lookupProperty(String(address).slice(0, 200), linzKey));
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    if (e instanceof LinzError) return res.status(404).json({ error: e.message });
+    console.error('[linz] lookup failed:', e?.message ?? e);
+    res.status(502).json({ error: "Couldn't reach LINZ just now. Please try again." });
   }
 });
 

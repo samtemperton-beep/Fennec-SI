@@ -64,14 +64,16 @@ function YearsToPayoff({ startDate, payoffDate }: { startDate: string; payoffDat
   return <>{years}y {rem}m</>
 }
 
+// From LINZ (backend/src/services/linz.ts). LINZ doesn't publish sales or values.
 interface PropertyData {
-  rv: number | null
-  land_value: number | null
-  improvement_value: number | null
+  full_address: string
+  suburb: string | null
+  town: string | null
+  territorial_authority: string | null
   legal_description: string | null
+  title_no: string | null
   area_sqm: number | null
-  recent_sales: { address: string; price: number; date: string }[]
-  source: string
+  valuation_reference: string | null
 }
 
 export default function HomeLoanPage() {
@@ -82,6 +84,7 @@ export default function HomeLoanPage() {
   const [loading, setLoading] = useState(true)
   const [propertyData, setPropertyData] = useState<PropertyData | null>(null)
   const [fetchingProperty, setFetchingProperty] = useState(false)
+  const [propertyError, setPropertyError] = useState('')
   const [actualPayment, setActualPayment] = useState<{ amount: number; frequency: string } | null>(null)
 
   useEffect(() => { load() }, [])
@@ -164,8 +167,9 @@ export default function HomeLoanPage() {
   }
 
   async function fetchPropertyData() {
-    if (!loan.address) { toast.error('Enter a property address first'); return }
+    if (!loan.address) { toast.error('Add the property address in Edit first'); return }
     setFetchingProperty(true)
+    setPropertyError('')
     try {
       const API = process.env.NEXT_PUBLIC_API_URL || ''
       const { data: { session } } = await supabase.auth.getSession()
@@ -173,16 +177,11 @@ export default function HomeLoanPage() {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       const result = await r.json()
-      if (!r.ok) throw new Error(result.error || 'Failed to fetch property data')
+      if (!r.ok) throw new Error(result.error || "Couldn't look up the property")
       setPropertyData(result)
-      if (result.rv) {
-        const updated = { ...loan, rv: result.rv }
-        setLoan(updated)
-        setDraft(updated)
-      }
-      toast.success('Property data loaded')
     } catch (e: any) {
-      toast.error(e.message)
+      setPropertyData(null)
+      setPropertyError(e.message)
     }
     setFetchingProperty(false)
   }
@@ -295,16 +294,10 @@ export default function HomeLoanPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
         {/* Property value */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>Property Value</h2>
-            <button onClick={fetchPropertyData} disabled={fetchingProperty}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
-              {fetchingProperty ? <LoadingSpinner size={12} /> : <IconRefresh size={12} />} Refresh LINZ
-            </button>
-          </div>
+          <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Property Value</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
               { label: 'Purchase Price', value: loan.purchase_price },
@@ -324,26 +317,42 @@ export default function HomeLoanPage() {
           </div>
         </div>
 
-        {/* Area sales */}
+        {/* Property details from LINZ */}
         <div className="card" style={{ padding: 20 }}>
-          <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Recent Area Sales</h2>
-          {propertyData?.recent_sales?.length ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {propertyData.recent_sales.slice(0, 5).map((s, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{s.address}</p>
-                    <p style={{ fontSize: 11, color: 'var(--text3)' }}>{new Date(s.date).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })}</p>
-                  </div>
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 13, color: 'var(--text)', flexShrink: 0, marginLeft: 8 }}>{currency.format(s.price)}</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14 }}>
+            <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>Property Details</h2>
+            <button onClick={fetchPropertyData} disabled={fetchingProperty}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              {fetchingProperty ? <LoadingSpinner size={12} /> : propertyData ? <IconRefresh size={12} /> : <IconSearch size={12} />} {propertyData ? 'Refresh' : 'Look up property'}
+            </button>
+          </div>
+          {propertyData ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {[
+                { label: 'Address', value: [propertyData.full_address, propertyData.suburb, propertyData.town].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ') },
+                { label: 'Council', value: propertyData.territorial_authority },
+                { label: 'Legal description', value: propertyData.legal_description },
+                { label: 'Title', value: propertyData.title_no },
+                { label: 'Land area', value: propertyData.area_sqm ? `${propertyData.area_sqm.toLocaleString('en-NZ')} m²` : null },
+                { label: 'Valuation reference', value: propertyData.valuation_reference },
+              ].map(r => (
+                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text2)', flexShrink: 0 }}>{r.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: r.value ? 'var(--text)' : 'var(--text3)', textAlign: 'right', overflowWrap: 'anywhere' }}>{r.value || '—'}</span>
                 </div>
               ))}
-              {propertyData.source && <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Source: {propertyData.source}</p>}
+              <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, lineHeight: 1.5 }}>
+                From LINZ. Sales and valuations aren&apos;t public data; your council&apos;s website shows the rating valuation (CV) for your valuation reference.
+              </p>
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
               <IconSearch size={24} style={{ color: 'var(--text3)', marginBottom: 8 }} />
-              <p style={{ fontSize: 13, color: 'var(--text2)' }}>Click &quot;Refresh LINZ&quot; to load recent sales near your address</p>
+              <p style={{ fontSize: 13, color: propertyError ? 'var(--red)' : 'var(--text2)' }}>
+                {propertyError || (loan.address
+                  ? 'Look up your property to see its legal description, title and land area from LINZ.'
+                  : 'Add your property address in Edit, then look it up here.')}
+              </p>
             </div>
           )}
         </div>
