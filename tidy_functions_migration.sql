@@ -9,6 +9,12 @@
 
 begin;
 
+-- household_members is no longer used by the app, but its read rule still called
+-- is_household_member(). Each person can now see only their own row.
+drop policy if exists "household_members_select" on public.household_members;
+create policy "household_members_select" on public.household_members
+  for select to authenticated using (user_id = auth.uid());
+
 -- Stop if a database rule still uses one, since revoking would break that rule.
 do $$
 declare
