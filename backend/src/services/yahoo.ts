@@ -3,10 +3,42 @@ import axios from 'axios';
 const FINNHUB = 'https://finnhub.io/api/v1';
 const key = () => process.env.FINNHUB_API_KEY || '';
 
+// Finnhub's plan only covers US listings (anything else answers 403), so symbols
+// with an exchange suffix (FPH.NZ, CBA.AX) are priced from Yahoo instead. Callers
+// must send the suffix: a bare "FPH" is a different, US company.
+const NON_US = /\.(NZ|AX|L|TO|V|HK|SI|T|DE|PA|AS|SW)$/i;
+
+async function yahooMeta(symbol: string) {
+  const { data } = await axios.get(
+    // A one-day range, so chartPreviousClose is yesterday's close and the change is today's.
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+    { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } }
+  );
+  const meta = data?.chart?.result?.[0]?.meta;
+  const price = Number(meta?.regularMarketPrice);
+  if (!meta || !Number.isFinite(price) || price <= 0) throw new Error(`No quote found for ${symbol}`);
+  const prev = Number(meta.chartPreviousClose ?? meta.previousClose);
+  const change = Number.isFinite(prev) && prev > 0 ? price - prev : undefined;
+  return {
+    price,
+    name: (meta.longName || meta.shortName) as string | undefined,
+    change,
+    changePct: change !== undefined ? (change / prev) * 100 : undefined,
+    w52Hi: Number(meta.fiftyTwoWeekHigh) || null,
+    w52Lo: Number(meta.fiftyTwoWeekLow) || null,
+    exchange: (meta.fullExchangeName || meta.exchangeName || null) as string | null,
+    currency: (meta.currency || null) as string | null,
+  };
+}
+
 export async function fetchPrices(tickers: string[]): Promise<Record<string, { price: number; name?: string; changePct?: number }>> {
   const results = await Promise.all(
     tickers.map(async t => {
       try {
+        if (NON_US.test(t)) {
+          const y = await yahooMeta(t);
+          return [t, { price: y.price, name: y.name, changePct: y.changePct }] as [string, { price: number; name?: string; changePct?: number }];
+        }
         const [{ data: q }, { data: p }] = await Promise.all([
           axios.get(`${FINNHUB}/quote?symbol=${t}&token=${key()}`, { timeout: 8000 }),
           axios.get(`${FINNHUB}/stock/profile2?symbol=${t}&token=${key()}`, { timeout: 8000 }),
@@ -22,6 +54,15 @@ export async function fetchPrices(tickers: string[]): Promise<Record<string, { p
 }
 
 export async function fetchQuote(ticker: string) {
+  if (NON_US.test(ticker)) {
+    const y = await yahooMeta(ticker);
+    return {
+      ticker, name: y.name || ticker, price: y.price, change: y.change ?? null, changePct: y.changePct ?? null,
+      volume: null, marketCap: null, pe: null, forwardPE: null, divYield: null,
+      w52Hi: y.w52Hi, w52Lo: y.w52Lo, sector: null, industry: null,
+      exchange: y.exchange, currency: y.currency || 'NZD', avgVolume: null,
+    };
+  }
   const [{ data: q }, { data: p }, metricsRes] = await Promise.all([
     axios.get(`${FINNHUB}/quote?symbol=${ticker}&token=${key()}`, { timeout: 8000 }),
     axios.get(`${FINNHUB}/stock/profile2?symbol=${ticker}&token=${key()}`, { timeout: 8000 }),

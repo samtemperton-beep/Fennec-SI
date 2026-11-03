@@ -51,6 +51,9 @@ export type PartnerStatus =
   | { status: 'pending'; code: string }
   | { status: 'linked'; partner: PartnerInfo; since?: string }
 
+export interface HealthResult { group: string; name: string; ok: boolean; ms: number; detail: string }
+export interface HealthRun { id: number; ran_at: string; trigger: 'scheduled' | 'manual'; ok: boolean; failed: number; results: HealthResult[] }
+
 export const api = {
   searchStocks: (q: string) =>
     apiFetch(`/api/prices/search?q=${encodeURIComponent(q)}`),
@@ -216,6 +219,12 @@ export const api = {
 
   adminGetStats: () =>
     apiFetch('/api/admin/stats'),
+
+  adminGetHealth: (): Promise<{ runs: HealthRun[] }> =>
+    apiFetch('/api/admin/health'),
+
+  adminRunHealth: (): Promise<{ ok: boolean; failed: number; results: HealthResult[] }> =>
+    apiFetch('/api/admin/health/run', { method: 'POST' }),
 
   adminGetUsageStats: () =>
     apiFetch('/api/admin/usage-stats'),

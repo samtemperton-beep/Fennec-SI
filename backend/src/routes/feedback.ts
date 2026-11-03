@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
 import ws from 'ws';
 import { requireAuth } from '../middleware/auth';
+import { emailAdmins, escapeHtml as esc } from '../services/adminEmail';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -10,7 +10,6 @@ dotenv.config();
 // Emailed to every admin, with the sender as the reply-to address.
 
 const router = Router();
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -32,14 +31,6 @@ function allowed(userId: string) {
   return true;
 }
 
-const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-
-async function adminEmails(): Promise<string[]> {
-  const { data } = await supabase.from('profiles').select('id').eq('is_admin', true);
-  const users = await Promise.all((data || []).map(p => supabase.auth.admin.getUserById(p.id)));
-  return users.map(u => u.data?.user?.email).filter((e): e is string => !!e);
-}
-
 // POST /api/feedback { kind, message, page, screenshot?: { name, type, data (base64) } }
 router.post('/', requireAuth, async (req: any, res) => {
   const kind = KINDS[req.body?.kind] ? String(req.body.kind) : 'other';
@@ -58,14 +49,9 @@ router.post('/', requireAuth, async (req: any, res) => {
     attachment = { filename: String(shot.name || 'screenshot.png').replace(/[^\w.-]/g, '_').slice(0, 80), content };
   }
 
-  const to = await adminEmails();
-  if (!to.length) return res.status(500).json({ error: 'No one is set up to receive feedback yet.' });
-
   const { data: profile } = await supabase.from('profiles').select('username, subscription_tier').eq('id', req.user.id).maybeSingle();
   const who = profile?.username || req.user.email;
-  const { error } = await resend.emails.send({
-    from: 'Fennec <alerts@fennecsi.com>',
-    to,
+  const error = await emailAdmins(supabase, {
     replyTo: req.user.email,
     subject: `${KINDS[kind]} from ${who}${page ? ` on ${page}` : ''}`,
     html: `<h2>${esc(KINDS[kind])}</h2>
@@ -75,7 +61,10 @@ router.post('/', requireAuth, async (req: any, res) => {
 <p style="white-space:pre-wrap">${esc(message || '(no message)')}</p>`,
     attachments: attachment ? [attachment] : undefined,
   });
-  if (error) return res.status(502).json({ error: "Couldn't send just now. Please try again." });
+  if (error) {
+    console.error('[feedback] email failed:', error);
+    return res.status(502).json({ error: "Couldn't send just now. Please try again." });
+  }
   res.json({ ok: true });
 });
 

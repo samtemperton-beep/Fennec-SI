@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { api, type NetWorthResponse } from '@/lib/api'
 import { GOVT_MTC_FULL_AT, GOVT_MTC_MAX, GOVT_MTC_MAX_AGE, currentAge } from '@/lib/kiwisaver'
 import { matchEmailsToBills, isPayable, type Bill, type EmailItem } from '@/lib/bills'
+import { yahooSymbol } from '@/lib/dividends'
 
 // Dashboard notifications: one pass over every part of the app, turned into a
 // short list of "how things are tracking" items. Each source is independent and
@@ -281,18 +282,29 @@ async function invoiceInsights({ supabase, userId }: InsightContext, today: stri
 
 async function investingInsights({ supabase, userId }: InsightContext, today: string): Promise<Insight[]> {
   const [{ data: holdings }, { data: alerts }, prefs] = await Promise.all([
-    supabase.from('holdings').select('ticker, shares, buy_price, current_price, price_locked').eq('user_id', userId),
+    supabase.from('holdings').select('ticker, market, shares, buy_price, current_price, price_locked').eq('user_id', userId),
     supabase.from('alerts').select('id, ticker, type, price').eq('user_id', userId),
     api.getNotificationPrefs().catch(() => null),
   ])
   if (!holdings?.length && !alerts?.length) return []
 
+  // Holdings are looked up by exchange symbol (FPH.NZ), then keyed back by ticker.
+  const priced = (holdings ?? []).filter(h => !h.price_locked)
   const tickers = [...new Set([
-    ...(holdings ?? []).filter(h => !h.price_locked).map(h => h.ticker),
+    ...priced.map(h => yahooSymbol(h.ticker, h.market)),
     ...(alerts ?? []).map(a => a.ticker),
   ])]
   let quotes: Record<string, { price: number; changePct?: number }> = {}
-  try { if (tickers.length) quotes = await api.getPrices(tickers) } catch {}
+  try {
+    if (tickers.length) {
+      const raw: Record<string, { price: number; changePct?: number }> = await api.getPrices(tickers)
+      quotes = { ...raw }
+      for (const h of priced) {
+        const q = raw[yahooSymbol(h.ticker, h.market)]
+        if (q) quotes[h.ticker] = q; else delete quotes[h.ticker]
+      }
+    }
+  } catch {}
 
   const out: Insight[] = []
   const priceOf = (t: string, fallback: number) => (quotes[t]?.price > 0 ? quotes[t].price : fallback)

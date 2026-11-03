@@ -21,6 +21,7 @@ import partnerRouter from './routes/partner';
 import feedbackRouter from './routes/feedback';
 import { startScheduledSync } from './services/scheduler';
 import { FAQ } from './services/faq';
+import { countServerErrors, startNightlyHealthCheck } from './services/healthCheck';
 import networthRouter from './routes/networth';
 
 dotenv.config();
@@ -46,6 +47,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(morgan('dev'));
+app.use(countServerErrors);
 app.use(express.json({ limit: '10mb' }));
 
 const limiter = rateLimit({ windowMs: 60_000, max: 100 });
@@ -73,8 +75,12 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));
 
 app.listen(PORT, () => {
   console.log(`Fennec SI backend running on :${PORT}`);
-  // Daily-ish background sync that builds value history. Opt-in per environment.
-  if (process.env.ENABLE_SCHEDULED_SYNC === 'true') startScheduledSync();
+  // Background bank sync and the nightly health check. Deployed server only:
+  // both act on real data, so they're opt-in per environment.
+  if (process.env.ENABLE_SCHEDULED_SYNC === 'true') {
+    startScheduledSync();
+    startNightlyHealthCheck();
+  }
 });
 
 export default app;

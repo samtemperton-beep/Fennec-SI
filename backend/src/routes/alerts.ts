@@ -131,10 +131,15 @@ router.post('/check', requireAuth, async (req, res) => {
   if (p.portfolio_sell_alerts) {
     const { data: holdings } = await supabase.from('holdings').select('*').eq('user_id', user.id);
     if (holdings?.length) {
-      const holdingTickers = holdings.map((h: any) => h.ticker);
-      const prices = await fetchPrices(holdingTickers);
+      // NZX and ASX holdings are priced by their exchange symbol (FPH.NZ, not the US "FPH").
+      const symbolOf = (h: any) => {
+        const t = String(h.ticker).toUpperCase();
+        const suffix = h.market === 'NZX' ? '.NZ' : h.market === 'ASX' ? '.AX' : '';
+        return suffix && !t.endsWith(suffix) ? t + suffix : t;
+      };
+      const prices = await fetchPrices([...new Set(holdings.map(symbolOf))]);
       for (const h of holdings) {
-        const priceData = prices[h.ticker];
+        const priceData = prices[symbolOf(h)];
         const current = typeof priceData === 'object' ? priceData.price : priceData;
         if (!current || !h.buy_price) continue;
         const changePct = ((current - h.buy_price) / h.buy_price) * 100;

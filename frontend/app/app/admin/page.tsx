@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import {
   IconShield, IconUsers, IconBrain, IconSettings2,
-  IconRefresh, IconCrown, IconActivity, IconCheck, IconX, IconLock,
+  IconRefresh, IconCrown, IconActivity, IconCheck, IconX, IconLock, IconHeartbeat,
 } from '@tabler/icons-react'
+import { HealthPanel } from '@/components/admin/HealthPanel'
 
 const GEMINI = 'gemini-2.5-flash'
 const HAIKU = 'claude-haiku-4-5-20251001'
@@ -56,7 +57,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 export default function AdminPage() {
   const router = useRouter()
   const [checking, setChecking] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'models' | 'users'>('overview')
+  const [tab, setTab] = useState<'overview' | 'health' | 'models' | 'users'>('overview')
 
   // Stats
   const [stats, setStats] = useState<any>(null)
@@ -198,6 +199,7 @@ export default function AdminPage() {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: IconActivity },
+    { id: 'health', label: 'Health', icon: IconHeartbeat },
     { id: 'models', label: 'Plans & AI', icon: IconBrain },
     { id: 'users', label: 'Users', icon: IconUsers },
   ] as const
@@ -219,7 +221,7 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: 'var(--surface2)', padding: 4, borderRadius: 10, width: 'fit-content' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 28, background: 'var(--surface2)', padding: 4, borderRadius: 10, width: 'fit-content', maxWidth: '100%' }}>
         {tabs.map(t => (
           <button
             key={t.id}
@@ -311,6 +313,8 @@ export default function AdminPage() {
           )}
         </div>
       )}
+
+      {tab === 'health' && <HealthPanel />}
 
       {/* PLANS & AI TAB */}
       {tab === 'models' && (

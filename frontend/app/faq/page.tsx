@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { FoxIcon } from '@/components/shared/FoxIcon'
 
 export const metadata = { title: 'FAQ — Fennec' }
 // The list lives in the backend (services/faq.ts) so the Fennec chat knows the same answers.
@@ -20,7 +21,10 @@ export default async function FaqPage() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '0 0 80px' }}>
       <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', padding: '16px 24px' }}>
-        <Link href="/" style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif', textDecoration: 'none', color: 'inherit' }}>Fennec</Link>
+        <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit' }}>
+          <FoxIcon size={24} />
+          <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec</span>
+        </Link>
       </div>
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 16px' }}>

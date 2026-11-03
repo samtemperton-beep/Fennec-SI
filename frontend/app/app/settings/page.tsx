@@ -552,7 +552,7 @@ export default function SettingsPage() {
               <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Brokerage Platform</h2>
               <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16, maxWidth: 460, lineHeight: 1.6 }}>
                 Tell us where you trade and we&apos;ll add a one-click link to your broker from the portfolio page.{' '}
-                <span style={{ color: 'var(--green)', fontWeight: 600 }}>We never access your account</span> — Fennec SI advises, you execute.
+                <span style={{ color: 'var(--green)', fontWeight: 600 }}>We never access your broker account</span>: you make every trade yourself.
               </p>
             </div>
             {broker && (

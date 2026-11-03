@@ -1,106 +1,126 @@
 import Link from 'next/link'
-import { IconTrendingUp } from '@tabler/icons-react'
+import { FoxIcon } from '@/components/shared/FoxIcon'
 
-export const metadata = { title: 'Privacy Policy — Fennec SI' }
+export const metadata = { title: 'Privacy Policy — Fennec' }
 
+// Keep in step with what the app actually does: the processors in section 5, the
+// FAQ (backend/src/services/faq.ts) and the Fennec chat's guide (appGuide.ts).
 export default function PrivacyPage() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '0 0 80px' }}>
-      {/* Top bar */}
-      <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Link href="/login" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconTrendingUp size={17} color="white" />
-          </div>
-          <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec SI</span>
+      <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', padding: '16px 24px' }}>
+        <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit' }}>
+          <FoxIcon size={24} />
+          <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Fennec</span>
         </Link>
       </div>
 
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 16px' }}>
         <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 8 }}>Privacy Policy</h1>
-        <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 48 }}>Last updated: 27 June 2026</p>
+        <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 40 }}>Last updated: 3 November 2026</p>
 
         <Section title="1. Who we are">
-          Fennec SI is an AI-powered investment intelligence platform based in New Zealand. This policy explains how we collect, use, and protect your personal information when you use our service at fennecsi.com.
+          Fennec is a New Zealand app for managing spending and investing in one place, available at fennecsi.com. This policy explains what personal information we collect, how we use and protect it, and your rights under the New Zealand Privacy Act 2020.
+          <br /><br />
+          Fennec is currently in testing. Features change often, and we&apos;ll update this policy as they do.
         </Section>
 
         <Section title="2. What we collect">
-          <strong>Account information:</strong> Your email address and any profile details you choose to provide (username, profession, location, avatar).
+          <strong>Your account:</strong> your email address, how you sign in (password, email link or Google), and profile details you choose to add, such as a username, photo, location or profession. Passwords are handled by our sign-in provider and stored only in hashed form; we never see them.
           <br /><br />
-          <strong>Portfolio data:</strong> Stock holdings, purchase prices, watchlist items, and AI analysis results you generate on the platform.
+          <strong>Money information you add or connect:</strong> bank accounts, balances and transactions, categories, budgets, bills, savings goals, KiwiSaver details, home loan figures, investment holdings, watchlists, price alerts, and (if you use the Business section) invoices and business settings.
           <br /><br />
-          <strong>Usage data:</strong> Pages visited, features used, AI call counts, and session timestamps — used to improve the platform and enforce free-tier limits.
+          <strong>Bank connections (optional):</strong> if you connect your bank, we receive account and transaction data through Akahu, a New Zealand open-banking provider, with your consent. Access is read-only: Fennec can&apos;t move money or make payments, and we never receive your bank login.
           <br /><br />
-          <strong>Broker documents:</strong> If you use portfolio verification, you may upload a broker statement. This document is passed to our AI system for data extraction only and is not retained after verification is complete.
+          <strong>Gmail (optional, Premium):</strong> if you connect Gmail, Fennec has read-only access to find bills and invoices. Matching emails are read to pull out the bill details (sender, amount, due date and reference), and we store those details, not your emails. You can disconnect at any time.
           <br /><br />
-          <strong>Device and technical data:</strong> IP address, browser type, and device type collected automatically via standard server logs.
+          <strong>Broker statements (optional, Premium):</strong> if you verify your portfolio, the statement you upload is read to confirm your holdings and isn&apos;t kept after verification.
+          <br /><br />
+          <strong>Partner sharing (optional):</strong> if you link with a partner, we record the link and what you&apos;ve chosen to share with them.
+          <br /><br />
+          <strong>Community:</strong> posts and comments you publish, and, if you verify your portfolio, your leaderboard entry.
+          <br /><br />
+          <strong>Feedback:</strong> messages you send with the Feedback button, any screenshot you attach, the page you were on, and your browser type.
+          <br /><br />
+          <strong>Usage and technical data:</strong> how many AI requests you&apos;ve made (to apply plan limits), when you last used the app, and standard server logs, which include IP addresses.
         </Section>
 
-        <Section title="3. How we use your data">
+        <Section title="3. How we use it">
           <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
-            <li>To provide and improve the Fennec SI service</li>
-            <li>To generate AI-powered signals and analysis personalised to your portfolio</li>
-            <li>To enforce free-tier usage limits and manage Premium subscriptions</li>
-            <li>To display leaderboard rankings (only with your consent via portfolio verification)</li>
-            <li>To send transactional emails (magic links, billing receipts, important notices)</li>
-            <li>To detect and prevent fraud or abuse</li>
+            <li>To run Fennec for you: show your money in one place, sync connected accounts, and send reminders and alerts you&apos;ve asked for</li>
+            <li>To produce AI answers, analysis and summaries based on your own figures</li>
+            <li>To share what you&apos;ve chosen with a linked partner</li>
+            <li>To apply plan features and limits, and handle Premium requests</li>
+            <li>To send account emails (sign-in links, password resets, alerts) and reply to feedback</li>
+            <li>To keep Fennec secure, fix problems, and prevent fraud and abuse</li>
           </ul>
-          We do not sell your personal data to third parties. We do not use your data for advertising.
+          We don&apos;t sell your personal information, and we don&apos;t use it for advertising.
         </Section>
 
-        <Section title="4. AI processing">
-          Portfolio analysis, signals, and portfolio verification are powered by Anthropic's Claude API. Data sent to Claude is subject to Anthropic's data processing terms. We do not use your data to train AI models. Analysis results are stored in your account so you can review them later.
-        </Section>
-
-        <Section title="5. Data sharing">
-          We share data only with:
+        <Section title="4. Who can see your information">
+          Your information is stored under your account, and our database only lets a signed-in person read or change their own records. Other Fennec users can&apos;t see it, except:
           <ul style={{ paddingLeft: 20, lineHeight: 2, marginTop: 8 }}>
-            <li><strong>Supabase</strong> — database and authentication (hosted in AWS ap-southeast-2)</li>
-            <li><strong>Anthropic</strong> — AI analysis processing</li>
-            <li><strong>Vercel</strong> — frontend hosting</li>
-            <li><strong>Railway</strong> — backend hosting</li>
+            <li>accounts, bills and goals you choose to share with a linked partner</li>
+            <li>community posts, which other users can read</li>
+            <li>the leaderboard, which shows your username and percentage performance, never dollar amounts</li>
           </ul>
-          All processors are required to handle data in accordance with applicable privacy laws.
+          Fennec&apos;s administrator can see account emails, usernames, plans and AI usage counts to run the service. The admin tools don&apos;t show anyone&apos;s accounts, transactions or investments.
         </Section>
 
-        <Section title="6. Cookies and local storage">
-          We use browser local storage to remember your theme preference (light/dark). We use session cookies set by Supabase for authentication. We do not use advertising or tracking cookies.
+        <Section title="5. AI processing">
+          Fennec&apos;s AI features use Anthropic (Claude) and Google (Gemini). When you use one, we send the provider what it needs for that answer: for example your question and a summary of the relevant figures, a holding you&apos;ve asked to analyse, the text of a bill email, or a broker statement you&apos;ve uploaded for verification. We don&apos;t send your password or bank login.
+          <br /><br />
+          We use these providers through their business APIs, under their terms for data handling. We don&apos;t use your information to train AI models. AI answers can be wrong, and they&apos;re general information, not financial advice.
         </Section>
 
-        <Section title="7. Data retention">
-          Your account data is retained while your account is active. If you delete your account, we will delete your personal data within 30 days, except where we are required to retain it by law (e.g. billing records for up to 7 years).
-        </Section>
-
-        <Section title="8. Your rights">
-          Under the New Zealand Privacy Act 2020, you have the right to:
+        <Section title="6. Service providers">
+          We use these providers to run Fennec. Each gets only what it needs for its part:
           <ul style={{ paddingLeft: 20, lineHeight: 2, marginTop: 8 }}>
-            <li>Request access to the personal information we hold about you</li>
-            <li>Request correction of inaccurate information</li>
-            <li>Request deletion of your account and associated data</li>
-            <li>Withdraw consent for optional data processing at any time</li>
+            <li><strong>Supabase</strong>: database, sign-in and file storage (hosted on Amazon Web Services in Sydney, Australia)</li>
+            <li><strong>Vercel</strong>: hosts the website</li>
+            <li><strong>Railway</strong>: hosts the server that syncs data and runs AI requests</li>
+            <li><strong>Akahu</strong>: bank and investment account connections</li>
+            <li><strong>Anthropic</strong> and <strong>Google</strong>: AI processing; Google also provides Google sign-in and the Gmail connection</li>
+            <li><strong>Resend</strong>: sends account, alert and feedback emails</li>
+            <li><strong>Finnhub</strong> and <strong>Yahoo Finance</strong>: market prices and news; we send them share codes only, never personal information</li>
           </ul>
-          To exercise any of these rights, email <a href="mailto:support@fennecsi.com" style={{ color: 'var(--primary)' }}>support@fennecsi.com</a>.
+          Some of these providers store or process information outside New Zealand, including in Australia and the United States. We choose providers that protect information in ways comparable to the Privacy Act.
         </Section>
 
-        <Section title="9. Security">
-          We use industry-standard security practices including encrypted connections (HTTPS), hashed credentials, and row-level security on our database. However, no system is completely secure — please use a strong, unique email account and report any suspected breach immediately.
+        <Section title="7. Security">
+          Information is encrypted in transit (HTTPS). Bank and Gmail connection keys are encrypted at rest. Database rules keep each person&apos;s records to themselves, and you can turn on two-factor sign-in in Settings. Bank access is read-only. No system is completely secure, so please use a strong, unique password, and tell us straight away if you think your account has been accessed by someone else.
         </Section>
 
-        <Section title="10. Children">
-          Fennec SI is not intended for users under 18. We do not knowingly collect data from children. If you believe a child has created an account, contact us and we will delete it.
+        <Section title="8. Cookies and browser storage">
+          We use cookies set by our sign-in provider to keep you signed in. Your browser also stores a few preferences, such as light or dark theme and cards you&apos;ve hidden. We don&apos;t use advertising or tracking cookies.
         </Section>
 
-        <Section title="11. Changes to this policy">
-          We may update this policy from time to time. We will notify you of material changes by email or in-app notice at least 14 days in advance.
+        <Section title="9. How long we keep it">
+          We keep your information while your account is open. Deleting your account in Settings removes your data straight away, apart from bills and goals you shared with a linked partner, which stay with them. Copies in backups and server logs are removed as those expire. We may keep information for longer only where the law requires it.
         </Section>
 
-        <Section title="12. Contact">
-          Privacy questions or complaints: <a href="mailto:support@fennecsi.com" style={{ color: 'var(--primary)' }}>support@fennecsi.com</a>
+        <Section title="10. Your rights">
+          Under the Privacy Act 2020 you can ask to see the personal information we hold about you and ask us to correct it. You can delete your account at any time in Settings, and disconnect your bank or Gmail whenever you like. To make a request, email{' '}
+          <a href="mailto:support@fennecsi.com" style={{ color: 'var(--primary)' }}>support@fennecsi.com</a>. If you&apos;re not happy with how we&apos;ve handled your information, you can complain to the{' '}
+          <a href="https://www.privacy.org.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>Office of the Privacy Commissioner</a>.
         </Section>
 
-        <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid var(--border)', display: 'flex', gap: 16 }}>
-          <Link href="/terms" style={{ color: 'var(--primary)', fontSize: 14, textDecoration: 'none' }}>Terms of Service →</Link>
-          <Link href="/login" style={{ color: 'var(--text2)', fontSize: 14, textDecoration: 'none' }}>← Back to sign in</Link>
+        <Section title="11. Age">
+          Fennec is for people aged 18 and over. If you think someone under 18 has an account, contact us and we&apos;ll delete it.
+        </Section>
+
+        <Section title="12. Changes to this policy">
+          We&apos;ll update this page when Fennec changes how it handles information, and tell you by email or in the app before any significant change takes effect.
+        </Section>
+
+        <Section title="13. Contact">
+          Privacy questions or requests: <a href="mailto:support@fennecsi.com" style={{ color: 'var(--primary)' }}>support@fennecsi.com</a>
+        </Section>
+
+        <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <Link href="/faq" style={{ color: 'var(--primary)', fontSize: 14, textDecoration: 'none' }}>FAQ</Link>
+          <Link href="/terms" style={{ color: 'var(--primary)', fontSize: 14, textDecoration: 'none' }}>Terms of Service</Link>
+          <Link href="/login" style={{ color: 'var(--text2)', fontSize: 14, textDecoration: 'none' }}>Sign in</Link>
         </div>
       </div>
     </div>
@@ -109,7 +129,7 @@ export default function PrivacyPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 36 }}>
+    <div style={{ marginBottom: 32 }}>
       <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 12, color: 'var(--text)' }}>{title}</h2>
       <div style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.8 }}>{children}</div>
     </div>

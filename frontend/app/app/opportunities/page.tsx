@@ -10,6 +10,7 @@ import { IconBrain, IconRefresh, IconPlus, IconExternalLink, IconArrowRight, Ico
 import { timeAgo } from '@/lib/utils'
 import { toast } from 'sonner'
 import { StockDetailModal } from '@/components/shared/StockDetailModal'
+import { openFeedback } from '@/components/shared/Feedback'
 
 interface Opp {
   ticker: string; name: string; market: string; sector: string
@@ -341,9 +342,9 @@ export default function DiscoverPage() {
           <div style={{ fontSize: 22, marginBottom: 8 }}>🔒</div>
           <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>More picks available</p>
           <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 14 }}>Premium shows every pick, including the highest-conviction opportunities.</p>
-          <a href="/app/settings" style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#1a1a1a', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>
-            ✦ Upgrade to Premium
-          </a>
+          <button type="button" onClick={() => openFeedback('premium')} style={{ display: 'inline-block', padding: '9px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#1a1a1a', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>
+            ✦ Request Premium
+          </button>
         </div>
       )}
     </div>

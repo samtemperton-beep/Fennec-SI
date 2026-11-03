@@ -17,6 +17,7 @@ import { AkahuSyncBar, type BrokerAccount } from '@/components/portfolio/AkahuSy
 import { UnmatchedHoldings } from '@/components/portfolio/UnmatchedHoldings'
 import { PortfolioBalance } from '@/components/portfolio/PortfolioBalance'
 import { DividendIncome } from '@/components/portfolio/DividendIncome'
+import { yahooSymbol } from '@/lib/dividends'
 import { PerformanceVsMarket } from '@/components/portfolio/PerformanceVsMarket'
 import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
@@ -152,12 +153,14 @@ export default function PortfolioPage() {
       try {
         // Locked rows (ambiguous tickers, e.g. SpaceX vs the SPCX ETF) keep the
         // broker's valuation: a market lookup by ticker would return the wrong instrument.
-        const tickers = [...new Set(rows.filter((h: any) => !h.price_locked).map((h: any) => h.ticker as string))]
+        // NZX and ASX holdings are looked up by exchange symbol (FPH.NZ): a bare
+        // "FPH" is a different, US company. A failed lookup (price 0) keeps the saved price.
+        const tickers = [...new Set(rows.filter((h: any) => !h.price_locked).map((h: any) => yahooSymbol(h.ticker, h.market)))]
         const priceData = await api.getPrices(tickers)
         setHoldings(rows.map((h: any) => h.price_locked ? h : ({
           ...h,
-          current_price: priceData[h.ticker]?.price ?? h.current_price,
-          name: priceData[h.ticker]?.name ?? h.name,
+          current_price: priceData[yahooSymbol(h.ticker, h.market)]?.price || h.current_price,
+          name: priceData[yahooSymbol(h.ticker, h.market)]?.name ?? h.name,
         })))
       } catch {}
     }
@@ -167,12 +170,12 @@ export default function PortfolioPage() {
     if (!holdings.length) return
     setRefreshing(true)
     try {
-      const tickers = [...new Set(holdings.filter(h => !h.price_locked).map(h => h.ticker))]
+      const tickers = [...new Set(holdings.filter(h => !h.price_locked).map(h => yahooSymbol(h.ticker, h.market)))]
       const data = await api.getPrices(tickers)
       const updates = holdings.map(h => h.price_locked ? h : ({
         ...h,
-        current_price: data[h.ticker]?.price ?? h.current_price,
-        name: data[h.ticker]?.name ?? h.name,
+        current_price: data[yahooSymbol(h.ticker, h.market)]?.price || h.current_price,
+        name: data[yahooSymbol(h.ticker, h.market)]?.name ?? h.name,
       }))
       setHoldings(updates)
       for (const h of updates) {

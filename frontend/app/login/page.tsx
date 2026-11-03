@@ -274,7 +274,7 @@ export default function LoginPage() {
             <FoxIcon size={28} />
           </div>
           <div>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18 }}>Fennec SI</span>
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18 }}>Fennec</span>
             <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic', display: 'block', lineHeight: 1, marginTop: 1 }}>Spend &amp; Invest</span>
           </div>
         </div>
@@ -324,7 +324,7 @@ export default function LoginPage() {
             <div style={{ background: 'var(--primary)', borderRadius: 8, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FoxIcon size={24} />
             </div>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>Fennec SI</span>
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>Fennec</span>
           </div>
 
           {/* ── Step: MFA ── */}

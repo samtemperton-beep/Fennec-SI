@@ -4,6 +4,7 @@ import ws from 'ws';
 import { requireAuth, requireAdmin, invalidateSettingsCache } from '../middleware/auth';
 import { MODELS, DEFAULTS } from '../services/llm';
 import { PLAN_FEATURES, PLAN_LIMITS } from '../services/plans';
+import { runAndRecord } from '../services/healthCheck';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -131,6 +132,28 @@ router.get('/stats', requireAuth, requireAdmin, async (_req, res) => {
     supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('last_usage_reset', new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
   ]);
   res.json({ total: total ?? 0, premium: premium ?? 0, activeThisWeek: active ?? 0 });
+});
+
+// GET /api/admin/health — the last two weeks of health checks, newest first
+router.get('/health', requireAuth, requireAdmin, async (_req, res) => {
+  const { data, error } = await supabase.from('health_checks')
+    .select('id, ran_at, trigger, ok, failed, results').order('ran_at', { ascending: false }).limit(14);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ runs: data ?? [] });
+});
+
+// POST /api/admin/health/run — run the check now. Saved, but not emailed.
+let manualRunning = false;
+router.post('/health/run', requireAuth, requireAdmin, async (_req, res) => {
+  if (manualRunning) return res.status(409).json({ error: 'A check is already running.' });
+  manualRunning = true;
+  try {
+    res.json(await runAndRecord(supabase, 'manual'));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    manualRunning = false;
+  }
 });
 
 export default router;
