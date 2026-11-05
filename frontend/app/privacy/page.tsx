@@ -40,6 +40,8 @@ export default function PrivacyPage() {
           <br /><br />
           <strong>Partner sharing (optional):</strong> if you link with a partner, we record the link and what you&apos;ve chosen to share with them.
           <br /><br />
+          <strong>Category rules:</strong> when you save a rule that uses one of Fennec&apos;s standard categories, its keyword and category (for example &quot;woolworths&quot; and Groceries) may be suggested for Fennec&apos;s shared category list, which the team reviews before anyone&apos;s transactions use it. Nothing that identifies you or your transactions is kept with the suggestion.
+          <br /><br />
           <strong>Community:</strong> posts and comments you publish, and, if you verify your portfolio, your leaderboard entry.
           <br /><br />
           <strong>Feedback:</strong> messages you send with the Feedback button, any screenshot you attach, the page you were on, and your browser type.

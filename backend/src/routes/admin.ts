@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin, invalidateSettingsCache } from '../middlewar
 import { MODELS, DEFAULTS } from '../services/llm';
 import { PLAN_FEATURES, PLAN_LIMITS } from '../services/plans';
 import { runAndRecord } from '../services/healthCheck';
+import { cleanKeyword, isDefaultCategory, merchantKey, DEFAULT_CATEGORIES } from '../services/sharedCategories';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -35,7 +36,7 @@ router.get('/users', requireAuth, requireAdmin, async (_req, res) => {
 
 // PATCH /api/admin/users/:id/tier — toggle a user's subscription tier
 router.patch('/users/:id/tier', requireAuth, requireAdmin, async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { tier } = req.body;
   if (!['free', 'premium'].includes(tier)) {
     return res.status(400).json({ error: 'tier must be "free" or "premium"' });
@@ -50,7 +51,7 @@ router.patch('/users/:id/tier', requireAuth, requireAdmin, async (req, res) => {
 
 // POST /api/admin/users/:id/reset-usage — reset a user's daily AI usage counter
 router.post('/users/:id/reset-usage', requireAuth, requireAdmin, async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { error } = await supabase
     .from('profiles')
     .update({ usage_count: 0, last_usage_reset: new Date().toISOString().slice(0, 10) })
@@ -154,6 +155,121 @@ router.post('/health/run', requireAuth, requireAdmin, async (_req, res) => {
   } finally {
     manualRunning = false;
   }
+});
+
+// ── Shared category list ────────────────────────────────────────────────────
+// Keyword -> category matches used to categorise everyone's transactions once
+// approved. See shared_categories_migration.sql.
+
+// GET /api/admin/category-matches — every match, with the default category names
+router.get('/category-matches', requireAuth, requireAdmin, async (_req, res) => {
+  const { data, error } = await supabase.from('shared_category_matches')
+    .select('id, keyword, category_name, scope, status, source, suggestions, created_at, reviewed_at')
+    .order('suggestions', { ascending: false }).order('keyword');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ matches: data ?? [], categories: DEFAULT_CATEGORIES });
+});
+
+// Approves a match: takes back any other approved category for the keyword,
+// then categorises everyone's matching uncategorised transactions.
+async function approve(id: string, keyword: string, scope: string) {
+  const { data: others } = await supabase.from('shared_category_matches')
+    .select('id').eq('keyword', keyword).eq('scope', scope).eq('status', 'approved').neq('id', id);
+  for (const o of others ?? []) {
+    await supabase.rpc('remove_shared_match', { target: o.id });
+    await supabase.from('shared_category_matches').update({ status: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', o.id);
+  }
+  const { error } = await supabase.from('shared_category_matches')
+    .update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw new Error(error.message);
+  const { data: applied, error: applyErr } = await supabase.rpc('apply_shared_match', { target: id });
+  if (applyErr) throw new Error(applyErr.message);
+  return Number(applied ?? 0);
+}
+
+// POST /api/admin/category-matches { keyword, category_name, scope } — add an approved match
+router.post('/category-matches', requireAuth, requireAdmin, async (req, res) => {
+  const keyword = cleanKeyword(req.body?.keyword);
+  const scope = req.body?.scope === 'business' ? 'business' : 'household';
+  const category = String(req.body?.category_name ?? '');
+  if (!keyword) return res.status(400).json({ error: 'Use 3 to 40 characters, with letters and no long numbers.' });
+  if (!isDefaultCategory(category, scope)) return res.status(400).json({ error: 'Pick one of the default categories.' });
+  const { data, error } = await supabase.from('shared_category_matches')
+    .upsert({ keyword, category_name: category, scope, source: 'admin' }, { onConflict: 'keyword,scope,category_name' })
+    .select('id').single();
+  if (error) return res.status(500).json({ error: error.message });
+  try {
+    res.json({ applied: await approve(data.id, keyword, scope) });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/admin/category-matches/:id { status?, category_name? }
+router.patch('/category-matches/:id', requireAuth, requireAdmin, async (req, res) => {
+  const id = String(req.params.id);
+  const { data: match, error } = await supabase.from('shared_category_matches')
+    .select('id, keyword, scope, status, category_name').eq('id', id).maybeSingle();
+  if (error || !match) return res.status(404).json({ error: 'Match not found' });
+
+  try {
+    // A different category: only while it isn't in use.
+    const category = req.body?.category_name;
+    if (category && category !== match.category_name) {
+      if (match.status === 'approved') return res.status(400).json({ error: 'Remove the match before changing its category.' });
+      if (!isDefaultCategory(category, match.scope)) return res.status(400).json({ error: 'Pick one of the default categories.' });
+      const { error: upErr } = await supabase.from('shared_category_matches').update({ category_name: category }).eq('id', id);
+      if (upErr) return res.status(409).json({ error: upErr.code === '23505' ? 'That match is already on the list.' : upErr.message });
+    }
+
+    const status = req.body?.status;
+    if (status === 'approved') return res.json({ applied: await approve(id, match.keyword, match.scope) });
+    if (status === 'rejected' || status === 'pending') {
+      let removed = 0;
+      if (match.status === 'approved') {
+        const { data } = await supabase.rpc('remove_shared_match', { target: id });
+        removed = Number(data ?? 0);
+      }
+      await supabase.from('shared_category_matches')
+        .update({ status, reviewed_at: status === 'rejected' ? new Date().toISOString() : null }).eq('id', id);
+      return res.json({ removed });
+    }
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/category-matches/from-my-data — suggest matches from the
+// admin's own categorised transactions: merchants seen at least twice, always
+// in the same default category. Added as pending.
+router.post('/category-matches/from-my-data', requireAuth, requireAdmin, async (req: any, res) => {
+  const { data: txs, error } = await supabase.from('fin_transactions')
+    .select('description, category_source, category:fin_categories(name, scope)')
+    .eq('user_id', req.user.id).not('category_id', 'is', null)
+    .order('date', { ascending: false }).limit(5000);
+  if (error) return res.status(500).json({ error: error.message });
+
+  const seen = new Map<string, { names: Set<string>; scope: string; count: number }>();
+  for (const t of txs ?? []) {
+    const cat: any = Array.isArray(t.category) ? t.category[0] : t.category;
+    if (t.category_source === 'shared' || !cat || !isDefaultCategory(cat.name, cat.scope)) continue;
+    const key = merchantKey(t.description ?? '');
+    if (!key) continue;
+    const k = `${cat.scope}|${key}`;
+    const s = seen.get(k) ?? { names: new Set<string>(), scope: cat.scope, count: 0 };
+    s.names.add(cat.name);
+    s.count++;
+    seen.set(k, s);
+  }
+  const rows = [...seen.entries()]
+    .filter(([, s]) => s.count >= 2 && s.names.size === 1)
+    .map(([k, s]) => ({ keyword: k.split('|')[1], category_name: [...s.names][0], scope: s.scope, source: 'admin', suggestions: 1 }));
+  if (!rows.length) return res.json({ added: 0 });
+  const { data: added, error: insErr } = await supabase.from('shared_category_matches')
+    .upsert(rows, { onConflict: 'keyword,scope,category_name', ignoreDuplicates: true }).select('id');
+  if (insErr) return res.status(500).json({ error: insErr.message });
+  res.json({ added: added?.length ?? 0, considered: rows.length });
 });
 
 export default router;

@@ -54,6 +54,12 @@ export type PartnerStatus =
 export interface HealthResult { group: string; name: string; ok: boolean; ms: number; detail: string }
 export interface HealthRun { id: number; ran_at: string; trigger: 'scheduled' | 'manual'; ok: boolean; failed: number; results: HealthResult[] }
 
+export type CategoryScope = 'household' | 'business'
+export interface CategoryMatch {
+  id: string; keyword: string; category_name: string; scope: CategoryScope
+  status: 'pending' | 'approved' | 'rejected'; source: 'starter' | 'admin' | 'users'; suggestions: number
+}
+
 export const api = {
   searchStocks: (q: string) =>
     apiFetch(`/api/prices/search?q=${encodeURIComponent(q)}`),
@@ -225,6 +231,18 @@ export const api = {
 
   adminRunHealth: (): Promise<{ ok: boolean; failed: number; results: HealthResult[] }> =>
     apiFetch('/api/admin/health/run', { method: 'POST' }),
+
+  adminGetCategoryMatches: (): Promise<{ matches: CategoryMatch[]; categories: Record<CategoryScope, string[]> }> =>
+    apiFetch('/api/admin/category-matches'),
+
+  adminAddCategoryMatch: (body: { keyword: string; category_name: string; scope: CategoryScope }): Promise<{ applied: number }> =>
+    apiFetch('/api/admin/category-matches', { method: 'POST', body: JSON.stringify(body) }),
+
+  adminUpdateCategoryMatch: (id: string, body: { status?: CategoryMatch['status']; category_name?: string }): Promise<{ applied?: number; removed?: number }> =>
+    apiFetch(`/api/admin/category-matches/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  adminSuggestCategoryMatches: (): Promise<{ added: number; considered?: number }> =>
+    apiFetch('/api/admin/category-matches/from-my-data', { method: 'POST' }),
 
   adminGetUsageStats: () =>
     apiFetch('/api/admin/usage-stats'),

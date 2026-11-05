@@ -19,7 +19,7 @@ Investing:
 
 Finance (household):
 - Accounts: bank balances. Bank sync uses Akahu with read-only access, connected from Settings. Accounts can be added by hand too.
-- Transactions: categorise them; "create a rule" auto-categorises matching ones.
+- Transactions: categorise them; "create a rule" auto-categorises matching ones. Common merchants are categorised automatically from Fennec's shared list (marked "auto"); the person's own rules come first, and "Not right? Stop matching" on the category turns a match off for them.
 - Budget: a monthly limit per category. Bills: recurring bills with reminders; Premium can scan Gmail for bills. Goals: savings goals with contributions.
 - KiwiSaver: balance and retirement projection. Home Loan: repayment calculator, plus property details from LINZ (legal description, title, land area) and the council rating valuation (CV) where that council's valuation roll is open data (currently Christchurch, Selwyn, Southland, Kaipara, Ōtorohanga and Kawerau). Anyone else can upload their rates notice or revaluation letter and Fennec reads the CV off it. LINZ doesn't publish sale prices, so Fennec can't show recent sales.
 

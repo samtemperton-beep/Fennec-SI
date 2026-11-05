@@ -20,6 +20,7 @@ function catColor(name: string) {
 interface Transaction {
   id: string; date: string; description: string; amount: number
   category_id: string | null; category?: { name: string } | null
+  category_source?: 'rule' | 'shared' | 'manual' | null; shared_match_id?: string | null; shared_match?: { keyword: string } | null
   account?: { name: string; owner: string } | null
 }
 interface Category { id: string; name: string }
@@ -71,7 +72,7 @@ function TransactionsPageInner() {
   async function loadTransactions() {
     let q = supabase
       .from('fin_transactions')
-      .select('id, date, description, amount, category_id, category:fin_categories(name), account:fin_accounts!inner(name,owner,is_business)')
+      .select('id, date, description, amount, category_id, category_source, shared_match_id, shared_match:shared_category_matches(keyword), category:fin_categories(name), account:fin_accounts!inner(name,owner,is_business)')
       .order('date', { ascending: false })
       .limit(200)
     if (debouncedSearch) q = q.ilike('description', `%${debouncedSearch}%`)
@@ -87,14 +88,33 @@ function TransactionsPageInner() {
   }
 
   async function setCategory(txId: string, categoryId: string, description: string) {
-    const { error } = await supabase.from('fin_transactions').update({ category_id: categoryId }).eq('id', txId)
+    const { error } = await supabase.from('fin_transactions').update({ category_id: categoryId, category_source: 'manual', shared_match_id: null }).eq('id', txId)
     if (error) { toast.error(error.message); return }
     const cat = categories.find(c => c.id === categoryId)
     setTransactions(prev => prev.map(t => t.id === txId
-      ? { ...t, category_id: categoryId, category: cat ? { name: cat.name } : null }
+      ? { ...t, category_id: categoryId, category: cat ? { name: cat.name } : null, category_source: 'manual' as const, shared_match_id: null, shared_match: null }
       : t))
     setEditingCat(null)
     if (cat) setCreatingRule({ txId, description, categoryId, categoryName: cat.name })
+  }
+
+  // Opts out of a shared-list match: it stops applying, and the categories it gave are cleared.
+  async function dismissShared(t: Transaction) {
+    const matchId = t.shared_match_id
+    if (!matchId) return
+    const { error } = await supabase.from('fin_category_optouts')
+      .upsert({ match_id: matchId }, { onConflict: 'user_id,match_id', ignoreDuplicates: true })
+    if (error) { toast.error(error.message); return }
+    const { data: cleared } = await supabase.from('fin_transactions')
+      .update({ category_id: null, category_source: null, shared_match_id: null })
+      .eq('shared_match_id', matchId).eq('category_source', 'shared')
+      .select('id')
+    setTransactions(prev => prev.map(x => x.shared_match_id === matchId && x.category_source === 'shared'
+      ? { ...x, category_id: null, category: null, category_source: null, shared_match_id: null, shared_match: null }
+      : x))
+    setEditingCat(null)
+    const n = cleared?.length ?? 0
+    toast.success(`Won’t match “${t.shared_match?.keyword ?? 'this'}” again. ${n} transaction${n === 1 ? '' : 's'} uncategorised.`)
   }
 
   async function saveRule(pattern: string) {
@@ -110,17 +130,17 @@ function TransactionsPageInner() {
     // Bulk-apply to matching uncategorised household transactions
     const { data: household } = await supabase.from('fin_accounts').select('id').eq('is_business', false)
     const { data: updated } = await supabase.from('fin_transactions')
-      .update({ category_id: creatingRule.categoryId })
+      .update({ category_id: creatingRule.categoryId, category_source: 'rule', shared_match_id: null })
       .in('account_id', (household || []).map(a => a.id))
       .ilike('description', `%${keyword}%`)
-      .is('category_id', null)
+      .or('category_id.is.null,category_source.eq.shared')
       .select('id')
     const count = updated?.length ?? 0
 
     // Also update local state for any visible matches
     setTransactions(prev => prev.map(t =>
-      t.description?.toLowerCase().includes(keyword) && !t.category_id
-        ? { ...t, category_id: creatingRule.categoryId, category: { name: creatingRule.categoryName } }
+      t.description?.toLowerCase().includes(keyword) && (!t.category_id || t.category_source === 'shared')
+        ? { ...t, category_id: creatingRule.categoryId, category: { name: creatingRule.categoryName }, category_source: 'rule' as const, shared_match_id: null, shared_match: null }
         : t
     ))
     toast.success(`Rule saved — auto-categorised ${count ?? 0} existing transactions`)
@@ -208,12 +228,18 @@ function TransactionsPageInner() {
                             {c.name}
                           </button>
                         ))}
+                        {t.category_source === 'shared' && t.shared_match_id && (
+                          <button onClick={() => dismissShared(t)} title="Fennec’s shared list chose this category. This stops it for you."
+                            style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--red)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+                            Not right? Stop matching “{t.shared_match?.keyword ?? 'this'}”
+                          </button>
+                        )}
                         <button onClick={() => setEditingCat(null)} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)', cursor: 'pointer' }}>Cancel</button>
                       </div>
                     ) : (
                       <button onClick={() => setEditingCat(t.id)}
                         style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: catName ? catColor(catName) + '22' : 'var(--surface2)', color: catName ? catColor(catName) : 'var(--text3)', border: catName ? `1px solid ${catColor(catName)}44` : '1px dashed var(--border)', cursor: 'pointer', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
-                        {catName ?? 'Categorise'}
+                        {catName ?? 'Categorise'}{catName && t.category_source === 'shared' && <span title="Categorised by Fennec’s shared list" style={{ marginLeft: 4, opacity: 0.7, fontWeight: 500 }}>· auto</span>}
                       </button>
                     )}
                   </div>
