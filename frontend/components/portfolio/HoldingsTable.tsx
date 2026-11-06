@@ -114,7 +114,7 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
                     title={brokerLabel}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}
                   >
-                    <div style={{ width: 36, height: 36, borderRadius: 9, background: tickerColor(h.ticker), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: 'white', flexShrink: 0, letterSpacing: '-.01em' }}>
+                    <div className="ht-logo" style={{ width: 36, height: 36, borderRadius: 9, background: tickerColor(h.ticker), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: 'white', flexShrink: 0, letterSpacing: '-.01em' }}>
                       {h.ticker.slice(0, 4)}
                     </div>
                     <div>
@@ -130,7 +130,7 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
                         <IconExternalLink size={11} style={{ color: 'var(--primary)', opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s', flexShrink: 0 }} />
                       </div>
                       <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                        {h.shares} shares{h.name ? ` · ${h.ticker}` : ''}
+                        {Number(h.shares.toFixed(4))} shares{h.name ? ` · ${h.ticker}` : ''}
                         {broker && isHovered && (
                           <span style={{ marginLeft: 6, color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
                             {broker.flag} {broker.name} →

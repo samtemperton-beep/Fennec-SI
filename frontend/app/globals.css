@@ -605,7 +605,8 @@ a.nw-part:hover .nw-part-arrow { opacity: 1; transform: translate(1px, -1px); }
 @media (max-width: 640px) {
   .ht-table .ht-wide { display: none; }
   .ht-table .ht-narrow { display: block; }
-  .ht-table th, .ht-table td { padding-left: 10px !important; padding-right: 10px !important; }
+  .ht-table th, .ht-table td { padding-left: 8px !important; padding-right: 8px !important; }
+  .ht-table .ht-logo { display: none !important; }
 }
 
 /* Fox chat on phones: the full width of the screen, above the fox button */
