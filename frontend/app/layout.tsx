@@ -52,6 +52,19 @@ export default function RootLayout({
             } catch(e){}
           })();
         `}} />
+        {/* A failed sign-in link can land on any page (Supabase falls back to the
+            Site URL) with the reason in the hash. Take it to the sign-in page,
+            which explains it (lib/authError.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              var h = location.hash;
+              if (h.indexOf('error_code=') > -1 && location.pathname !== '/login') {
+                location.replace('/login?' + h.slice(1));
+              }
+            } catch(e){}
+          })();
+        `}} />
       </head>
       <body>
         {children}

@@ -30,15 +30,32 @@ export async function GET(request: NextRequest) {
     }
   )
 
+  // Tell the sign-in page why it failed (lib/authError.ts turns this into words).
+  const failed = (params: Record<string, string>) =>
+    NextResponse.redirect(`${origin}/login?${new URLSearchParams(params)}`)
+
+  // Supabase already gave up (e.g. Google sign-in cancelled, link expired): pass its reason on.
+  const sbError = searchParams.get('error')
+  if (sbError && !code && !token_hash) {
+    const params: Record<string, string> = { error: sbError }
+    const ec = searchParams.get('error_code'); if (ec) params.error_code = ec
+    const ed = searchParams.get('error_description'); if (ed) params.error_description = ed
+    return failed(params)
+  }
+
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) return NextResponse.redirect(`${origin}${next}`)
+    // The code only works in the browser that asked for it (it holds the matching verifier).
+    if (/verifier/i.test(error.message)) return failed({ error: 'other_browser' })
+    if (/expired|invalid/i.test(error.message)) return failed({ error: 'auth_failed', error_code: 'otp_expired' })
   }
 
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({ token_hash, type })
     if (!error) return NextResponse.redirect(`${origin}${next}`)
+    if (/expired|invalid/i.test(error.message)) return failed({ error: 'auth_failed', error_code: 'otp_expired' })
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+  return failed({ error: 'auth_failed' })
 }

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { safeNext } from '@/lib/safeNext'
 import { checkEmail } from '@/lib/emailCheck'
 import { checkPassword, PASSWORD_MIN } from '@/lib/password'
+import { readAuthProblem, type AuthProblem } from '@/lib/authError'
 import { FoxIcon } from '@/components/shared/FoxIcon'
 import { IconMail, IconLoader, IconLock, IconEye, IconEyeOff, IconShieldCheck, IconArrowLeft } from '@tabler/icons-react'
 
@@ -31,6 +32,7 @@ export default function LoginPage() {
   const [suggestion, setSuggestion] = useState<string | null>(null) // "Did you mean ...?"
   const [keptEmail, setKeptEmail] = useState('') // the user said their address is right as typed
   const [idleNotice, setIdleNotice] = useState('') // signed out after inactivity (components/shared/SecurityGuard.tsx)
+  const [authProblem, setAuthProblem] = useState<AuthProblem | null>(null) // a sign-in link or Google sign-in failed (lib/authError.ts)
 
   function changeEmail(value: string) {
     setEmail(value)
@@ -73,6 +75,14 @@ export default function LoginPage() {
     if (q.get('signedout') === 'idle') {
       const mins = Number(q.get('after')) || 30
       setIdleNotice(`You were signed out after ${mins >= 60 ? `${mins / 60} hour${mins === 60 ? '' : 's'}` : `${mins} minutes`} without activity, to keep your account safe. You can change this in Settings → Security & privacy.`)
+    }
+    const problem = readAuthProblem(window.location.search, window.location.hash)
+    if (problem) {
+      setAuthProblem(problem)
+      // Tidy the address so a refresh doesn't show the message again.
+      ;['error', 'error_code', 'error_description', 'sb'].forEach(k => q.delete(k))
+      const rest = q.toString()
+      window.history.replaceState(null, '', `/login${rest ? `?${rest}` : ''}`)
     }
   }, [])
 
@@ -398,6 +408,18 @@ export default function LoginPage() {
               <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 24, marginBottom: 6, textAlign: 'center' }}>
                 {mode === 'signup' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : mode === 'newpw' ? 'Choose a new password' : 'Welcome back'}
               </h2>
+              {authProblem && (mode === 'signin' || mode === 'signup') && (
+                <div role="alert" style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: 'var(--text)', fontSize: 13, lineHeight: 1.5, borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+                  {authProblem.message}
+                  {authProblem.offerNewLink && (
+                    <button type="button"
+                      onClick={() => { setMode('signin'); setMethod('magic'); setAuthProblem(null); setError('') }}
+                      style={{ display: 'block', marginTop: 6, background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                      Send a new sign-in link →
+                    </button>
+                  )}
+                </div>
+              )}
               {idleNotice && mode === 'signin' && (
                 <p style={{ background: 'var(--primary-light)', color: 'var(--text)', fontSize: 13, lineHeight: 1.5, borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>{idleNotice}</p>
               )}
