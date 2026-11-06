@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { IconCheck, IconChevronDown, IconExternalLink } from '@tabler/icons-react'
 
 // The Akahu personal app walkthrough, from https://developers.akahu.nz/docs/personal-apps
@@ -9,9 +9,16 @@ import { IconCheck, IconChevronDown, IconExternalLink } from '@tabler/icons-reac
 
 const PHONE_TIP = 'On a phone? Akahu opens in a new tab. To come back here, tap your browser’s tabs button and choose Fennec. Your ticks stay put.'
 
-const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
+// Screenshots of Akahu's screens, one or two per step, in frontend/public/akahu/.
+// A step shows a picture only once its file exists, so new ones can be dropped
+// in without touching this code. Never include a real token or QR code: blur
+// or cover them before saving.
+type Shot = { file: string; alt: string }
+
+const STEPS: { title: string; what: string[]; stuck: string[]; shots: Shot[] }[] = [
   {
     title: 'Create your free Akahu account',
+    shots: [{ file: '1-sign-up.png', alt: 'Akahu’s sign-up page, with the email box and Continue button' }],
     what: [
       'Open my.akahu.nz using the button below. It opens in a new tab, so this page stays here.',
       'Enter your email address, press Continue and follow the prompts.',
@@ -24,6 +31,7 @@ const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
   },
   {
     title: 'Connect your first bank',
+    shots: [{ file: '2-connect-bank.png', alt: 'Akahu’s list of banks to connect' }],
     what: [
       'Follow Akahu’s prompts to connect a bank account. You sign in to your bank through Akahu, and Fennec never sees your banking password.',
       'Akahu needs at least one bank connected before the next step works. You can add your broker and KiwiSaver at the same time.',
@@ -35,6 +43,7 @@ const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
   },
   {
     title: 'Open the Developers page',
+    shots: [{ file: '3-developers-menu.png', alt: 'Akahu’s menu, open, with Developers in it' }],
     what: [
       'While signed in to Akahu, open the menu (the three lines at the top left) and choose Developers. You can also go straight to my.akahu.nz/developers.',
       'Don’t let the name put you off: you don’t need to be a developer, and you won’t need to write any code.',
@@ -45,6 +54,10 @@ const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
   },
   {
     title: 'Agree to the terms and set up security',
+    shots: [
+      { file: '4-terms.png', alt: 'Akahu’s Developer Terms, with the button to agree' },
+      { file: '4-security.png', alt: 'Akahu asking you to set up an authenticator app' },
+    ],
     what: [
       'The first time, Akahu asks you to agree to its Developer Terms.',
       'It also requires multi-factor authentication, which means entering a code from an app on your phone when you sign in. Follow the prompts to set it up.',
@@ -56,6 +69,7 @@ const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
   },
   {
     title: 'Copy your two tokens into Fennec',
+    shots: [{ file: '5-tokens.png', alt: 'Akahu’s Developers page showing the App ID Token and User Access Token, each with a copy button' }],
     what: [
       'Akahu now shows an App ID Token and a User Access Token. These are like keys that let Fennec read your accounts.',
       'Copy each one into the matching box below, then press Connect Akahu. Each box shows a green tick when the token looks right.',
@@ -115,6 +129,7 @@ export function AkahuGuide() {
               {isOpen && (
                 <div style={{ padding: '0 12px 12px 44px' }}>
                   {s.what.map(t => <p key={t} style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.55, margin: '0 0 7px' }}>{t}</p>)}
+                  {s.shots.map(shot => <Screenshot key={shot.file} shot={shot} />)}
                   {i === 0 && (
                     <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer"
                       style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: 'var(--primary-light)', border: '1px solid var(--primary)', color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, textDecoration: 'none', margin: '2px 0 8px' }}>
@@ -135,6 +150,32 @@ export function AkahuGuide() {
         })}
       </div>
     </div>
+  )
+}
+
+// One of Akahu's screens. Stays hidden until the image has loaded, so a step
+// without its file yet just shows the words. Tap to open it full size.
+function Screenshot({ shot }: { shot: Shot }) {
+  const [state, setState] = useState<'loading' | 'ok' | 'missing'>('loading')
+  const img = useRef<HTMLImageElement>(null)
+  // The image may finish before React is listening (server-rendered page).
+  useEffect(() => {
+    const el = img.current
+    if (el?.complete) setState(el.naturalWidth > 0 ? 'ok' : 'missing')
+  }, [])
+  if (state === 'missing') return null
+  const src = `/akahu/${shot.file}`
+  return (
+    <figure style={{ margin: '4px 0 10px', display: state === 'ok' ? 'block' : 'none' }}>
+      <a href={src} target="_blank" rel="noopener noreferrer" title="Open full size">
+        {/* Not loading="lazy": a lazy image inside a hidden box never loads. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img ref={img} src={src} alt={shot.alt}
+          onLoad={() => setState('ok')} onError={() => setState('missing')}
+          style={{ display: 'block', width: '100%', maxWidth: 420, height: 'auto', borderRadius: 8, border: '1px solid var(--border)' }} />
+      </a>
+      <figcaption style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>What it looks like on Akahu. Tap to enlarge.</figcaption>
+    </figure>
   )
 }
 
