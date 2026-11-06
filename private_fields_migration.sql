@@ -1,5 +1,5 @@
--- Private fields: personal identifiers are stored encrypted, and date of birth
--- is kept to the month.
+-- Private fields: personal identifiers are stored encrypted, date of birth is
+-- kept to the month, and each person's security settings have a place to live.
 --
 -- IRD, GST and bank account numbers (business_settings) and the home address
 -- (home_loan.address) are encrypted by Fennec's server with a key that isn't in
@@ -71,6 +71,14 @@ update public.fin_kiwisaver
 alter table public.fin_kiwisaver drop constraint if exists fin_kiwisaver_birth_month_only;
 alter table public.fin_kiwisaver add constraint fin_kiwisaver_birth_month_only
   check (date_of_birth is null or extract(day from date_of_birth) = 1);
+
+-- 4. Security settings each person can ease off (Settings → Security & privacy).
+--    Empty means everything on; see frontend/lib/security.ts. Saved by the
+--    person's own profile update, like the dashboard layout.
+alter table public.profiles add column if not exists security_prefs jsonb not null default '{}'::jsonb;
+alter table public.profiles drop constraint if exists profiles_security_prefs_object;
+alter table public.profiles add constraint profiles_security_prefs_object
+  check (jsonb_typeof(security_prefs) = 'object' and pg_column_size(security_prefs) < 2000);
 
 commit;
 

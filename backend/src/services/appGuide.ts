@@ -8,9 +8,9 @@ export const APP_GUIDE = `ABOUT THE FENNEC APP (use this when the user asks how 
 
 Name: the app is Fennec SI, where SI stands for Save & Invest. People usually just say Fennec.
 
-Layout: the top bar has five sections. Dashboard; Investing; Finance; Business; Community. Next to Settings, an eye button hides every dollar amount on screen (remembered on that device). The account menu (top right) has Settings, Send feedback, theme and sign out. The fox chat (you) is in the bottom-right corner of every page, and the Feedback button is bottom-left.
+Layout: the top bar has five sections. Dashboard; Investing; Finance; Business; Community. Next to Settings, an eye button shows or hides every dollar amount on screen; amounts start hidden (shown as dots) unless the person has turned that off. The account menu (top right) has Settings, Send feedback, theme and sign out. The fox chat (you) is in the bottom-right corner of every page, and the Feedback button is bottom-left.
 
-Dashboard: cards for net worth, spending, portfolio, bills and goals, plus a daily briefing. "Customise" shows, hides and reorders cards. New users see a Getting started checklist.
+Dashboard: cards for net worth, spending, portfolio, bills and goals, plus a daily briefing. "Customise" shows, hides and reorders cards. New users see a Getting started checklist (connect bank, add investments, budget, bill or goal, ask the fox, check security settings).
 
 Investing:
 - My Portfolio: holdings (NZX, ASX, US). Add by hand, import a CSV or screenshot, or sync from a broker through Akahu. Shows gains, dividends, performance against the market, and a buy/hold/sell Stock Analyzer.
@@ -20,14 +20,24 @@ Investing:
 Finance (household):
 - Accounts: bank balances. Bank sync uses Akahu with read-only access, connected from Settings. Accounts can be added by hand too.
 - Transactions: categorise them; "create a rule" auto-categorises matching ones. Common merchants are categorised automatically from Fennec's shared list (marked "auto"); the person's own rules come first, and "Not right? Stop matching" on the category turns a match off for them.
-- Budget: a monthly limit per category. Bills: recurring bills with reminders; Premium can scan Gmail for bills. Goals: savings goals with contributions.
-- KiwiSaver: balance and retirement projection. Home Loan: repayment calculator, plus property details from LINZ (legal description, title, land area) and the council rating valuation (CV) where that council's valuation roll is open data (currently Christchurch, Selwyn, Southland, Kaipara, Ōtorohanga and Kawerau). Anyone else can upload their rates notice or revaluation letter and Fennec reads the CV off it. LINZ doesn't publish sale prices, so Fennec can't show recent sales.
+- Budget: a monthly limit per category. Bills: recurring bills with reminders; the Email Inbox on the Bills page (Premium) scans Gmail for bills. Goals: savings goals with contributions.
+- KiwiSaver: balance (synced from the provider through Akahu, or by hand) and a retirement projection with employer and government contributions; a salary calculator (from an hourly rate or pay before or after tax); "What if" to try other contribution rates, funds or top-ups (not saved); balance history. Month and year of birth are asked for, not the full date.
+- Home Loan: repayments are read from the loan account's own transactions (amount and how often: weekly, fortnightly or monthly) and the actual interest rate from the bank's interest charges, falling back to the details entered in Edit. Shows payoff date, interest to go, progress, equity and LVR, and the next five years. The property address is stored encrypted. Property details from LINZ (legal description, title, land area) and the council rating valuation (CV) where that council's valuation roll is open data (currently Christchurch, Selwyn, Southland, Kaipara, Ōtorohanga and Kawerau). Anyone else can upload their rates notice or revaluation letter and Fennec reads the CV off it. LINZ doesn't publish sale prices, so Fennec can't show recent sales.
 
 Business (Premium): business accounts and transactions, invoices, and GST and income tax estimates. Business accounts are kept out of the household pages.
 
 Community: posts, the leaderboard (Premium verified portfolios), and Notifications, including price alerts.
 
-Settings: profile, plan, bank connection (Akahu), partner sharing, two-factor sign-in, and Delete account. Gmail is connected from the Bills page.
+Settings: profile, plan, bank connection (Akahu), partner sharing, Security & privacy, two-factor sign-in, and Delete account. Gmail is connected from the Bills page.
+
+Security & privacy (Settings): everything starts switched on, and each person can ease off what gets in their way:
+- Hide amounts when Fennec opens (on): dollar amounts show as dots until the eye in the top bar is tapped. Showing them lasts until Fennec is closed.
+- Hide amounts again after 5 minutes away (on).
+- Hide personal details until tapped (on): IRD, GST and bank account numbers, home address, property title details. They stay encrypted either way.
+- Sign out when inactive: 15 minutes, 30 minutes (default), 1 hour, 4 hours or never, with a one-minute warning. If someone asks why they were signed out, this is why.
+- Two-factor sign-in: off until set up, and recommended.
+- Always on and not changeable: data private to each person, encryption of connections and personal details, read-only bank access, month-and-year birth date.
+Recommend keeping these on, especially on shared or work devices, but respect the person's choice.
 
 Plans: Free includes the portfolio (up to 10 holdings), bank sync, budgets, bills, goals, KiwiSaver and home loan tools, this chat and other AI features up to 10 AI uses a day, previews of Discover, and partner sharing. Premium adds unlimited AI and holdings, all Discover picks, Deep Dive research, AI post drafts, Gmail bill scanning, the Business section and a verified portfolio badge. Premium isn't sold yet: the "Request Premium" button sends a request to the team. Limits can change, so if the app shows something different, the app is right.
 

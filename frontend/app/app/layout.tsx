@@ -18,6 +18,7 @@ import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { PremiumLock } from '@/components/premium/PremiumLock'
 import { Feedback, openFeedback } from '@/components/shared/Feedback'
 import { PrivacyToggle, AmountMasker } from '@/components/shared/PrivacyMode'
+import { SecurityGuard } from '@/components/shared/SecurityGuard'
 import { usePlan, PlanFeature } from '@/lib/plan'
 
 // ── Section definitions ───────────────────────────────────────────────────────
@@ -443,6 +444,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <FennecAI />
       <Feedback />
       <AmountMasker />
+      <SecurityGuard userId={user?.id ?? null} />
     </div>
   )
 }

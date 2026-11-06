@@ -30,6 +30,7 @@ export default function LoginPage() {
   const [confirmPw, setConfirmPw] = useState('')
   const [suggestion, setSuggestion] = useState<string | null>(null) // "Did you mean ...?"
   const [keptEmail, setKeptEmail] = useState('') // the user said their address is right as typed
+  const [idleNotice, setIdleNotice] = useState('') // signed out after inactivity (components/shared/SecurityGuard.tsx)
 
   function changeEmail(value: string) {
     setEmail(value)
@@ -68,6 +69,11 @@ export default function LoginPage() {
     const m = new URLSearchParams(window.location.search).get('mode')
     if (m === 'signup') setMode('signup')
     if (m === 'reset') setMode('newpw')
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('signedout') === 'idle') {
+      const mins = Number(q.get('after')) || 30
+      setIdleNotice(`You were signed out after ${mins >= 60 ? `${mins / 60} hour${mins === 60 ? '' : 's'}` : `${mins} minutes`} without activity, to keep your account safe. You can change this in Settings → Security & privacy.`)
+    }
   }, [])
 
   function switchMode(m: Mode) {
@@ -392,9 +398,17 @@ export default function LoginPage() {
               <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 24, marginBottom: 6, textAlign: 'center' }}>
                 {mode === 'signup' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : mode === 'newpw' ? 'Choose a new password' : 'Welcome back'}
               </h2>
-              <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', marginBottom: 28 }}>
+              {idleNotice && mode === 'signin' && (
+                <p style={{ background: 'var(--primary-light)', color: 'var(--text)', fontSize: 13, lineHeight: 1.5, borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>{idleNotice}</p>
+              )}
+              <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', marginBottom: mode === 'signup' ? 10 : 28 }}>
                 {mode === 'signup' ? 'Free to start. No card needed.' : mode === 'forgot' ? "Enter your email and we'll send you a link." : mode === 'newpw' ? `At least ${PASSWORD_MIN} characters.` : 'Sign in to your Fennec account'}
               </p>
+              {mode === 'signup' && (
+                <p style={{ color: 'var(--text3)', fontSize: 12, textAlign: 'center', lineHeight: 1.5, marginBottom: 24 }}>
+                  Every security feature starts switched on: hidden balances, encrypted personal details and automatic sign-out. Adjust them any time in Settings.
+                </p>
+              )}
 
               {mode === 'forgot' && (
                 <form onSubmit={sendReset}>

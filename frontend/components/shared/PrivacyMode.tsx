@@ -1,9 +1,12 @@
 'use client'
 import { useEffect, useSyncExternalStore } from 'react'
 import { IconEye, IconEyeOff } from '@tabler/icons-react'
+import { DEFAULT_SECURITY, readSecurityPrefs, type SecurityPrefs } from '@/lib/security'
 
 // "Hide amounts": one eye in the top bar that hides every dollar amount on
-// screen, for using Fennec where others can see it. Remembered on this device.
+// screen, for using Fennec where others can see it. Whether amounts start
+// hidden is a security setting (lib/security.ts, on by default); tapping the
+// eye lasts until Fennec is closed.
 //
 // Amounts are formatted in well over a hundred places, so rather than change
 // each one, AmountMasker swaps the text of dollar amounts on the page for dots
@@ -13,26 +16,43 @@ import { IconEye, IconEyeOff } from '@tabler/icons-react'
 // Anything inside [data-amounts="show"] is left alone. Inputs aren't text nodes,
 // so forms still show what's being typed.
 
-const STORAGE_KEY = 'fennec-hide-amounts'
+const PREFS_KEY = 'fennec-security-prefs'   // this device's copy of the account's settings
+const SESSION_KEY = 'fennec-amounts-hidden' // the eye's state until Fennec is closed
 const listeners = new Set<() => void>()
+const notify = () => listeners.forEach(l => l())
+const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb) } }
 
-function read(): boolean {
-  try { return localStorage.getItem(STORAGE_KEY) === '1' } catch { return false }
+function readCachedPrefs(): SecurityPrefs {
+  try { return readSecurityPrefs(JSON.parse(localStorage.getItem(PREFS_KEY) || 'null')) } catch { return DEFAULT_SECURITY }
 }
-let hidden = typeof window !== 'undefined' ? read() : false
+function sessionChoice(): boolean | null {
+  try { const v = sessionStorage.getItem(SESSION_KEY); return v === null ? null : v === '1' } catch { return null }
+}
+
+const inBrowser = typeof window !== 'undefined'
+let prefs: SecurityPrefs = inBrowser ? readCachedPrefs() : DEFAULT_SECURITY
+let hidden = inBrowser ? sessionChoice() ?? prefs.hideAmountsOnOpen : false
 
 export function setAmountsHidden(v: boolean) {
   hidden = v
-  try { localStorage.setItem(STORAGE_KEY, v ? '1' : '0') } catch { /* private window */ }
-  listeners.forEach(l => l())
+  try { sessionStorage.setItem(SESSION_KEY, v ? '1' : '0') } catch { /* private window */ }
+  notify()
+}
+
+/** The account's security settings, from the profile. Applies "hide amounts on open" if the eye hasn't been used yet. */
+export function setSecurityPrefs(p: SecurityPrefs) {
+  prefs = p
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)) } catch { /* private window */ }
+  if (sessionChoice() === null) hidden = p.hideAmountsOnOpen
+  notify()
 }
 
 export function useAmountsHidden(): boolean {
-  return useSyncExternalStore(
-    cb => { listeners.add(cb); return () => { listeners.delete(cb) } },
-    () => hidden,
-    () => false,
-  )
+  return useSyncExternalStore(subscribe, () => hidden, () => false)
+}
+
+export function useSecurityPrefs(): SecurityPrefs {
+  return useSyncExternalStore(subscribe, () => prefs, () => DEFAULT_SECURITY)
 }
 
 export function PrivacyToggle({ className }: { className?: string }) {

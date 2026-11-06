@@ -69,6 +69,7 @@ export default function HomeLoanPage() {
   // The address is stored encrypted: the page gets only a hint, and the address
   // itself when the person taps the eye or edits it.
   const [addressHint, setAddressHint] = useState<string | null>(null)
+  const [addressVersion, setAddressVersion] = useState(0) // remounts the hidden address after a save
   const [addressEdited, setAddressEdited] = useState(false)
   const [loadingAddress, setLoadingAddress] = useState(false)
 
@@ -78,6 +79,7 @@ export default function HomeLoanPage() {
     try {
       const { fields } = await api.getPrivateFields()
       setAddressHint(fields.home_address.hint)
+      setAddressVersion(v => v + 1)
     } catch { setAddressHint(null) }
   }
 
@@ -280,7 +282,7 @@ export default function HomeLoanPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Home Loan</h1>
-          {addressHint && <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}><Secret field="home_address" hint={addressHint} /></p>}
+          {addressHint && <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}><Secret key={addressVersion} field="home_address" hint={addressHint} /></p>}
         </div>
         {!editing ? (
           <button onClick={() => { setDraft({ ...loan, address: '' }); setAddressEdited(false); setEditing(true) }}

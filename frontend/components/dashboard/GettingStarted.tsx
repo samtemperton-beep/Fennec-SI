@@ -32,8 +32,12 @@ export function GettingStarted({ userId }: { userId: string | null }) {
       count(supabase.from('fin_categories').select('id', { count: 'exact', head: true }).gt('monthly_budget', 0)),
       count(supabase.from('fin_bills').select('id', { count: 'exact', head: true })),
       count(supabase.from('fin_goals').select('id', { count: 'exact', head: true })),
-    ]).then(([bank, holding, budget, bill, goal]) => setDone({
-      bank, holding, budget, billsGoals: bill || goal, fox: read(ASKED_FOX_KEY) === '1',
+      // Security: done once two-factor is on or the settings have been looked at.
+      supabase.auth.mfa.listFactors().then(({ data }) => (data?.totp ?? []).some(f => f.status === 'verified')).catch(() => false),
+      Promise.resolve(supabase.from('profiles').select('security_prefs').eq('id', userId).maybeSingle())
+        .then(({ data }) => !!(data?.security_prefs as { reviewedAt?: string } | null)?.reviewedAt).catch(() => false),
+    ]).then(([bank, holding, budget, bill, goal, twoFactor, reviewed]) => setDone({
+      bank, holding, budget, billsGoals: bill || goal, fox: read(ASKED_FOX_KEY) === '1', security: twoFactor || reviewed,
     })).catch(() => { /* leave it hidden */ })
   }, [userId])
 
@@ -46,6 +50,7 @@ export function GettingStarted({ userId }: { userId: string | null }) {
     { id: 'billsGoals', title: 'Add a bill or a savings goal', body: 'Fennec reminds you before bills are due.', href: '/app/finance/bills', cta: 'Add', done: done.billsGoals },
     { id: 'fox', title: 'Ask Fennec a question', body: 'Tap the fox in the bottom corner. It knows your numbers.', cta: 'How', done: done.fox,
       action: () => toast('Tap the fox in the bottom-right corner of any page and ask anything, like "Where am I overspending?"') },
+    { id: 'security', title: 'Check your security settings', body: 'Everything starts on. Turn on two-factor sign-in, and ease off anything that gets in your way.', href: '/app/settings#security', cta: 'Check', done: done.security },
   ]
   const finished = steps.filter(s => s.done).length
   if (finished === steps.length) return null

@@ -10,6 +10,7 @@ import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { api } from '@/lib/api'
 import { DeleteAccount } from '@/components/settings/DeleteAccount'
 import { PartnerCard } from '@/components/settings/PartnerCard'
+import { SecurityCard } from '@/components/settings/SecurityCard'
 import { openFeedback } from '@/components/shared/Feedback'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -609,8 +610,11 @@ export default function SettingsPage() {
       {/* Partner sharing */}
       <div className="mt-6"><PartnerCard /></div>
 
+      {/* Security & privacy: what starts on, and what can be eased off */}
+      <SecurityCard userId={user?.id ?? null} twoFactorOn={mfaFactors.length > 0} />
+
       {/* Two-Factor Authentication */}
-      <div className="card mt-6">
+      <div className="card mt-6" id="two-factor" style={{ scrollMarginTop: 80 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <IconShieldCheck size={16} style={{ color: 'var(--primary)' }} />
           <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>Two-Factor Authentication</h2>

@@ -93,11 +93,11 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="7. Security">
-          Information is encrypted in transit (HTTPS) and at rest. On top of that, bank and Gmail connection keys, IRD, GST and bank account numbers, and your home address are encrypted with a key held separately from the database, so a copy of the database alone wouldn&apos;t reveal them. For KiwiSaver we keep only the month and year you were born, not the full date. On screen, those details stay hidden until you tap the eye next to them, and the eye in the top bar hides every dollar amount. Database rules keep each person&apos;s records to themselves, and you can turn on two-factor sign-in in Settings. Bank access is read-only. No system is completely secure, so please use a strong, unique password, and tell us straight away if you think your account has been accessed by someone else.
+          Information is encrypted in transit (HTTPS) and at rest. On top of that, bank and Gmail connection keys, IRD, GST and bank account numbers, and your home address are encrypted with a key held separately from the database, so a copy of the database alone wouldn&apos;t reveal them. For KiwiSaver we keep only the month and year you were born, not the full date. On screen, dollar amounts and those details start hidden until you tap the eye, and you&apos;re signed out after a period without activity. You can adjust these in Settings → Security &amp; privacy. Database rules keep each person&apos;s records to themselves, and you can turn on two-factor sign-in in Settings. Bank access is read-only. No system is completely secure, so please use a strong, unique password, and tell us straight away if you think your account has been accessed by someone else.
         </Section>
 
         <Section title="8. Cookies and browser storage">
-          We use cookies set by our sign-in provider to keep you signed in. Your browser also stores a few preferences, such as light or dark theme and cards you&apos;ve hidden. We don&apos;t use advertising or tracking cookies.
+          We use cookies set by our sign-in provider to keep you signed in. Your browser also stores a few preferences, such as light or dark theme, cards you&apos;ve hidden and your security settings, and the time you were last active (so Fennec can sign you out when you&apos;re away). We don&apos;t use advertising or tracking cookies.
         </Section>
 
         <Section title="9. How long we keep it">

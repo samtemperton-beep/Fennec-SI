@@ -6,7 +6,7 @@ import { api } from '@/lib/api'
 import { AkahuGuide } from '@/components/onboarding/AkahuGuide'
 import { SetupHelpChat } from '@/components/onboarding/SetupHelpChat'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { IconCheck, IconArrowRight, IconPlugConnected, IconUpload, IconExternalLink, IconChartBar, IconWallet, IconNewSection, IconUsers, IconBriefcase } from '@tabler/icons-react'
+import { IconCheck, IconArrowRight, IconPlugConnected, IconUpload, IconExternalLink, IconChartBar, IconWallet, IconNewSection, IconUsers, IconBriefcase, IconShieldLock } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 const FEATURES = [
@@ -486,6 +486,22 @@ export default function OnboardingPage() {
                   <IconCheck size={14} style={{ color: 'var(--green)', marginLeft: 'auto', flexShrink: 0 }} />
                 </div>
               )}
+            </div>
+
+            {/* Security starts fully on; see lib/security.ts */}
+            <div style={{ textAlign: 'left', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)', marginBottom: 24 }}>
+              <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
+                <IconShieldLock size={16} style={{ color: 'var(--primary)' }} /> Your account starts with every security feature on
+              </p>
+              <ul style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.7, paddingLeft: 18, margin: 0 }}>
+                <li>Dollar amounts are hidden until you tap the eye in the top bar</li>
+                <li>IRD and bank account numbers and your home address are encrypted, and hidden until you tap to show them</li>
+                <li>You&apos;re signed out after 30 minutes without activity</li>
+                <li>Only you can see your data, and bank access is read-only</li>
+              </ul>
+              <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8, lineHeight: 1.5 }}>
+                Change these in Settings → Security &amp; privacy. We also recommend turning on two-factor sign-in there.
+              </p>
             </div>
 
             <button onClick={finish} disabled={saving}
