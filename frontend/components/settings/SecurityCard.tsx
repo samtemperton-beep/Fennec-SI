@@ -37,7 +37,7 @@ export function SecurityCard({ userId, twoFactorOn }: { userId: string | null; t
 
       <Toggle label="Hide amounts when Fennec opens" checked={prefs.hideAmountsOnOpen} disabled={saving}
         onChange={v => save({ hideAmountsOnOpen: v })}>
-        Dollar amounts show as ••••• until you tap the eye in the top bar. Handy when people can see your screen.
+        Your own dollar amounts show as ••••• until you tap the eye in the top bar. Market figures, like share prices on the Investing pages, always show. Handy when people can see your screen.
       </Toggle>
       <Toggle label={`Hide amounts again after ${AWAY_MINUTES} minutes away`} checked={prefs.rehideAfterAway} disabled={saving}
         onChange={v => save({ rehideAfterAway: v })}>

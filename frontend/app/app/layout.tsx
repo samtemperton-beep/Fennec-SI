@@ -112,6 +112,15 @@ const SECTIONS = {
 
 type SectionKey = keyof typeof SECTIONS
 
+// Pages that only show market data (share prices, estimates, picks, news) or
+// public posts, never the person's own money. The eye's "hide amounts" leaves
+// these alone, so a share price isn't dots. They use the person's tickers only
+// to label things. Pages with any of their own figures stay off this list.
+const MARKET_DATA_PAGES = ['/app/top10', '/app/opportunities', '/app/watchlist', '/app/news', '/app/newsletters', '/app/ipo', '/app/community', '/app/leaderboard']
+function showsMarketDataOnly(pathname: string): boolean {
+  return MARKET_DATA_PAGES.some(p => pathname === p || pathname.startsWith(p + '/'))
+}
+
 function getActiveSection(pathname: string): SectionKey {
   if (pathname === '/app/dashboard') return 'dashboard'
   if (pathname.startsWith('/app/finance/business')) return 'business'
@@ -437,7 +446,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <div key={pathname} className={`app-page${slideDir ? ` swipe-in-${slideDir}` : ''}`}>
+        <div key={pathname} className={`app-page${slideDir ? ` swipe-in-${slideDir}` : ''}`}
+          data-amounts={showsMarketDataOnly(pathname) ? 'show' : undefined}>
           {lockedPage ? <div style={{ padding: '0 16px' }}><PremiumLock title={lockedPage.title} blurb={lockedPage.blurb} /></div> : children}
         </div>
       </main>

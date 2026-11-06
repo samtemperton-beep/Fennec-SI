@@ -8,7 +8,7 @@ export const APP_GUIDE = `ABOUT THE FENNEC APP (use this when the user asks how 
 
 Name: the app is Fennec SI, where SI stands for Save & Invest. People usually just say Fennec.
 
-Layout: the top bar has five sections. Dashboard; Investing; Finance; Business; Community. Next to Settings, an eye button shows or hides every dollar amount on screen; amounts start hidden (shown as dots) unless the person has turned that off. The account menu (top right) has Settings, Send feedback, theme and sign out. The fox chat (you) is in the bottom-right corner of every page, and the Feedback button is bottom-left.
+Layout: the top bar has five sections. Dashboard; Investing; Finance; Business; Community. Next to Settings, an eye button shows or hides the person's own dollar amounts (balances, spending, bills, goals, KiwiSaver, home loan, portfolio values); they start hidden (shown as dots) unless the person has turned that off. Market figures on Today's Picks, Discover, Watchlist, News, Newsletters, Events, Community and the Leaderboard always show, since they aren't personal. On My Portfolio, share prices are hidden too, because with the share count they would give away the value. The account menu (top right) has Settings, Send feedback, theme and sign out. The fox chat (you) is in the bottom-right corner of every page, and the Feedback button is bottom-left.
 
 Dashboard: cards for net worth, spending, portfolio, bills and goals, plus a daily briefing. "Customise" shows, hides and reorders cards. New users see a Getting started checklist (connect bank, add investments, budget, bill or goal, ask the fox, check security settings).
 
