@@ -109,7 +109,7 @@ export default function CommunityPage() {
   const withLikes = filtered.map(p => ({ ...p, liked: likedIds.has(p.id) }))
 
   return (
-    <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1fr 260px', gap: 20 }} className="grid-cols-1 xl:grid-cols-[1fr_260px]">
+    <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 260px', gap: 20 }} className="m-stack m-pad">
       <div>
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Community</h1>

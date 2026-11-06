@@ -593,3 +593,33 @@ a.nw-part:hover .nw-part-arrow { opacity: 1; transform: translate(1px, -1px); }
   .feedback-fab { bottom: 20px; left: 14px; padding: 10px; }
   .feedback-fab-label { display: none; }
 }
+
+/* Phones: a row of columns wraps onto two lines, first cell on its own line */
+@media (max-width: 640px) {
+  .m-wrap-row { display: flex !important; flex-wrap: wrap; column-gap: 12px !important; row-gap: 2px !important; }
+  .m-wrap-row > :first-child { flex-basis: 100%; }
+}
+
+/* Holdings table: phones show gain and return under the value */
+.ht-narrow { display: none; }
+@media (max-width: 640px) {
+  .ht-table .ht-wide { display: none; }
+  .ht-table .ht-narrow { display: block; }
+  .ht-table th, .ht-table td { padding-left: 10px !important; padding-right: 10px !important; }
+}
+
+/* Fox chat on phones: the full width of the screen, above the fox button */
+@media (max-width: 640px) {
+  .fox-chat-panel { left: 8px !important; right: 8px !important; width: auto !important; bottom: 92px !important; max-height: calc(100dvh - 150px) !important; }
+}
+
+/* Phones: side-by-side columns stack, table headers that no longer line up hide */
+@media (max-width: 640px) {
+  .m-stack { grid-template-columns: minmax(0, 1fr) !important; }
+  .m-pad { padding: 16px 14px 32px !important; }
+  .m-hide { display: none !important; }
+  /* Invoice line: description on its own line, then quantity, price, total, remove */
+  .inv-line { grid-template-columns: 1fr 1fr 1fr 32px !important; row-gap: 6px; }
+  .inv-line > :first-child { grid-column: 1 / -1; margin-right: 0 !important; }
+  .inv-line > input { min-width: 0; }
+}

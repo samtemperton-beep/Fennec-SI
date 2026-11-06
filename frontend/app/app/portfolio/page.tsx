@@ -500,8 +500,8 @@ export default function PortfolioPage() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20 }} className="xl:grid-cols-[1fr_300px] grid-cols-1">
-          <div className="space-y-4">
+        <div>
+          <div className="space-y-4" style={{ minWidth: 0 }}>
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '20px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
                 <div>

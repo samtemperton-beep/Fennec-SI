@@ -545,9 +545,9 @@ export function FennecAI() {
 
       {/* Chat panel */}
       {open && (
-        <div style={{
+        <div className="fox-chat-panel" style={{
           position: 'fixed', bottom: 88, right: 24, zIndex: 9997,
-          width: 400, maxHeight: 560,
+          width: 400, maxHeight: 'min(560px, calc(100dvh - 110px))',
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 16, display: 'flex', flexDirection: 'column',
           boxShadow: '0 12px 50px rgba(0,0,0,0.2)',

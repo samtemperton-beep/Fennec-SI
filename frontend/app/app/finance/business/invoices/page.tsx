@@ -279,7 +279,7 @@ function InvoiceModal({ invoice, settings, allInvoices, onClose, onSaved }: {
 
         <div style={{ padding: 20 }}>
           {/* Invoice meta */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }}>
+          <div className="m-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }}>
             <div>
               <label style={labelStyle}>Invoice #</label>
               <input value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} style={inputStyle} />
@@ -297,7 +297,7 @@ function InvoiceModal({ invoice, settings, allInvoices, onClose, onSaved }: {
           {/* Client */}
           <div style={{ padding: 16, borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 20 }}>
             <p style={{ ...labelStyle, marginBottom: 10 }}>Client Details</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div className="m-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div>
                 <label style={{ ...labelStyle, fontSize: 10 }}>Name *</label>
                 <input value={form.client_name} onChange={e => setForm(f => ({ ...f, client_name: e.target.value }))} placeholder="Client or company name" style={inputStyle} />
@@ -318,13 +318,13 @@ function InvoiceModal({ invoice, settings, allInvoices, onClose, onSaved }: {
           <div style={{ marginBottom: 20 }}>
             <p style={{ ...labelStyle, marginBottom: 10 }}>Line Items</p>
             <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 110px 90px 32px', gap: 0, background: 'var(--surface2)', padding: '7px 12px', borderBottom: '1px solid var(--border)' }}>
+              <div className="m-hide" style={{ display: 'grid', gridTemplateColumns: '1fr 72px 110px 90px 32px', gap: 0, background: 'var(--surface2)', padding: '7px 12px', borderBottom: '1px solid var(--border)' }}>
                 {['Description', 'Qty', 'Unit Price', 'Total', ''].map(h => (
                   <span key={h} style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 700, fontFamily: 'Syne, sans-serif', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</span>
                 ))}
               </div>
               {items.map((item, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 72px 110px 90px 32px', gap: 0, padding: '8px 12px', borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center' }}>
+                <div key={i} className="inv-line" style={{ display: 'grid', gridTemplateColumns: '1fr 72px 110px 90px 32px', gap: 0, padding: '8px 12px', borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center' }}>
                   <input value={item.description} onChange={e => setItem(i, 'description', e.target.value)} placeholder="Service description…"
                     style={{ ...inputStyle, width: 'auto', marginRight: 8 }} />
                   <input type="number" value={item.quantity} min={0} onChange={e => setItem(i, 'quantity', e.target.value)}
@@ -454,22 +454,22 @@ function SettingsModal({ settings, hints, onClose, onSaved }: { settings: BizSet
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: 'var(--surface)', borderRadius: 16, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 16, width: '100%', maxWidth: 520, maxHeight: '90dvh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 15, margin: 0 }}>Business Details</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', lineHeight: 0 }}><IconX size={16} /></button>
         </div>
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="m-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div><label style={labelStyle}>Business Name</label><input value={form.business_name} onChange={e => setForm(f => ({ ...f, business_name: e.target.value }))} style={inputStyle} /></div>
             <div><label style={labelStyle}>Email</label><input value={form.business_email} onChange={e => setForm(f => ({ ...f, business_email: e.target.value }))} style={inputStyle} /></div>
           </div>
           <div><label style={labelStyle}>Address</label><textarea value={form.business_address} onChange={e => setForm(f => ({ ...f, business_address: e.target.value }))} rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} /></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="m-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div><label style={labelStyle}>Phone</label><input value={form.business_phone} onChange={e => setForm(f => ({ ...f, business_phone: e.target.value }))} style={inputStyle} /></div>
             <div><label style={labelStyle}>Bank Account</label><input value={form.bank_account} onChange={e => setId('bank_account', e.target.value)} placeholder={idPlaceholder('bank_account', '12-3456-7890123-00')} autoComplete="off" style={inputStyle} /></div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 10 }}>
+          <div className="m-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 10 }}>
             <div><label style={labelStyle}>IRD Number</label><input value={form.ird_number} onChange={e => setId('ird_number', e.target.value)} placeholder={idPlaceholder('ird_number', '123-456-789')} autoComplete="off" style={inputStyle} /></div>
             <div><label style={labelStyle}>GST Number</label><input value={form.gst_number} onChange={e => setId('gst_number', e.target.value)} placeholder={idPlaceholder('gst_number', '123-456-789')} autoComplete="off" style={inputStyle} /></div>
             <div><label style={labelStyle}>Pay Terms</label>
@@ -620,7 +620,7 @@ export default function InvoicesPage() {
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 110px 90px 100px', gap: 0, padding: '10px 18px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)' }}>
+          <div className="m-hide" style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 110px 90px 100px', gap: 0, padding: '10px 18px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)' }}>
             {['Invoice', 'Client', 'Issued', 'Due', 'Total', 'Status'].map(h => (
               <span key={h} style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'Syne, sans-serif', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em' }}>{h}</span>
             ))}
@@ -628,7 +628,7 @@ export default function InvoicesPage() {
           {invoices.map((inv, i) => {
             const { total } = calcTotals(inv.items || [], settings.gst_registered && !inv.gst_excluded)
             return (
-              <div key={inv.id} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 110px 90px 100px', gap: 0, padding: '13px 18px', borderBottom: i < invoices.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center' }}>
+              <div key={inv.id} className="m-wrap-row" style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 110px 90px 100px', gap: 0, padding: '13px 18px', borderBottom: i < invoices.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center' }}>
                 <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 600, color: 'var(--primary)' }}>{inv.invoice_number}</span>
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{inv.client_name}</p>

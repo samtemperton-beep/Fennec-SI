@@ -72,8 +72,8 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
     return dir === 1 ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />
   }
 
-  const th = (k: SortKey, label: string, align: 'left' | 'right' = 'right') => (
-    <th onClick={() => toggleSort(k)}
+  const th = (k: SortKey, label: string, align: 'left' | 'right' = 'right', className?: string) => (
+    <th className={className} onClick={() => toggleSort(k)}
       style={{ cursor: 'pointer', color: sort === k ? 'var(--primary)' : 'var(--text3)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '12px 16px', textAlign: align, whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }}
     >
       <span className="inline-flex items-center gap-1">{label}<SortIcon k={k} /></span>
@@ -85,13 +85,13 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
 
   return (
     <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table className="ht-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
             {th('ticker', 'Stock', 'left')}
             {th('current_price', 'Value')}
-            {th('pl', 'Your gain')}
-            {th('plpct', 'Return')}
+            {th('pl', 'Your gain', 'right', 'ht-wide')}
+            {th('plpct', 'Return', 'right', 'ht-wide')}
             <th style={{ color: 'var(--text3)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '12px 16px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>Signal</th>
           </tr>
         </thead>
@@ -155,11 +155,15 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
                       </span>
                     )}
                   </p>
+                  {/* Phones: gain and return go under the value instead of their own columns */}
+                  <p className="ht-narrow" style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 600, marginTop: 2, color: pl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                    {pl >= 0 ? '+' : ''}{fmtCurrency(pl)} · {fmtPct(plpct)}
+                  </p>
                 </td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: pl >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
+                <td className="ht-wide" style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: pl >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
                   {pl >= 0 ? '+' : ''}{fmtCurrency(pl)}
                 </td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: plpct >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
+                <td className="ht-wide" style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: plpct >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
                   {fmtPct(plpct)}
                 </td>
                 <td style={{ padding: '12px', textAlign: 'center' }}>
@@ -169,7 +173,7 @@ export function HoldingsTable({ holdings, analyzingSet, onDelete, onAnalyze, bro
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                       <SignalBadge signal={h.signal} />
                       {h.signal_reason && (
-                        <span style={{ fontSize: 10, color: 'var(--text2)', maxWidth: 140, textAlign: 'center', display: 'block', lineHeight: 1.3 }} title={h.signal_reason}>
+                        <span className="ht-wide" style={{ fontSize: 10, color: 'var(--text2)', maxWidth: 140, textAlign: 'center', display: 'block', lineHeight: 1.3 }} title={h.signal_reason}>
                           {h.signal_reason.slice(0, 60)}{h.signal_reason.length > 60 ? '…' : ''}
                         </span>
                       )}

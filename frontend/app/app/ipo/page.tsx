@@ -429,7 +429,7 @@ export default function EventsPage() {
                   const daysAway = Math.ceil((new Date(ev.date).getTime() - today.getTime()) / 86400000)
                   const timeLabel = ev.hour === 'bmo' ? 'BMO' : ev.hour === 'amc' ? 'AMC' : ''
                   return (
-                    <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 16px', cursor: 'pointer' }}
+                    <div key={i} className="card" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 14px', padding: '10px 16px', cursor: 'pointer' }}
                       onClick={() => { setViewYear(new Date(ev.date).getFullYear()); setViewMonth(new Date(ev.date).getMonth()); setSelectedDate(ev.date) }}
                     >
                       <div style={{ fontFamily: 'DM Mono, monospace', fontWeight: 800, fontSize: 13, minWidth: 38, textAlign: 'center',
@@ -437,7 +437,7 @@ export default function EventsPage() {
                         {daysAway === 0 ? 'Today' : daysAway === 1 ? 'Tmrw' : `${daysAway}d`}
                       </div>
                       <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, minWidth: 60 }}>{ev.symbol}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text2)', flex: 1 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text2)', flex: '1 1 150px' }}>
                         Q{ev.quarter} {ev.year}
                         {timeLabel ? ` · ${timeLabel}` : ''}
                         {' · '}{new Date(ev.date + 'T12:00:00').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}

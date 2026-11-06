@@ -77,7 +77,7 @@ export function Feedback() {
         <div onClick={() => !sending && setOpen(false)}
           style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <form onSubmit={send} onClick={e => e.stopPropagation()} className="card"
-            style={{ width: '100%', maxWidth: 440, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            style={{ width: '100%', maxWidth: 440, maxHeight: '90dvh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 16 }}>Send feedback</h2>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer' }}><IconX size={18} /></button>

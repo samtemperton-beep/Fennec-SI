@@ -186,7 +186,7 @@ export function WhatIf({
           {[{ key: 'now', label: 'Your plan', defaultReturn: base.expectedReturn, range: current }, ...funds].map((f, i) => {
             const diff = f.range ? f.range.expected.finalBalance - current.expected.finalBalance : 0
             return (
-              <div key={f.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px,1fr) 70px minmax(90px,1fr) minmax(120px,1.4fr)', gap: 8, padding: '8px 12px', fontSize: 11, alignItems: 'center', background: i === 0 ? 'var(--surface2)' : 'transparent', borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
+              <div key={f.key} className="m-wrap-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(90px,1fr) 70px minmax(90px,1fr) minmax(120px,1.4fr)', gap: 8, padding: '8px 12px', fontSize: 11, alignItems: 'center', background: i === 0 ? 'var(--surface2)' : 'transparent', borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
                 <span style={{ fontWeight: 700 }}>{f.label}</span>
                 <span style={{ color: 'var(--text3)' }}>{f.defaultReturn}% a year</span>
                 <span style={{ fontFamily: 'DM Mono, monospace' }}>

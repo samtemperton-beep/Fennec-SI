@@ -94,7 +94,7 @@ export function IncomeCard({ view, onToggleTax, onRetry }: { view: IncomeView; o
             {e.payers.map((p, i) => {
               const t = trendLabel(p.trend)
               return (
-                <div key={p.ticker} style={{ display: 'grid', gridTemplateColumns: 'minmax(110px,1.3fr) minmax(70px,0.8fr) minmax(80px,1fr) 60px minmax(90px,1fr)', gap: 8, padding: '8px 12px', fontSize: 11, alignItems: 'center', borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
+                <div key={p.ticker} className="m-wrap-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(110px,1.3fr) minmax(70px,0.8fr) minmax(80px,1fr) 60px minmax(90px,1fr)', gap: 8, padding: '8px 12px', fontSize: 11, alignItems: 'center', borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ fontWeight: 700 }}>{p.ticker}</span>
                     {t && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: t === 'Raised' ? 'var(--green)' : 'var(--red)' }}>{t}</span>}
