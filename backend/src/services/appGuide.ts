@@ -28,7 +28,7 @@ Business (Premium): business accounts and transactions, invoices, and GST and in
 
 Community: posts, the leaderboard (Premium verified portfolios), and Notifications, including price alerts.
 
-Settings: profile, plan, bank connection (Akahu), partner sharing, Security & privacy, two-factor sign-in, and Delete account. Gmail is connected from the Bills page.
+Settings: profile, plan, bank connection (Akahu Sync, with the same step-by-step guide as sign-up behind "Not sure how? Show me step by step"), partner sharing, Security & privacy, two-factor sign-in, and Delete account. Gmail is connected from the Bills page.
 
 Security & privacy (Settings): everything starts switched on, and each person can ease off what gets in their way:
 - Hide amounts when Fennec opens (on): dollar amounts show as dots until the eye in the top bar is tapped. Showing them lasts until Fennec is closed.

@@ -12,6 +12,11 @@ import { DeleteAccount } from '@/components/settings/DeleteAccount'
 import { PartnerCard } from '@/components/settings/PartnerCard'
 import { SecurityCard } from '@/components/settings/SecurityCard'
 import { openFeedback } from '@/components/shared/Feedback'
+import { AkahuGuide, AkahuBeforeYouStart } from '@/components/onboarding/AkahuGuide'
+import { AkahuTokenInput } from '@/components/onboarding/AkahuTokenInput'
+
+const TOKEN_LABEL: React.CSSProperties = { display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }
+const TOKEN_INPUT: React.CSSProperties = { width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }
 import Link from 'next/link'
 import { toast } from 'sonner'
 
@@ -708,6 +713,7 @@ function AkahuSettings({ supabase }: { supabase: any }) {
   const [problem, setProblem] = useState<{ problem: string; detail: string | null } | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
 
   useEffect(() => {
     // Only the row's existence is needed; the token columns aren't readable from the browser.
@@ -756,19 +762,21 @@ function AkahuSettings({ supabase }: { supabase: any }) {
             : <><strong>{problem.detail}</strong> needs reconnecting. Sign in at <a href="https://my.akahu.nz" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>my.akahu.nz</a> and reconnect it. Your tokens stay the same, so there&apos;s nothing to change here.</>}
         </div>
       )}
+      {/* The step-by-step guide from sign-up, for anyone connecting (or reconnecting) from here */}
+      {(!hasCreds || problem?.problem === 'tokens') && (
+        <div style={{ marginBottom: 14 }}>
+          <button type="button" onClick={() => setShowGuide(g => !g)} aria-expanded={showGuide}
+            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            {showGuide ? 'Hide the step-by-step guide' : 'Not sure how? Show me step by step'}
+          </button>
+          {showGuide && <div style={{ marginTop: 12 }}>{!hasCreds && <AkahuBeforeYouStart />}<AkahuGuide /></div>}
+        </div>
+      )}
       <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>App ID Token</label>
-          <input type="password" value={appToken} onChange={e => setAppToken(e.target.value)}
-            placeholder={hasCreds ? '••••••••• (saved)' : 'app_token_...'}
-            style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>User Access Token</label>
-          <input type="password" value={userToken} onChange={e => setUserToken(e.target.value)}
-            placeholder={hasCreds ? '••••••••• (saved)' : 'user_token_...'}
-            style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none' }} />
-        </div>
+        <AkahuTokenInput kind="app" value={appToken} onChange={setAppToken} placeholder={hasCreds ? '••••••••• (saved)' : undefined}
+          labelStyle={TOKEN_LABEL} inputStyle={TOKEN_INPUT} />
+        <AkahuTokenInput kind="user" value={userToken} onChange={setUserToken} placeholder={hasCreds ? '••••••••• (saved)' : undefined}
+          labelStyle={TOKEN_LABEL} inputStyle={TOKEN_INPUT} />
         <button type="submit" disabled={saving || (!appToken && !userToken)}
           style={{ padding: '9px 20px', borderRadius: 8, background: 'var(--primary)', color: 'white', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: saving || (!appToken && !userToken) ? 0.6 : 1, width: 'fit-content' }}>
           {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Akahu Tokens'}

@@ -7,12 +7,15 @@ import { IconCheck, IconChevronDown, IconExternalLink } from '@tabler/icons-reac
 // what "done" looks like, and what to try if it doesn't work. One step opens at a
 // time, ticks stay put, and Akahu opens in a new tab so this page stays where it is.
 
+const PHONE_TIP = 'On a phone? Akahu opens in a new tab. To come back here, tap your browser’s tabs button and choose Fennec. Your ticks stay put.'
+
 const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
   {
     title: 'Create your free Akahu account',
     what: [
       'Open my.akahu.nz using the button below. It opens in a new tab, so this page stays here.',
       'Enter your email address, press Continue and follow the prompts.',
+      PHONE_TIP,
     ],
     stuck: [
       'Waiting on an email from Akahu? Check your spam folder.',
@@ -55,7 +58,8 @@ const STEPS: { title: string; what: string[]; stuck: string[] }[] = [
     title: 'Copy your two tokens into Fennec',
     what: [
       'Akahu now shows an App ID Token and a User Access Token. These are like keys that let Fennec read your accounts.',
-      'Copy each one into the matching box below, then press Connect Akahu.',
+      'Copy each one into the matching box below, then press Connect Akahu. Each box shows a green tick when the token looks right.',
+      'On a phone, do one token at a time: copy it, switch back to this tab, paste it, then go back to Akahu for the other.',
       'Keep them private, like a password.',
     ],
     stuck: [
@@ -130,6 +134,22 @@ export function AkahuGuide() {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// Shown before people start, so the time, the authenticator app and the
+// tab-switching aren't a surprise halfway through.
+export function AkahuBeforeYouStart() {
+  return (
+    <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 20 }}>
+      <p style={{ fontSize: 11, fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'var(--text)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Before you start</p>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.6 }}>
+        <li>It takes about 10 minutes and it&apos;s free. We&apos;ll guide you one step at a time.</li>
+        <li>Have your bank login handy, and an authenticator app on your phone (Google or Microsoft Authenticator, both free). Akahu asks you to set one up.</li>
+        <li>It&apos;s easiest on a computer, because you&apos;ll copy two codes from Akahu into Fennec. On a phone it works too, with some switching between tabs.</li>
+        <li>No time now? Skip it and connect later from Settings → Akahu Sync.</li>
+      </ul>
     </div>
   )
 }

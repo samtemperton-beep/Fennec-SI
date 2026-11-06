@@ -20,7 +20,7 @@ export const FAQ: FaqTopic[] = [
   {
     topic: 'Bank accounts and spending',
     items: [
-      { q: 'How do I connect my bank?', a: 'Go to Settings and connect through Akahu, a New Zealand open-banking service. You choose which accounts to share with Fennec. You can also add accounts by hand on the Accounts page.' },
+      { q: 'How do I connect my bank?', a: 'Through Akahu, a New Zealand open-banking service, either during sign-up or later in Settings → Akahu Sync (tap "Not sure how? Show me step by step"). You create a free Akahu account, connect your bank there, then make a free "personal app" on Akahu\'s Developers page, which gives you two codes (an App ID Token and a User Access Token) to paste into Fennec. It takes about 10 minutes. Akahu asks you to set up an authenticator app, and it\'s easiest on a computer because you copy the codes between two websites. Each box shows a green tick when a code looks right. You can also add accounts by hand on the Accounts page.' },
       { q: 'Is connecting my bank safe?', a: 'Akahu gives Fennec read-only access: Fennec can see balances and transactions but can\'t move money or make payments. You never give Fennec your bank password, and you can revoke access at any time in Settings or through Akahu.' },
       { q: 'Which banks work?', a: 'Most major New Zealand banks and many investment platforms that Akahu supports. Akahu lists them when you connect.' },
       { q: 'Why aren\'t today\'s transactions showing?', a: 'Banks usually send new data to Akahu about once a day, so recent transactions can take until the next day to appear. Fennec checks for new data automatically during the day.' },

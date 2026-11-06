@@ -3,7 +3,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
-import { AkahuGuide } from '@/components/onboarding/AkahuGuide'
+import { AkahuGuide, AkahuBeforeYouStart } from '@/components/onboarding/AkahuGuide'
+import { AkahuTokenInput } from '@/components/onboarding/AkahuTokenInput'
+
+const TOKEN_LABEL: React.CSSProperties = { display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }
+const TOKEN_INPUT: React.CSSProperties = { width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', display: 'block' }
 import { SetupHelpChat } from '@/components/onboarding/SetupHelpChat'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconCheck, IconArrowRight, IconPlugConnected, IconUpload, IconExternalLink, IconChartBar, IconWallet, IconNewSection, IconUsers, IconBriefcase, IconShieldLock } from '@tabler/icons-react'
@@ -317,6 +321,8 @@ export default function OnboardingPage() {
               ))}
             </div>
 
+            <AkahuBeforeYouStart />
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button onClick={() => setStep('akahu-tokens')}
                 style={{ width: '100%', padding: '13px', borderRadius: 10, background: 'var(--primary)', color: 'white', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -343,22 +349,8 @@ export default function OnboardingPage() {
             <SetupHelpChat />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>App ID Token</label>
-                <input type="password" placeholder="app_token_..." value={appToken} onChange={e => setAppToken(e.target.value)}
-                  style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', display: 'block' }}
-                  onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
-                  onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>User Access Token</label>
-                <input type="password" placeholder="user_token_..." value={userToken} onChange={e => setUserToken(e.target.value)}
-                  style={{ width: '100%', padding: '11px 14px', borderRadius: 10, background: 'var(--surface2)', border: '1.5px solid var(--border)', color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 13, outline: 'none', display: 'block' }}
-                  onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
-                  onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-                />
-              </div>
+              <AkahuTokenInput kind="app" value={appToken} onChange={setAppToken} labelStyle={TOKEN_LABEL} inputStyle={TOKEN_INPUT} />
+              <AkahuTokenInput kind="user" value={userToken} onChange={setUserToken} labelStyle={TOKEN_LABEL} inputStyle={TOKEN_INPUT} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
