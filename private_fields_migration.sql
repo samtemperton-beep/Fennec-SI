@@ -1,18 +1,18 @@
--- Private fields: personal identifiers are stored encrypted, date of birth is
--- kept to the month, and each person's security settings have a place to live.
---
--- IRD, GST and bank account numbers (business_settings) and the home address
--- (home_loan.address) are encrypted by Fennec's server with a key that isn't in
--- Supabase (see backend/src/services/privateFields.ts). This makes the database
--- refuse any new plain-text value in those columns, so a page or a stolen sign-in
--- can't write one around the server. Values already saved stay as they are until
--- the server starts, when it encrypts them.
---
--- Run this BEFORE deploying the code that goes with it.
+/* Private fields: personal identifiers are stored encrypted, date of birth is
+   kept to the month, and each person's security settings have a place to live.
+   
+   IRD, GST and bank account numbers (business_settings) and the home address
+   (home_loan.address) are encrypted by Fennec's server with a key that isn't in
+   Supabase (see backend/src/services/privateFields.ts). This makes the database
+   refuse any new plain-text value in those columns, so a page or a stolen sign-in
+   can't write one around the server. Values already saved stay as they are until
+   the server starts, when it encrypts them.
+   
+   Run this BEFORE deploying the code that goes with it. */
 
 begin;
 
--- 1. Ciphertext is longer than the numbers, so the columns must be plain text.
+/* 1. Ciphertext is longer than the numbers, so the columns must be plain text. */
 do $$
 declare r record;
 begin
@@ -26,9 +26,9 @@ begin
   end loop;
 end $$;
 
--- 2. Only encrypted values (or blanks) may be written. Unchanged values are let
---    through, so rows saved before this can still be edited until the server
---    encrypts them.
+/* 2. Only encrypted values (or blanks) may be written. Unchanged values are let
+      through, so rows saved before this can still be edited until the server
+      encrypts them. */
 create or replace function public.require_encrypted_fields()
 returns trigger
 language plpgsql
@@ -40,8 +40,8 @@ declare
   old_v text;
 begin
   foreach col in array tg_argv loop
-    new_v := to_jsonb(new) ->> col;
-    old_v := case when tg_op = 'UPDATE' then to_jsonb(old) ->> col end;
+    new_v := jsonb_extract_path_text(to_jsonb(new), col);
+    old_v := case when tg_op = 'UPDATE' then jsonb_extract_path_text(to_jsonb(old), col) end;
     if new_v is not null and new_v <> '' and new_v not like 'enc:f1:%' and new_v is distinct from old_v then
       raise exception 'This detail is saved through Fennec so it can be encrypted. Refresh the page and try again.'
         using errcode = '22023';
@@ -63,7 +63,7 @@ create trigger home_loan_encrypted_fields
   before insert or update on public.home_loan
   for each row execute function public.require_encrypted_fields('address');
 
--- 3. KiwiSaver only needs your age, so keep the month and year of birth, not the day.
+/* 3. KiwiSaver only needs your age, so keep the month and year of birth, not the day. */
 update public.fin_kiwisaver
    set date_of_birth = date_trunc('month', date_of_birth)::date
  where date_of_birth is not null and extract(day from date_of_birth) <> 1;
@@ -72,9 +72,9 @@ alter table public.fin_kiwisaver drop constraint if exists fin_kiwisaver_birth_m
 alter table public.fin_kiwisaver add constraint fin_kiwisaver_birth_month_only
   check (date_of_birth is null or extract(day from date_of_birth) = 1);
 
--- 4. Security settings each person can ease off (Settings → Security & privacy).
---    Empty means everything on; see frontend/lib/security.ts. Saved by the
---    person's own profile update, like the dashboard layout.
+/* 4. Security settings each person can ease off (Settings → Security & privacy).
+      Empty means everything on; see frontend/lib/security.ts. Saved by the
+      person's own profile update, like the dashboard layout. */
 alter table public.profiles add column if not exists security_prefs jsonb not null default '{}'::jsonb;
 alter table public.profiles drop constraint if exists profiles_security_prefs_object;
 alter table public.profiles add constraint profiles_security_prefs_object
@@ -82,8 +82,8 @@ alter table public.profiles add constraint profiles_security_prefs_object
 
 commit;
 
--- Check: how many saved details are still waiting for the server to encrypt them
--- (this drops to 0 once the new server code has started).
+/* Check: how many saved details are still waiting for the server to encrypt them
+   (this drops to 0 once the new server code has started). */
 select 'business_settings' as table_name,
        count(*) filter (where ird_number   <> '' and ird_number   not like 'enc:f1:%')
      + count(*) filter (where gst_number   <> '' and gst_number   not like 'enc:f1:%')
