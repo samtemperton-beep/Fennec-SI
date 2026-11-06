@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconPlus, IconX, IconPrinter, IconEdit, IconTrash, IconCheck, IconFileInvoice, IconChevronDown } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { api, type PrivateField } from '@/lib/api'
 
 const supabase = createClient()
 const currency = (n: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n)
@@ -38,6 +39,13 @@ const DEFAULT_SETTINGS: BizSettings = {
   business_name: '', business_address: '', business_email: '', business_phone: '',
   ird_number: '', gst_number: '', bank_account: '', payment_terms: 30, gst_registered: true,
 }
+
+// IRD, GST and bank account numbers are stored encrypted (backend/src/services/privateFields.ts).
+// The page gets a hint for each, and the numbers themselves only to show, edit or print them.
+type IdField = 'ird_number' | 'gst_number' | 'bank_account'
+const ID_FIELDS: IdField[] = ['ird_number', 'gst_number', 'bank_account']
+type IdHints = Partial<Record<IdField, string | null>>
+const withoutIds = (s: BizSettings): BizSettings => ({ ...s, ird_number: '', gst_number: '', bank_account: '' })
 
 function calcTotals(items: InvoiceItem[], gstRegistered: boolean) {
   const subtotal = items.reduce((s, i) => s + (Number(i.quantity) * Number(i.unit_price)), 0)
@@ -79,7 +87,7 @@ function StatusBadge({ status, onChange }: { status: string; onChange?: (s: stri
 function PrintView({ invoice, settings, onClose }: { invoice: Invoice; settings: BizSettings; onClose: () => void }) {
   const { subtotal, gst, total } = calcTotals(invoice.items || [], settings.gst_registered && !invoice.gst_excluded)
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div data-amounts="show" style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: 'white', color: '#111', borderRadius: 12, width: '100%', maxWidth: 720, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         {/* Toolbar */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', borderBottom: '1px solid #e5e7eb' }}>
@@ -398,19 +406,45 @@ function InvoiceModal({ invoice, settings, allInvoices, onClose, onSaved }: {
 }
 
 // ── Settings modal ────────────────────────────────────────────────────────────
-function SettingsModal({ settings, onClose, onSaved }: { settings: BizSettings; onClose: () => void; onSaved: (s: BizSettings) => void }) {
+function SettingsModal({ settings, hints, onClose, onSaved }: { settings: BizSettings; hints: IdHints; onClose: () => void; onSaved: (s: BizSettings) => void }) {
   const [form, setForm] = useState(settings)
   const [saving, setSaving] = useState(false)
+  // The encrypted numbers that have been typed in or opened, and so will be saved.
+  const [edited, setEdited] = useState<Set<IdField>>(new Set())
+  const [opening, setOpening] = useState(false)
+  const unopened = ID_FIELDS.filter(f => hints[f] && !edited.has(f))
+
+  function setId(f: IdField, v: string) {
+    setEdited(prev => new Set(prev).add(f))
+    setForm(prev => ({ ...prev, [f]: v }))
+  }
+
+  async function showSaved() {
+    setOpening(true)
+    try {
+      const { values } = await api.revealPrivateFields(unopened as PrivateField[])
+      setForm(prev => ({ ...prev, ...Object.fromEntries(unopened.map(f => [f, values[f] ?? ''])) }))
+      setEdited(prev => new Set([...prev, ...unopened]))
+    } catch (e: any) { toast.error(e.message) }
+    setOpening(false)
+  }
+
+  const idPlaceholder = (f: IdField, eg: string) => hints[f] && !edited.has(f) ? `Saved (${hints[f]})` : eg
 
   async function save() {
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not logged in')
-      const { error } = await supabase.from('business_settings').upsert({ ...form, user_id: user.id }, { onConflict: 'user_id' })
+      // Everything except the numbers, then the numbers through the server to be encrypted.
+      const { ird_number, gst_number, bank_account, ...rest } = form
+      const { error } = await supabase.from('business_settings').upsert({ ...rest, user_id: user.id }, { onConflict: 'user_id' })
       if (error) throw error
+      const ids: Record<IdField, string> = { ird_number, gst_number, bank_account }
+      const changed = Object.fromEntries(ID_FIELDS.filter(f => edited.has(f)).map(f => [f, ids[f]]))
+      if (Object.keys(changed).length) await api.savePrivateFields(changed)
       toast.success('Business details saved')
-      onSaved(form)
+      onSaved(withoutIds(form))
     } catch (e: any) { toast.error(e.message) }
     setSaving(false)
   }
@@ -433,11 +467,11 @@ function SettingsModal({ settings, onClose, onSaved }: { settings: BizSettings; 
           <div><label style={labelStyle}>Address</label><textarea value={form.business_address} onChange={e => setForm(f => ({ ...f, business_address: e.target.value }))} rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div><label style={labelStyle}>Phone</label><input value={form.business_phone} onChange={e => setForm(f => ({ ...f, business_phone: e.target.value }))} style={inputStyle} /></div>
-            <div><label style={labelStyle}>Bank Account</label><input value={form.bank_account} onChange={e => setForm(f => ({ ...f, bank_account: e.target.value }))} placeholder="12-3456-7890123-00" style={inputStyle} /></div>
+            <div><label style={labelStyle}>Bank Account</label><input value={form.bank_account} onChange={e => setId('bank_account', e.target.value)} placeholder={idPlaceholder('bank_account', '12-3456-7890123-00')} autoComplete="off" style={inputStyle} /></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 10 }}>
-            <div><label style={labelStyle}>IRD Number</label><input value={form.ird_number} onChange={e => setForm(f => ({ ...f, ird_number: e.target.value }))} placeholder="123-456-789" style={inputStyle} /></div>
-            <div><label style={labelStyle}>GST Number</label><input value={form.gst_number} onChange={e => setForm(f => ({ ...f, gst_number: e.target.value }))} placeholder="123-456-789" style={inputStyle} /></div>
+            <div><label style={labelStyle}>IRD Number</label><input value={form.ird_number} onChange={e => setId('ird_number', e.target.value)} placeholder={idPlaceholder('ird_number', '123-456-789')} autoComplete="off" style={inputStyle} /></div>
+            <div><label style={labelStyle}>GST Number</label><input value={form.gst_number} onChange={e => setId('gst_number', e.target.value)} placeholder={idPlaceholder('gst_number', '123-456-789')} autoComplete="off" style={inputStyle} /></div>
             <div><label style={labelStyle}>Pay Terms</label>
               <select value={form.payment_terms} onChange={e => setForm(f => ({ ...f, payment_terms: Number(e.target.value) }))}
                 style={{ ...inputStyle }}>
@@ -445,6 +479,12 @@ function SettingsModal({ settings, onClose, onSaved }: { settings: BizSettings; 
               </select>
             </div>
           </div>
+          <p style={{ fontSize: 11, color: 'var(--text3)', margin: 0 }}>
+            Bank account, IRD and GST numbers are stored encrypted. An empty box keeps what&apos;s saved.
+            {unopened.length > 0 && (
+              <> <button type="button" onClick={showSaved} disabled={opening} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontSize: 11, cursor: 'pointer' }}>{opening ? 'Opening…' : 'Show saved numbers'}</button></>
+            )}
+          </p>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
             <input type="checkbox" checked={form.gst_registered} onChange={e => setForm(f => ({ ...f, gst_registered: e.target.checked }))} />
             GST registered (adds 15% GST to invoices)
@@ -469,6 +509,28 @@ export default function InvoicesPage() {
   const [editing, setEditing] = useState<Invoice | null | string>()
   const [viewing, setViewing] = useState<Invoice | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [idHints, setIdHints] = useState<IdHints>({})
+  // The numbers for printing, fetched the first time an invoice is opened.
+  const printIds = useRef<Partial<BizSettings> | null>(null)
+
+  async function loadIdHints() {
+    printIds.current = null
+    try {
+      const { fields } = await api.getPrivateFields()
+      setIdHints(Object.fromEntries(ID_FIELDS.map(f => [f, fields[f].hint])))
+    } catch { setIdHints({}) }
+  }
+
+  async function openInvoice(inv: Invoice) {
+    const saved = ID_FIELDS.filter(f => idHints[f])
+    if (saved.length && !printIds.current) {
+      try {
+        const { values } = await api.revealPrivateFields(saved as PrivateField[])
+        printIds.current = Object.fromEntries(saved.map(f => [f, values[f] ?? '']))
+      } catch (e: any) { toast.error(`Couldn't add your IRD, GST and bank numbers: ${e.message}`) }
+    }
+    setViewing({ ...inv })
+  }
 
   useEffect(() => { load() }, [])
 
@@ -482,7 +544,7 @@ export default function InvoicesPage() {
       supabase.from('business_settings').select('*').eq('user_id', user.id).maybeSingle(),
     ])
     setInvoices((inv as any) || [])
-    if (cfg) setSettings({ ...DEFAULT_SETTINGS, ...cfg })
+    if (cfg) { setSettings(withoutIds({ ...DEFAULT_SETTINGS, ...cfg })); loadIdHints() }
     setLoading(false)
   }
 
@@ -579,7 +641,7 @@ export default function InvoicesPage() {
                 <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 700 }}>{currency(total)}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <StatusBadge status={inv.status} onChange={s => updateStatus(inv.id, s)} />
-                  <button onClick={() => setViewing({ ...inv })} title="View" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', lineHeight: 0, padding: 2 }}><IconPrinter size={13} /></button>
+                  <button onClick={() => openInvoice(inv)} title="View" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', lineHeight: 0, padding: 2 }}><IconPrinter size={13} /></button>
                   <button onClick={() => setEditing(inv)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', lineHeight: 0, padding: 2 }}><IconEdit size={13} /></button>
                   <button onClick={() => deleteInvoice(inv.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', lineHeight: 0, padding: 2 }}><IconTrash size={13} /></button>
                 </div>
@@ -600,10 +662,10 @@ export default function InvoicesPage() {
         />
       )}
       {viewing && (
-        <PrintView invoice={viewing} settings={settings} onClose={() => setViewing(null)} />
+        <PrintView invoice={viewing} settings={{ ...settings, ...printIds.current }} onClose={() => setViewing(null)} />
       )}
       {showSettings && (
-        <SettingsModal settings={settings} onClose={() => setShowSettings(false)} onSaved={s => { setSettings(s); setShowSettings(false) }} />
+        <SettingsModal settings={settings} hints={idHints} onClose={() => setShowSettings(false)} onSaved={s => { setSettings(s); setShowSettings(false); loadIdHints() }} />
       )}
     </div>
   )

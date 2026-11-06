@@ -288,4 +288,17 @@ export const api = {
       }
     }
   },
+
+  // Encrypted personal details. See backend/src/routes/private.ts.
+  getPrivateFields: (): Promise<{ fields: Record<PrivateField, { saved: boolean; hint: string | null }> }> =>
+    apiFetch('/api/private/fields'),
+
+  revealPrivateFields: (fields: PrivateField[]): Promise<{ values: Partial<Record<PrivateField, string | null>> }> =>
+    apiFetch('/api/private/reveal', { method: 'POST', body: JSON.stringify({ fields }) }),
+
+  /** An empty string clears a detail. The row (business details, home loan) must already be saved. */
+  savePrivateFields: (values: Partial<Record<PrivateField, string>>): Promise<{ ok: true }> =>
+    apiFetch('/api/private/fields', { method: 'PUT', body: JSON.stringify(values) }),
 }
+
+export type PrivateField = 'ird_number' | 'gst_number' | 'bank_account' | 'home_address'

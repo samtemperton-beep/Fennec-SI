@@ -23,6 +23,7 @@ import { startScheduledSync } from './services/scheduler';
 import { FAQ } from './services/faq';
 import { countServerErrors, startNightlyHealthCheck } from './services/healthCheck';
 import networthRouter from './routes/networth';
+import privateRouter, { encryptLegacyOnStartup } from './routes/private';
 
 dotenv.config();
 
@@ -68,6 +69,7 @@ app.use('/api/gmail', gmailRouter);
 app.use('/api/account', accountRouter);
 app.use('/api/partner', partnerRouter);
 app.use('/api/feedback', feedbackRouter);
+app.use('/api/private', privateRouter);
 // Public: the FAQ page reads the same list the Fennec chat knows.
 app.get('/api/faq', (_req, res) => res.json(FAQ));
 
@@ -80,6 +82,9 @@ app.listen(PORT, () => {
   if (process.env.ENABLE_SCHEDULED_SYNC === 'true') {
     startScheduledSync();
     startNightlyHealthCheck();
+    // Same key as the live server, so only here: a local copy with another key
+    // would encrypt details the live server can't read.
+    encryptLegacyOnStartup();
   }
 });
 

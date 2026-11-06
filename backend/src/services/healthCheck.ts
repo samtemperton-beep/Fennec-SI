@@ -4,6 +4,7 @@ import ws from 'ws';
 import { complete, MODELS } from './llm';
 import { emailAdmins, escapeHtml as esc } from './adminEmail';
 import { lookupProperty, valuationRollCoverage } from './linz';
+import { encryptionAvailable } from './tokenCrypto';
 
 // The nightly health check. It visits the website and the API the way a visitor
 // would, asks each AI model for a one-word reply, checks the database and the
@@ -149,6 +150,22 @@ export async function runHealthCheck(supabase: SupabaseClient): Promise<CheckRes
     const missing = required.filter(k => !process.env[k]);
     if (missing.length) throw new Error(`Missing: ${missing.join(', ')}`);
     return 'All set';
+  }));
+
+  // Bank tokens and IRD/GST/bank numbers and home addresses are encrypted with
+  // this key; anything still in plain text means the startup pass hasn't run.
+  checks.push(timed('Setup', 'Encryption', async () => {
+    if (!encryptionAvailable()) throw new Error('AKAHU_TOKEN_KEY is missing or unusable, so saved details can’t be encrypted or opened');
+    const plain = (rows: any[] | null, cols: string[]) =>
+      (rows ?? []).filter(r => cols.some(c => typeof r[c] === 'string' && r[c] && !r[c].startsWith('enc:'))).length;
+    const [biz, home] = await Promise.all([
+      supabase.from('business_settings').select('ird_number, gst_number, bank_account'),
+      supabase.from('home_loan').select('address'),
+    ]);
+    if (biz.error || home.error) throw new Error((biz.error ?? home.error)!.message);
+    const left = plain(biz.data, ['ird_number', 'gst_number', 'bank_account']) + plain(home.data, ['address']);
+    if (left) throw new Error(`${left} saved row(s) still have details in plain text`);
+    return 'Key set; all saved details encrypted';
   }));
 
   const results = await Promise.all(checks);

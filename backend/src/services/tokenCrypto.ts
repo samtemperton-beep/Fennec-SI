@@ -28,9 +28,10 @@ export class TokenDecryptError extends Error {
   code = 'credentials_unreadable';
 }
 
-let cached: { raw: string; key: Buffer } | null = null;
+const cached = new Map<string, { raw: string; key: Buffer }>();
 
-function getKey(): Buffer {
+/** The cipher key for one purpose, derived from AKAHU_TOKEN_KEY. Throws TokenKeyError if unusable. */
+export function deriveKey(context: string = KEY_CONTEXT): Buffer {
   const raw = process.env.AKAHU_TOKEN_KEY;
   if (!raw) throw new TokenKeyError('AKAHU_TOKEN_KEY is not set on the server.');
   if (raw.length < MIN_KEY_LENGTH) {
@@ -39,13 +40,16 @@ function getKey(): Buffer {
   if (EXPOSED_KEY_SHA256.has(crypto.createHash('sha256').update(raw).digest('hex'))) {
     throw new TokenKeyError('AKAHU_TOKEN_KEY is set to a secret that was exposed in git. Generate a new one.');
   }
-  if (cached?.raw === raw) return cached.key;
-  // HKDF so the raw secret never is the cipher key itself, and the same secret
-  // can't be confused with one used for another purpose.
-  const key = Buffer.from(crypto.hkdfSync('sha256', raw, Buffer.alloc(0), KEY_CONTEXT, 32));
-  cached = { raw, key };
+  const hit = cached.get(context);
+  if (hit?.raw === raw) return hit.key;
+  // HKDF so the raw secret never is the cipher key itself, and each purpose
+  // (bank tokens, personal details) gets its own key from the same secret.
+  const key = Buffer.from(crypto.hkdfSync('sha256', raw, Buffer.alloc(0), context, 32));
+  cached.set(context, { raw, key });
   return key;
 }
+
+const getKey = () => deriveKey(KEY_CONTEXT);
 
 export function isEncrypted(stored: string): boolean {
   return stored.startsWith(PREFIX);

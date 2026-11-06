@@ -17,6 +17,7 @@ import { Avatar } from '@/components/shared/Avatar'
 import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { PremiumLock } from '@/components/premium/PremiumLock'
 import { Feedback, openFeedback } from '@/components/shared/Feedback'
+import { PrivacyToggle, AmountMasker } from '@/components/shared/PrivacyMode'
 import { usePlan, PlanFeature } from '@/lib/plan'
 
 // ── Section definitions ───────────────────────────────────────────────────────
@@ -326,6 +327,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
+          {/* Hide every dollar amount on screen; remembered on this device */}
+          <PrivacyToggle className="topnav-settings topnav-privacy" />
+
           {/* Settings — in the account menu on phones */}
           <Link
             href="/app/settings"
@@ -438,6 +442,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
       <FennecAI />
       <Feedback />
+      <AmountMasker />
     </div>
   )
 }

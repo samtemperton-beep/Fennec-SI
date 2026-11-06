@@ -8,6 +8,8 @@ import { IconHome, IconEdit, IconCheck, IconX, IconSearch, IconRefresh } from '@
 import { toast } from 'sonner'
 import { RatesNoticeUpload, type RatesNoticeValues } from '@/components/finance/RatesNoticeUpload'
 import { detectRepayment, summariseInterest, projectPayoff, scheduledMonthly, type LoanTx } from '@/lib/homeloan'
+import { api } from '@/lib/api'
+import { Secret } from '@/components/shared/Secret'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
@@ -64,8 +66,30 @@ export default function HomeLoanPage() {
   const [propertyError, setPropertyError] = useState('')
   const [notice, setNotice] = useState<RatesNoticeValues | null>(null)
   const [loanTxs, setLoanTxs] = useState<LoanTx[]>([])
+  // The address is stored encrypted: the page gets only a hint, and the address
+  // itself when the person taps the eye or edits it.
+  const [addressHint, setAddressHint] = useState<string | null>(null)
+  const [addressEdited, setAddressEdited] = useState(false)
+  const [loadingAddress, setLoadingAddress] = useState(false)
 
   useEffect(() => { load() }, [])
+
+  async function loadAddressHint() {
+    try {
+      const { fields } = await api.getPrivateFields()
+      setAddressHint(fields.home_address.hint)
+    } catch { setAddressHint(null) }
+  }
+
+  async function showSavedAddress() {
+    setLoadingAddress(true)
+    try {
+      const { values } = await api.revealPrivateFields(['home_address'])
+      setDraft(d => ({ ...d, address: values.home_address ?? '' }))
+      setAddressEdited(true)
+    } catch (e: any) { toast.error(e.message) }
+    setLoadingAddress(false)
+  }
 
   async function load() {
     setLoading(true)
@@ -99,7 +123,8 @@ export default function HomeLoanPage() {
     }
 
     if (data) {
-      const merged = { ...data, ...(liveBalance !== null ? { balance: liveBalance } : {}) }
+      loadAddressHint()
+      const merged = { ...data, address: '', ...(liveBalance !== null ? { balance: liveBalance } : {}) }
       setLoan(merged)
       setDraft(merged)
     } else if (liveBalance !== null) {
@@ -115,13 +140,22 @@ export default function HomeLoanPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
 
-    const payload = { ...draft, user_id: user.id }
-    const { error } = loan.id
-      ? await supabase.from('home_loan').update(payload).eq('id', loan.id)
-      : await supabase.from('home_loan').insert(payload).select().single()
+    // The address goes to the server separately, to be encrypted.
+    const { address, ...rest } = draft
+    const payload = { ...rest, user_id: user.id }
+    const { data: row, error } = loan.id
+      ? await supabase.from('home_loan').update(payload).eq('id', loan.id).select('id').single()
+      : await supabase.from('home_loan').insert(payload).select('id').single()
 
     if (error) { toast.error(error.message); setSaving(false); return }
-    setLoan(draft)
+    if (addressEdited) {
+      try {
+        await api.savePrivateFields({ home_address: address })
+        await loadAddressHint()
+      } catch (e: any) { toast.error(`Loan saved, but not the address: ${e.message}`) }
+    }
+    setLoan({ ...draft, id: row?.id ?? loan.id, address: '' })
+    setAddressEdited(false)
     setEditing(false)
     toast.success('Loan details saved')
     setSaving(false)
@@ -138,13 +172,14 @@ export default function HomeLoanPage() {
   }
 
   async function fetchPropertyData() {
-    if (!loan.address) { toast.error('Add the property address in Edit first'); return }
+    if (!addressHint) { toast.error('Add the property address in Edit first'); return }
     setFetchingProperty(true)
     setPropertyError('')
     try {
+      // The server looks up the address saved on the loan.
       const API = process.env.NEXT_PUBLIC_API_URL || ''
       const { data: { session } } = await supabase.auth.getSession()
-      const r = await fetch(`${API}/api/finance/property?address=${encodeURIComponent(loan.address)}`, {
+      const r = await fetch(`${API}/api/finance/property`, {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       const result = await r.json()
@@ -190,9 +225,8 @@ export default function HomeLoanPage() {
   const shown = rollValue
     ? { ...rollValue, source: 'your council’s valuation roll (via LINZ)' }
     : notice?.capital_value ? { ...notice, source: `your rates notice${notice.council ? ` (${notice.council})` : ''}` } : null
-  // "12 Smith" from "12 Smith Street, Ponsonby": enough to spot a notice for another property.
-  const streetKey = (a: string | null) => (a || '').toLowerCase().match(/\d+[a-z]?\s+[a-z]+/)?.[0] ?? null
-  const otherProperty = !rollValue && notice?.address && streetKey(loan.address) && streetKey(notice.address) !== streetKey(loan.address)
+  // The server compares the notice's address with the saved one.
+  const otherProperty = !rollValue && notice?.matches_home === false
   const valuationBox = shown?.capital_value ? (
     <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
@@ -205,7 +239,7 @@ export default function HomeLoanPage() {
       </p>
       <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>From {shown.source}</p>
       {otherProperty && (
-        <p style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>This notice is for {notice!.address}, which doesn&apos;t look like the address on your loan.</p>
+        <p style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>This notice doesn&apos;t look like it&apos;s for the address on your loan.</p>
       )}
       {loan.id && loan.rv !== shown.capital_value && (
         <button onClick={() => applyCouncilValue(shown.capital_value!)}
@@ -246,10 +280,10 @@ export default function HomeLoanPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Home Loan</h1>
-          {loan.address && <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>{loan.address}</p>}
+          {addressHint && <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}><Secret field="home_address" hint={addressHint} /></p>}
         </div>
         {!editing ? (
-          <button onClick={() => { setDraft(loan); setEditing(true) }}
+          <button onClick={() => { setDraft({ ...loan, address: '' }); setAddressEdited(false); setEditing(true) }}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
             <IconEdit size={14} /> Edit Details
           </button>
@@ -272,7 +306,25 @@ export default function HomeLoanPage() {
         <div className="card" style={{ marginBottom: 24, padding: 24 }}>
           <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Loan Details</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
-            {inp('Property Address', 'address')}
+            <div>
+              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>
+                Property Address
+                {addressHint && !addressEdited && (
+                  <button type="button" onClick={showSavedAddress} disabled={loadingAddress}
+                    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontSize: 12, cursor: 'pointer' }}>
+                    {loadingAddress ? 'Opening…' : 'Show saved'}
+                  </button>
+                )}
+              </label>
+              <input
+                value={draft.address}
+                onChange={e => { setAddressEdited(true); setDraft(d => ({ ...d, address: e.target.value })) }}
+                placeholder={addressHint && !addressEdited ? `Saved (${addressHint}). Type to replace.` : '12 Smith Street, Ponsonby'}
+                autoComplete="off"
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+              />
+              <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Stored encrypted.</p>
+            </div>
             {inp('Current Balance', 'balance', 'number', '$')}
             {inp('Interest Rate (%)', 'interest_rate', 'number')}
             {inp('Loan Term (years)', 'loan_term_years', 'number')}
@@ -358,20 +410,20 @@ export default function HomeLoanPage() {
           {propertyData ? (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {[
-                { label: 'Address', value: [propertyData.full_address, propertyData.suburb, propertyData.town].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ') },
+                { label: 'Address', value: [propertyData.full_address, propertyData.suburb, propertyData.town].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', '), secret: true },
                 { label: 'Council', value: propertyData.territorial_authority },
-                { label: 'Legal description', value: propertyData.legal_description },
-                { label: 'Title', value: propertyData.title_no },
+                { label: 'Legal description', value: propertyData.legal_description, secret: true },
+                { label: 'Title', value: propertyData.title_no, secret: true },
                 { label: 'Land area', value: propertyData.area_sqm ? `${propertyData.area_sqm.toLocaleString('en-NZ')} m²` : null },
                 ...(propertyData.valuation?.bedrooms || propertyData.valuation?.floor_area_sqm ? [{
                   label: 'Home',
                   value: [propertyData.valuation.bedrooms && `${propertyData.valuation.bedrooms} bedrooms`, propertyData.valuation.floor_area_sqm && `${propertyData.valuation.floor_area_sqm} m² floor area`].filter(Boolean).join(', '),
                 }] : []),
-                { label: 'Valuation reference', value: propertyData.valuation_reference },
-              ].map(r => (
+                { label: 'Valuation reference', value: propertyData.valuation_reference, secret: true },
+              ].map((r: { label: string; value: string | null; secret?: boolean }) => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ fontSize: 13, color: 'var(--text2)', flexShrink: 0 }}>{r.label}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: r.value ? 'var(--text)' : 'var(--text3)', textAlign: 'right', overflowWrap: 'anywhere' }}>{r.value || '—'}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: r.value ? 'var(--text)' : 'var(--text3)', textAlign: 'right', overflowWrap: 'anywhere' }}>{r.secret ? <Secret value={r.value} /> : r.value || '—'}</span>
                 </div>
               ))}
               <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, lineHeight: 1.5 }}>
@@ -382,7 +434,7 @@ export default function HomeLoanPage() {
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
               <IconSearch size={24} style={{ color: 'var(--text3)', marginBottom: 8 }} />
               <p style={{ fontSize: 13, color: propertyError ? 'var(--red)' : 'var(--text2)' }}>
-                {propertyError || (loan.address
+                {propertyError || (addressHint
                   ? 'Look up your property to see its legal description, title, land area and council valuation.'
                   : 'Add your property address in Edit, then look it up here.')}
               </p>

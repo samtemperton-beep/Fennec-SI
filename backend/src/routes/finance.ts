@@ -7,6 +7,10 @@ import { syncFinanceAccounts } from '../services/financeSync';
 import { clearAkahuProblem } from '../services/akahuHealth';
 import { lookupProperty, LinzError } from '../services/linz';
 import { readRatesNotice, RatesNoticeError } from '../services/ratesNotice';
+import { loadPrivateFields } from '../services/privateFields';
+
+// "12 smith" from "12 Smith Street, Ponsonby": enough to spot a notice for another property.
+const streetKey = (a: string | null | undefined) => (a || '').toLowerCase().match(/\d+[a-z]?\s+[a-z]+/)?.[0] ?? null;
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -90,10 +94,18 @@ router.delete('/akahu', requireAuth, async (req: any, res) => {
 // ── GET /api/finance/property ─────────────────────────────────────────────────
 // Property details from LINZ (address, legal description, title, land area) for
 // the Home Loan page. See services/linz.ts for why there are no sales or values.
+// The address is the one saved (encrypted) on the person's home loan, so the
+// browser doesn't need to hold it to look it up.
 router.get('/property', requireAuth, async (req: any, res) => {
   const userId: string = req.user.id;
-  const address = req.query.address as string;
-  if (!address) return res.status(400).json({ error: 'address query param required' });
+  let address: string | null = null;
+  try {
+    address = (await loadPrivateFields(supabase, userId, ['home_address'])).home_address;
+  } catch (e: any) {
+    console.error('[linz] could not read saved address:', e?.message ?? e);
+    return res.status(500).json({ error: "Couldn't open your saved address. Please enter it again in Edit." });
+  }
+  if (!address) return res.status(400).json({ error: 'Add your property address in Edit first.' });
 
   const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(userId);
   if (userErr || !user) return res.status(401).json({ error: 'Unauthorised' });
@@ -120,7 +132,16 @@ router.post('/rates-notice', requireAuth, async (req: any, res) => {
   if (!file?.data || !file?.type) return res.status(400).json({ error: 'Choose a file first.' });
   if (!await checkAndIncrementUsage(req, res)) return;
   try {
-    res.json(await readRatesNotice({ type: String(file.type), data: String(file.data) }));
+    const notice = await readRatesNotice({ type: String(file.type), data: String(file.data) });
+    // Compared here so the page can warn about a notice for another property
+    // without holding the saved address.
+    let matches_home: boolean | null = null;
+    try {
+      const home = (await loadPrivateFields(supabase, req.user.id, ['home_address'])).home_address;
+      const a = streetKey(home), b = streetKey(notice.address);
+      if (a && b) matches_home = a === b;
+    } catch { /* no saved address to compare */ }
+    res.json({ ...notice, matches_home });
   } catch (e: any) {
     if (e instanceof RatesNoticeError) return res.status(422).json({ error: e.message });
     console.error('[rates notice] read failed:', e?.message ?? e);

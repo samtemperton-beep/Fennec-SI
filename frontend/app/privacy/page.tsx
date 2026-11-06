@@ -17,7 +17,7 @@ export default function PrivacyPage() {
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 16px' }}>
         <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 8 }}>Privacy Policy</h1>
-        <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 40 }}>Last updated: 3 November 2026</p>
+        <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 40 }}>Last updated: 6 November 2026</p>
 
         <Section title="1. Who we are">
           Fennec SI (short for Save &amp; Invest, and called Fennec in this policy) is a New Zealand app for saving and investing in one place, available at fennecsi.com. This policy explains what personal information we collect, how we use and protect it, and your rights under the New Zealand Privacy Act 2020.
@@ -93,7 +93,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="7. Security">
-          Information is encrypted in transit (HTTPS). Bank and Gmail connection keys are encrypted at rest. Database rules keep each person&apos;s records to themselves, and you can turn on two-factor sign-in in Settings. Bank access is read-only. No system is completely secure, so please use a strong, unique password, and tell us straight away if you think your account has been accessed by someone else.
+          Information is encrypted in transit (HTTPS) and at rest. On top of that, bank and Gmail connection keys, IRD, GST and bank account numbers, and your home address are encrypted with a key held separately from the database, so a copy of the database alone wouldn&apos;t reveal them. For KiwiSaver we keep only the month and year you were born, not the full date. On screen, those details stay hidden until you tap the eye next to them, and the eye in the top bar hides every dollar amount. Database rules keep each person&apos;s records to themselves, and you can turn on two-factor sign-in in Settings. Bank access is read-only. No system is completely secure, so please use a strong, unique password, and tell us straight away if you think your account has been accessed by someone else.
         </Section>
 
         <Section title="8. Cookies and browser storage">

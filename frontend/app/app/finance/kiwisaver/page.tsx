@@ -6,6 +6,7 @@ import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { projectRange, EMPLOYEE_RATES, FUND_RETURNS, RANGE_SPREAD, GOVT_MTC_MAX, GOVT_MTC_FULL_AT, DEFAULT_INFLATION, type ProjectionPoint, type ProjectionInput } from '@/lib/kiwisaver'
 import { WhatIf } from '@/components/kiwisaver/WhatIf'
 import { SalaryCalculator } from '@/components/kiwisaver/SalaryCalculator'
+import { MonthYearInput } from '@/components/shared/MonthYearInput'
 import { toast } from 'sonner'
 import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin, IconRefresh } from '@tabler/icons-react'
 
@@ -306,8 +307,8 @@ export default function KiwiSaverPage() {
             </div>
             {/* Date of birth */}
             <div>
-              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Date of birth</label>
-              <input type="date" value={form.date_of_birth || ''} onChange={e => setForm((f: any) => ({ ...f, date_of_birth: e.target.value }))} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Month and year of birth</label>
+              <MonthYearInput value={form.date_of_birth} onChange={v => setForm((f: any) => ({ ...f, date_of_birth: v }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
             </div>
             {/* Retirement age */}
             <div>
@@ -362,8 +363,8 @@ export default function KiwiSaverPage() {
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Date of birth</label>
-                  <input type="date" value={form.date_of_birth || ''} onChange={e => setForm((f: any) => ({ ...f, date_of_birth: e.target.value }))} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Month and year of birth</label>
+                  <MonthYearInput value={form.date_of_birth} onChange={v => setForm((f: any) => ({ ...f, date_of_birth: v }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'block', marginBottom: 5 }}>Annual salary before tax (NZD)</label>

@@ -242,6 +242,8 @@ body {
   transition: all 0.15s;
 }
 .topnav-settings:hover { background: var(--surface2); color: var(--text); }
+.topnav-privacy { background: none; cursor: pointer; padding: 0; }
+.topnav-privacy[aria-pressed="true"] { color: var(--primary); }
 .topnav-settings.active {
   background: var(--primary-light);
   border-color: var(--primary);

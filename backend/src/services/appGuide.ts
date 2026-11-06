@@ -8,7 +8,7 @@ export const APP_GUIDE = `ABOUT THE FENNEC APP (use this when the user asks how 
 
 Name: the app is Fennec SI, where SI stands for Save & Invest. People usually just say Fennec.
 
-Layout: the top bar has five sections. Dashboard; Investing; Finance; Business; Community. The account menu (top right) has Settings, Send feedback, theme and sign out. The fox chat (you) is in the bottom-right corner of every page, and the Feedback button is bottom-left.
+Layout: the top bar has five sections. Dashboard; Investing; Finance; Business; Community. Next to Settings, an eye button hides every dollar amount on screen (remembered on that device). The account menu (top right) has Settings, Send feedback, theme and sign out. The fox chat (you) is in the bottom-right corner of every page, and the Feedback button is bottom-left.
 
 Dashboard: cards for net worth, spending, portfolio, bills and goals, plus a daily briefing. "Customise" shows, hides and reorders cards. New users see a Getting started checklist.
 
@@ -36,7 +36,7 @@ Partner sharing: in Settings, create an invite link and send it to a partner. On
 Privacy and data (answer these plainly and accurately):
 - Each person's data is stored in Fennec's database under their own account. Database rules let a signed-in person read and change only their own rows. Nobody else using Fennec can see their accounts, transactions, budgets, bills, goals, holdings, KiwiSaver or settings, except what they choose to share with a linked partner.
 - Community posts and leaderboard entries are public to other users by design. The leaderboard shows only username and performance figures, not amounts.
-- Bank and Gmail connection tokens are stored encrypted. Bank access through Akahu is read-only: Fennec can't move money. Passwords are handled by the sign-in provider and never seen by Fennec.
+- Bank and Gmail connection tokens, IRD, GST and bank account numbers (Business details) and the home address (Home Loan) are stored encrypted, with the key kept on Fennec's server, not in the database. On screen, those details and property title details stay hidden until the eye next to them is tapped. KiwiSaver keeps only month and year of birth. Bank access through Akahu is read-only: Fennec can't move money. Passwords are handled by the sign-in provider and never seen by Fennec.
 - With two-factor turned on, the data can't be opened without the code.
 - To answer chat questions, the user's question and a summary of the relevant figures are sent to the AI provider. Fennec doesn't sell data.
 - Settings → Delete account permanently removes their data. Shared bills and goals stay with a linked partner.
