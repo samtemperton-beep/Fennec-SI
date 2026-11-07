@@ -9,7 +9,7 @@ const FEATURES = [
   {
     emoji: '📈',
     title: 'Portfolio Tracking',
-    desc: 'Track NZ, ASX & US stocks in one place. Real-time prices, P&L, AI signals, and performance charts.',
+    desc: 'Track NZ, ASX & US shares in one place. Market prices, gains and losses, AI signals and performance charts.',
   },
   {
     emoji: '🏦',
@@ -34,7 +34,7 @@ const FEATURES = [
   {
     emoji: '🔔',
     title: 'Smart Alerts',
-    desc: 'Price alerts and AI signal changes sent to your email. Know the moment your targets are triggered.',
+    desc: 'Set a price target on any share and get an email when it’s hit. Watchlist signals and earnings reminders show in the app.',
   },
   {
     emoji: '🏆',
@@ -44,7 +44,7 @@ const FEATURES = [
   {
     emoji: '🔒',
     title: 'Secure & Private',
-    desc: 'Bank sync via Akahu — read-only access. Keys encrypted with AES-256. Hosted on Vercel + Railway.',
+    desc: 'Bank sync via Akahu with read-only access. Bank keys and private details encrypted with AES-256. Your data is stored in Sydney, Australia.',
   },
 ]
 
@@ -69,10 +69,12 @@ const PRO_FEATURES = [
   'Verified portfolio badge and leaderboard rank',
 ]
 
+// Made-up examples of what a post looks like, labelled as such on the page. No
+// times, likes or figures, so nothing reads as real activity or real facts.
 const COMMUNITY_POSTS = [
-  { user: 'kiwi_trader', initial: 'K', bg: 'var(--primary)', signal: 'BUY', ticker: 'AAPL', body: '📱 Apple Q1 earnings crush estimates. $AAPL BUY — services revenue up 17% YoY. Target $230.', time: '2m ago', likes: 12 },
-  { user: 'asx_bull', initial: 'A', bg: '#10b981', signal: 'HOLD', ticker: 'BHP', body: '⛏️ Iron ore holding steady. BHP looks range-bound near-term. Accumulate on dips.', time: '8m ago', likes: 7 },
-  { user: 'nzx_picks', initial: 'N', bg: '#f59e0b', signal: 'BUY', ticker: 'FPH', body: '🏥 Fisher & Paykel Health recovering well. Export sales data solid. Long-term BUY.', time: '15m ago', likes: 19 },
+  { user: 'example_kiwi', initial: 'K', bg: 'var(--primary)', signal: 'BUY', ticker: 'AAPL', body: '📱 Adding to my Apple position after the results. Anyone else holding for the long term?' },
+  { user: 'example_investor', initial: 'E', bg: '#10b981', signal: 'HOLD', ticker: 'BHP', body: '⛏️ Holding BHP for now and watching iron ore prices.' },
+  { user: 'example_saver', initial: 'S', bg: '#f59e0b', signal: 'BUY', ticker: 'FPH', body: '🏥 Fisher & Paykel Healthcare is my long-term NZ pick.' },
 ]
 
 function SignalPill({ signal }: { signal: string }) {
@@ -125,7 +127,7 @@ export default function LandingPage() {
         </h1>
         <p style={{ color: 'var(--text2)', fontSize: 17, lineHeight: 1.7, marginBottom: 40, maxWidth: 580, margin: '0 auto 40px' }}>
           Fennec SI helps you save and invest in one place. Track your NZ, ASX &amp; US investments,
-          manage your budget, bills, goals and KiwiSaver, and get answers from an AI assistant that knows your full financial picture.
+          manage your budget, bills, goals and KiwiSaver, and get answers from an AI assistant that knows your numbers.
         </p>
 
         {/* Mini feature pills */}
@@ -168,12 +170,16 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 12, marginTop: 10 }}>Example figures, to show what your dashboard looks like.</p>
       </section>
 
       {/* ── Community feed ── */}
       <section style={{ maxWidth: 680, margin: '0 auto', padding: '0 32px 64px' }}>
         <p style={{ textAlign: 'center', color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
-          From the community
+          Share ideas with the community
+        </p>
+        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 12, marginTop: -10, marginBottom: 16 }}>
+          Example posts, to show what it looks like. Posts are members&apos; own views, not advice.
         </p>
         <div style={{ border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', overflow: 'hidden' }}>
           {COMMUNITY_POSTS.map((p, i) => (
@@ -185,10 +191,8 @@ export default function LandingPage() {
                 <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>{p.user}</span>
                 <SignalPill signal={p.signal} />
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginLeft: 2 }}>{p.ticker}</span>
-                <span style={{ color: 'var(--text2)', fontSize: 12, marginLeft: 'auto' }}>{p.time}</span>
               </div>
               <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>{p.body}</p>
-              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6 }}>❤️ {p.likes}</p>
             </div>
           ))}
         </div>
@@ -218,7 +222,7 @@ export default function LandingPage() {
           <div>
             <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18, color: 'var(--primary)', marginBottom: 8 }}>Meet Fennec AI</h3>
             <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
-              An AI assistant that knows your full financial picture — your holdings, bank balances, KiwiSaver, spending, and goals. It changes focus automatically based on what you're looking at, so answers are always relevant.
+              An AI assistant that sees a summary of your holdings, bank balances, KiwiSaver, spending and goals. It changes focus based on the page you&apos;re on, so its answers fit what you&apos;re looking at. General information, not financial advice.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {['"Am I on track for retirement?"', '"Should I rebalance my portfolio?"', '"Where am I overspending?"', '"What\'s my net worth trajectory?"'].map(q => (
@@ -256,7 +260,7 @@ export default function LandingPage() {
           <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 12, padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20 }}>Premium</p>
-              <span style={{ background: 'var(--primary)', color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, fontFamily: 'Syne, sans-serif' }}>POPULAR</span>
+              <span style={{ background: 'var(--primary)', color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, fontFamily: 'Syne, sans-serif' }}>COMING SOON</span>
             </div>
             <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 36, fontWeight: 800, marginBottom: 20, color: 'var(--primary)' }}>
               $9<span style={{ fontSize: 14, color: 'var(--text2)' }}>/mo</span>

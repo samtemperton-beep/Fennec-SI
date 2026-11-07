@@ -256,14 +256,14 @@ export default function LoginPage() {
     {
       bg: 'rgba(16,185,129,.12)', color: 'var(--green)',
       icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58"/></svg>,
-      title: 'AI-powered signals on every holding',
-      body: 'Get BUY / HOLD / SELL reasoning in real time across NZ, ASX &amp; US markets.',
+      title: 'AI signals on your holdings',
+      body: 'BUY / HOLD / SELL reasoning for your NZ, ASX &amp; US shares. General information, not financial advice.',
     },
     {
       bg: 'rgba(251,191,36,.1)', color: '#fbbf24',
       icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
       title: 'Smart budgets & earnings calendar',
-      body: 'Set spending targets, get earnings reminders, and stay ahead of market events that affect your portfolio.',
+      body: 'Set spending targets, see upcoming earnings for the companies you hold, and get a reminder the day before they report.',
     },
   ]
 
@@ -316,19 +316,10 @@ export default function LoginPage() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex' }}>
-            {['#5b6aff', '#10b981', '#f59e0b', '#ef4444'].map((bg, i) => (
-              <div key={i} style={{ width: 28, height: 28, borderRadius: '50%', background: bg, border: '2px solid var(--bg)', marginLeft: i === 0 ? 0 : -8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'white', fontWeight: 700, fontFamily: 'Syne, sans-serif' }}>
-                {['K','A','S','M'][i]}
-              </div>
-            ))}
-          </div>
-          <div>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 13, color: 'var(--green)' }}>★★★★★</p>
-            <p style={{ fontSize: 12, color: 'var(--text2)' }}>Trusted by 500+ investors across NZ &amp; AU</p>
-          </div>
-        </div>
+        {/* Only things that are true today: no user counts or ratings until there are real ones. */}
+        <p style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif' }}>
+          Made in New Zealand · Free to start · Read-only bank access
+        </p>
       </div>
 
       {/* ── Right panel: login form ── */}

@@ -20,7 +20,7 @@ const FEATURES = [
     color: 'var(--primary)',
     bg: 'var(--primary-light)',
     label: 'Investments',
-    description: 'Track your NZ, ASX & US portfolio with live prices and AI signals',
+    description: 'Track your NZ, ASX & US portfolio with market prices and AI signals',
     recommended: true,
   },
   {
@@ -289,8 +289,8 @@ export default function OnboardingPage() {
         {step === 'akahu' && (
           <div className="card" style={{ padding: 28 }}>
             <FennecMessage>
-              Now for the most important step. To give you accurate, real-time data across your <strong>bank accounts, investments, and KiwiSaver</strong> — Fennec connects to them via <strong>Akahu</strong>.<br /><br />
-              Akahu is a trusted NZ Open Banking provider. It reads your balances and transactions securely — <strong>Fennec never sees your login credentials</strong>.
+              Now for the most important step. To keep your <strong>bank accounts, investments and KiwiSaver</strong> up to date automatically, Fennec connects to them via <strong>Akahu</strong>. Banks usually send new data once a day.<br /><br />
+              Akahu is a New Zealand open banking provider. It reads your balances and transactions securely — <strong>Fennec never sees your login credentials</strong>.
             </FennecMessage>
 
             {/* Why Akahu matters */}
