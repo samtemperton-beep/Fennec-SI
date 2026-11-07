@@ -31,9 +31,13 @@ const STEPS: { title: string; what: string[]; stuck: string[]; shots: Shot[] }[]
   },
   {
     title: 'Connect your first bank',
-    shots: [{ file: '2-connect-bank.png', alt: 'Akahu’s list of banks to connect' }],
+    shots: [
+      { file: '2-allow-access.png', alt: 'Akahu screen saying your Personal App is requesting ongoing access, with a Continue button' },
+      { file: '2-connect-bank.png', alt: 'Akahu’s Select your provider screen, with a search box and bank logos' },
+    ],
     what: [
       'Follow Akahu’s prompts to connect a bank account. You sign in to your bank through Akahu, and Fennec never sees your banking password.',
+      'Akahu may first say your Personal App (with your name) is requesting ongoing access. That’s expected: press Continue, then pick your bank from the list.',
       'Akahu needs at least one bank connected before the next step works. You can add your broker and KiwiSaver at the same time.',
     ],
     stuck: [
