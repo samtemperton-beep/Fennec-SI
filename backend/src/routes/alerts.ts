@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
-import { fetchPrices } from '../services/yahoo';
+import { fetchPrices, splitSymbol, type Market } from '../services/yahoo';
 import { fetchEarningsCalendar } from '../services/finnhub';
 import { Resend } from 'resend';
 import ws from 'ws';
@@ -83,15 +83,26 @@ async function writeNotification(userId: string, type: string, ticker: string | 
   await supabase.from('notifications').insert({ user_id: userId, type, ticker, title, body });
 }
 
-router.post('/check', requireAuth, async (req, res) => {
-  const user = (req as any).user;
+// "FPH.NZ" -> "FPH (NZX)"; prices with their currency, since an alert on an NZX
+// share is in NZ dollars and one on a US share in US dollars.
+const CURRENCY: Record<Market, string> = { NZX: 'NZ$', ASX: 'A$', US: 'US$' };
+const label = (symbol: string) => { const s = splitSymbol(symbol); return `${s.code} (${s.market})`; };
+const money = (symbol: string, n: number) => `${CURRENCY[splitSymbol(symbol).market]}${Number(n).toFixed(2)}`;
+const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+
+/**
+ * Checks one person's alerts and writes notifications (and emails price alerts).
+ * Used by "Check now" and by the background checker (startAlertChecks).
+ * priceOnly: just the price targets, for the frequent background run.
+ */
+export async function checkAlertsForUser(user: { id: string; email?: string | null }, opts: { priceOnly?: boolean } = {}) {
   const triggered: any[] = [];
 
   // Load prefs
-  const { data: prefs } = await supabase.from('notification_prefs').select('*').eq('user_id', user.id).single();
-  const p = prefs || { frequency: 'morning', stop_loss_pct: 10, take_profit_pct: 20, portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true, earnings_alerts: true };
+  const { data: prefs } = await supabase.from('notification_prefs').select('*').eq('user_id', user.id).maybeSingle();
+  const p = prefs || { stop_loss_pct: 10, take_profit_pct: 20, portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true, earnings_alerts: true };
 
-  // 1. Price alerts (existing)
+  // 1. Price alerts
   if (p.price_alerts !== false) {
     const { data: alerts } = await supabase.from('alerts').select('*').eq('user_id', user.id).eq('triggered', false);
     if (alerts?.length) {
@@ -105,27 +116,29 @@ router.post('/check', requireAuth, async (req, res) => {
         const hit =
           (alert.type === 'above' && price >= alert.price) ||
           (alert.type === 'below' && price <= alert.price);
-        if (hit) {
-          triggered.push({ ...alert, current_price: price, category: 'price' });
-          await supabase.from('alerts').update({ triggered: true }).eq('id', alert.id);
-          await writeNotification(
-            user.id, 'price_alert', alert.ticker,
-            `${alert.ticker} hit your price target`,
-            `${alert.ticker} is now $${price.toFixed(2)} — your alert for price ${alert.type} $${alert.price} was triggered.`
-          );
-          try {
-            const { data: profile } = await supabase.from('profiles').select('username').eq('id', user.id).single();
-            await resend.emails.send({
-              from: 'Fennec <alerts@fennecsi.com>',
-              to: user.email,
-              subject: `Alert: ${alert.ticker} ${alert.type} $${alert.price}`,
-              html: `<h2>Fennec SI Alert</h2><p>Hi ${profile?.username || 'there'},</p><p>${alert.ticker} is now $${price.toFixed(2)} — your ${alert.type} $${alert.price} alert was triggered.</p><p><a href="${process.env.FRONTEND_URL}/app/alerts">View alerts</a></p>`,
-            });
-          } catch {}
-        }
+        if (!hit) continue;
+        // Claim it first, so "Check now" and the background run can't both send it.
+        const { data: claimed } = await supabase.from('alerts').update({ triggered: true })
+          .eq('id', alert.id).eq('triggered', false).select('id');
+        if (!claimed?.length) continue;
+        triggered.push({ ...alert, current_price: price, category: 'price' });
+        const name = typeof priceData === 'object' && priceData.name ? ` ${priceData.name}` : '';
+        const what = `${label(alert.ticker)}${name} is now ${money(alert.ticker, price)}. Your alert for ${alert.type} ${money(alert.ticker, alert.price)} was triggered.`;
+        await writeNotification(user.id, 'price_alert', alert.ticker, `${label(alert.ticker)} hit your price target`, what);
+        if (!user.email) continue;
+        try {
+          const { data: profile } = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle();
+          await resend.emails.send({
+            from: 'Fennec <alerts@fennecsi.com>',
+            to: user.email,
+            subject: `Alert: ${label(alert.ticker)} ${alert.type} ${money(alert.ticker, alert.price)}`,
+            html: `<h2>Fennec SI Alert</h2><p>Hi ${esc(profile?.username || 'there')},</p><p>${esc(what)}</p><p><a href="${process.env.FRONTEND_URL}/app/alerts">View alerts</a></p>`,
+          });
+        } catch {}
       }
     }
   }
+  if (opts.priceOnly) return triggered;
 
   // 2. Portfolio stop-loss / take-profit
   if (p.portfolio_sell_alerts) {
@@ -230,7 +243,80 @@ router.post('/check', requireAuth, async (req, res) => {
     }
   }
 
-  res.json({ triggered, count: triggered.length });
+  return triggered;
+}
+
+router.post('/check', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  try {
+    const triggered = await checkAlertsForUser({ id: user.id, email: user.email });
+    res.json({ triggered, count: triggered.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
+
+// ── Background checks ─────────────────────────────────────────────────────────
+// Price targets every 15 minutes (only people with an alert waiting), and the
+// rest (stop-loss, take-profit, watchlist signals, earnings reminders) every
+// 6 hours for everyone. Started from index.ts with the scheduled sync, so only
+// on the deployed server.
+
+const PRICE_EVERY_MS = 15 * 60 * 1000;
+const FULL_EVERY_MS = 6 * 60 * 60 * 1000;
+let priceRunning = false;
+let fullRunning = false;
+
+async function emailOf(id: string) {
+  const { data } = await supabase.auth.admin.getUserById(id);
+  return data?.user?.email ?? null;
+}
+
+async function runFor(ids: string[], priceOnly: boolean) {
+  let fired = 0;
+  for (const id of ids) {
+    try {
+      fired += (await checkAlertsForUser({ id, email: await emailOf(id) }, { priceOnly })).length;
+    } catch (e: any) {
+      console.error(`[alerts] user ${id.slice(0, 8)} check failed: ${e?.message ?? e}`);
+    }
+  }
+  return fired;
+}
+
+export function startAlertChecks() {
+  async function priceTick() {
+    if (priceRunning) return;
+    priceRunning = true;
+    try {
+      const { data } = await supabase.from('alerts').select('user_id').eq('triggered', false);
+      const ids = [...new Set((data ?? []).map((r: any) => r.user_id as string))];
+      const fired = await runFor(ids, true);
+      if (fired) console.log(`[alerts] ${fired} price alert(s) sent`);
+    } catch (e: any) {
+      console.error('[alerts] price run failed:', e?.message ?? e);
+    } finally { priceRunning = false; }
+  }
+  async function fullTick() {
+    if (fullRunning) return;
+    fullRunning = true;
+    try {
+      const [h, w] = await Promise.all([
+        supabase.from('holdings').select('user_id'),
+        supabase.from('watchlist').select('user_id'),
+      ]);
+      const ids = [...new Set([...(h.data ?? []), ...(w.data ?? [])].map((r: any) => r.user_id as string))];
+      const fired = await runFor(ids, false);
+      console.log(`[alerts] full check: ${ids.length} users, ${fired} notification(s)`);
+    } catch (e: any) {
+      console.error('[alerts] full run failed:', e?.message ?? e);
+    } finally { fullRunning = false; }
+  }
+  setTimeout(priceTick, 60 * 1000);
+  setInterval(priceTick, PRICE_EVERY_MS);
+  setTimeout(fullTick, 5 * 60 * 1000);
+  setInterval(fullTick, FULL_EVERY_MS);
+  console.log('[alerts] background checks on: price targets every 15 min, everything else every 6 hours');
+}
 
 export default router;

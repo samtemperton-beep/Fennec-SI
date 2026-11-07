@@ -60,6 +60,43 @@ export async function fetchPrices(tickers: string[]): Promise<Record<string, { p
   return Object.fromEntries(results);
 }
 
+export type Market = 'NZX' | 'ASX' | 'US';
+export interface Listing { symbol: string; code: string; market: Market; name: string; price: number; currency: string }
+
+const MARKET_SUFFIX: { market: Market; suffix: string; currency: string }[] = [
+  { market: 'NZX', suffix: '.NZ', currency: 'NZD' },
+  { market: 'ASX', suffix: '.AX', currency: 'AUD' },
+  { market: 'US', suffix: '', currency: 'USD' },
+];
+
+/**
+ * Every market a share code is listed on. About 1 in 4 NZX codes is also a
+ * different US company (FPH, AIR, MCY, SKT...), so the person must pick one.
+ * A code typed with its suffix (FPH.NZ) only checks that market. NZX first.
+ */
+export async function lookupCode(raw: string): Promise<Listing[]> {
+  const typed = raw.trim().toUpperCase();
+  const withSuffix = MARKET_SUFFIX.find(m => m.suffix && typed.endsWith(m.suffix));
+  const code = withSuffix ? typed.slice(0, -withSuffix.suffix.length) : typed;
+  if (!/^[A-Z0-9][A-Z0-9\-]{0,9}$/.test(code)) return [];
+  const markets = withSuffix ? [withSuffix] : MARKET_SUFFIX;
+  const found = await Promise.all(markets.map(async m => {
+    try {
+      const y = await yahooMeta(code + m.suffix);
+      return { symbol: code + m.suffix, code, market: m.market, name: y.name || code, price: y.price, currency: y.currency || m.currency } as Listing;
+    } catch { return null; }
+  }));
+  return found.filter((l): l is Listing => l !== null);
+}
+
+/** "FPH.NZ" -> { code: "FPH", market: "NZX" }. A bare code is the US listing. */
+export function splitSymbol(symbol: string): { code: string; market: Market } {
+  const s = symbol.toUpperCase();
+  if (s.endsWith('.NZ')) return { code: s.slice(0, -3), market: 'NZX' };
+  if (s.endsWith('.AX')) return { code: s.slice(0, -3), market: 'ASX' };
+  return { code: s, market: 'US' };
+}
+
 /** A quote from Yahoo alone: price, today's change and 52-week range, without Finnhub's fundamentals. */
 async function yahooQuote(ticker: string) {
   const y = await yahooMeta(ticker);

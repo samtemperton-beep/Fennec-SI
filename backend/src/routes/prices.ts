@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import axios from 'axios';
-import { fetchPrices, fetchQuote, fetchChart, searchSymbols } from '../services/yahoo';
+import { fetchPrices, fetchQuote, fetchChart, searchSymbols, lookupCode } from '../services/yahoo';
 import { requireAuth } from '../middleware/auth';
 import { getUsdNzd, getRateToNzd } from '../services/fx';
 import { getProfiles } from '../services/profiles';
@@ -107,6 +107,18 @@ router.get('/dividends', requireAuth, async (req, res) => {
   if (symbols.length === 0) return res.json({ dividends: {} });
   res.set('Cache-Control', 'private, max-age=3600');
   res.json({ dividends: await getDividends(symbols) });
+});
+
+// GET /api/prices/lookup?code=FPH — every market (NZX / ASX / US) the code is
+// listed on, with name and price, so the person picks the right one.
+router.get('/lookup', requireAuth, async (req, res) => {
+  const code = String(req.query.code || '').trim();
+  if (!code) return res.json([]);
+  try {
+    res.json(await lookupCode(code));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.get('/search', requireAuth, async (req, res) => {

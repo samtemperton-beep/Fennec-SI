@@ -9,7 +9,7 @@ import pricesRouter from './routes/prices';
 import aiRouter from './routes/ai';
 import newsRouter from './routes/news';
 import importRouter from './routes/import';
-import alertsRouter from './routes/alerts';
+import alertsRouter, { startAlertChecks } from './routes/alerts';
 import adminRouter from './routes/admin';
 import premiumRouter from './routes/premium';
 import socialRouter from './routes/social';
@@ -82,6 +82,9 @@ app.listen(PORT, () => {
   if (process.env.ENABLE_SCHEDULED_SYNC === 'true') {
     startScheduledSync();
     startNightlyHealthCheck();
+    // Price targets, stop-loss, signals and earnings reminders, checked and
+    // emailed without anyone opening the Alerts page.
+    startAlertChecks();
     // Same key as the live server, so only here: a local copy with another key
     // would encrypt details the live server can't read.
     encryptLegacyOnStartup();

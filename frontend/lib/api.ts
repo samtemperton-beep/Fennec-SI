@@ -63,6 +63,9 @@ export interface CategoryMatch {
 export const api = {
   searchStocks: (q: string) =>
     apiFetch(`/api/prices/search?q=${encodeURIComponent(q)}`),
+  /** Every market (NZX / ASX / US) a share code is listed on. See lib/markets.ts. */
+  lookupCode: (code: string) =>
+    apiFetch(`/api/prices/lookup?code=${encodeURIComponent(code)}`),
 
   getPrices: (tickers: string[]) =>
     apiFetch(`/api/prices?tickers=${tickers.join(',')}`),

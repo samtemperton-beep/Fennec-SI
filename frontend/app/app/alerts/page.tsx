@@ -6,6 +6,8 @@ import { api } from '@/lib/api'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { timeAgo } from '@/lib/utils'
+import { splitSymbol, priceIn, CURRENCY_OF, type Listing } from '@/lib/markets'
+import { MarketBadge } from '@/components/shared/MarketBadge'
 import {
   IconBell, IconPlus, IconTrash, IconRefresh, IconCheck,
   IconChevronDown, IconArrowDown, IconArrowUp, IconEye,
@@ -39,12 +41,6 @@ const NOTIF_ICON: Record<string, { icon: typeof IconBell; color: string; bg: str
   watchlist_signal:  { icon: IconEye,       color: '#5b7cf0', bg: 'rgba(91,124,240,0.12)' },
   earnings_reminder: { icon: IconBell,      color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
 }
-
-const FREQ_OPTIONS = [
-  { value: 'morning',   label: 'Morning digest',  desc: 'One summary at 8 AM — great for casual traders' },
-  { value: 'hourly',    label: 'Hourly updates',  desc: 'Batched every hour during market hours' },
-  { value: 'immediate', label: 'Immediate',        desc: 'Notified as soon as a condition is met — for active traders' },
-] as const
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -80,6 +76,29 @@ export default function NotificationsPage() {
   const [loadingAlerts, setLoadingAlerts] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
   const [form, setForm] = useState({ ticker: '', type: 'above', price: '' })
+  // Markets the typed code is listed on, and the one picked (see lib/markets.ts).
+  const [listings, setListings] = useState<Listing[] | null>(null)
+  const [listing, setListing] = useState<Listing | null>(null)
+  const [looking, setLooking] = useState(false)
+
+  useEffect(() => {
+    const code = form.ticker.trim()
+    setListing(null)
+    if (!code) { setListings(null); setLooking(false); return }
+    let stale = false
+    setLooking(true)
+    const t = setTimeout(async () => {
+      try {
+        const found: Listing[] = await api.lookupCode(code)
+        if (stale) return
+        const list = Array.isArray(found) ? found : []
+        setListings(list)
+        if (list.length === 1) setListing(list[0]) // only one market: nothing to choose
+      } catch { if (!stale) setListings([]) }
+      if (!stale) setLooking(false)
+    }, 450)
+    return () => { stale = true; clearTimeout(t) }
+  }, [form.ticker])
 
   // Preferences
   const [prefs, setPrefs] = useState<Prefs>({
@@ -145,15 +164,17 @@ export default function NotificationsPage() {
   async function addAlert(e: React.FormEvent) {
     e.preventDefault()
     if (!userId) return
+    if (!listing) return toast.error(listings?.length ? 'Pick which market you mean.' : 'Enter a share code we can find.')
+    // Saved with its market suffix (FPH.NZ), so it's priced on the right exchange.
     const { data, error } = await supabase.from('alerts').insert({
-      user_id: userId, ticker: form.ticker.toUpperCase(), type: form.type,
+      user_id: userId, ticker: listing.symbol, type: form.type,
       price: form.price ? parseFloat(form.price) : null,
     }).select().single()
     if (error) return toast.error(error.message)
     setAlerts(prev => [data, ...prev])
     setAddOpen(false)
     setForm({ ticker: '', type: 'above', price: '' })
-    toast.success('Alert created')
+    toast.success(`Alert created for ${listing.code} (${listing.market})`)
   }
 
   async function removeAlert(id: number) {
@@ -338,7 +359,7 @@ export default function NotificationsPage() {
                 </div>
                 <div>
                   <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Price alerts</div>
-                  <div style={{ fontSize: 12, color: 'var(--text2)' }}>Trigger when a stock crosses a specific price</div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)' }}>Checked about every 15 minutes. You get an email when one is hit.</div>
                 </div>
               </div>
               <button onClick={() => setAddOpen(true)}
@@ -362,9 +383,10 @@ export default function NotificationsPage() {
                       <IconBell size={15} style={{ color: '#f59e0b' }} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>{a.ticker}</span>
+                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, marginRight: 6 }}>{splitSymbol(a.ticker).code}</span>
+                      <MarketBadge market={splitSymbol(a.ticker).market} />
                       <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 8, textTransform: 'capitalize' }}>{a.type}</span>
-                      {a.price != null && <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#f59e0b', marginLeft: 8 }}>${a.price.toFixed(2)}</span>}
+                      {a.price != null && <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#f59e0b', marginLeft: 8 }}>{priceIn(a.ticker, a.price)}</span>}
                       <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Created {timeAgo(a.created_at)}</div>
                     </div>
                     <button onClick={() => removeAlert(a.id)} style={{ color: 'var(--text3)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}><IconTrash size={15} /></button>
@@ -379,8 +401,9 @@ export default function NotificationsPage() {
                       <div key={a.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', opacity: 0.55 }}>
                         <IconCheck size={15} style={{ color: '#22c55e', flexShrink: 0 }} />
                         <div style={{ flex: 1, fontSize: 13 }}>
-                          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700 }}>{a.ticker}</span>
-                          <span style={{ color: 'var(--text2)', marginLeft: 8 }}>{a.type} {a.price != null ? `$${a.price.toFixed(2)}` : ''} — triggered</span>
+                          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, marginRight: 6 }}>{splitSymbol(a.ticker).code}</span>
+                          <MarketBadge market={splitSymbol(a.ticker).market} />
+                          <span style={{ color: 'var(--text2)', marginLeft: 8 }}>{a.type} {a.price != null ? priceIn(a.ticker, a.price) : ''}, triggered</span>
                         </div>
                         <button onClick={() => removeAlert(a.id)} style={{ color: 'var(--text3)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}><IconTrash size={15} /></button>
                       </div>
@@ -403,35 +426,14 @@ export default function NotificationsPage() {
               <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(91,124,240,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <IconClock size={16} style={{ color: '#5b7cf0' }} />
               </div>
-              <div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Check frequency</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)' }}>How often your alerts are scanned and bundled</div>
-              </div>
+              <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>When Fennec checks</div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {FREQ_OPTIONS.map(opt => (
-                <button key={opt.value} onClick={() => setPrefs(p => ({ ...p, frequency: opt.value }))}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                    border: `2px solid ${prefs.frequency === opt.value ? 'var(--primary)' : 'var(--border)'}`,
-                    background: prefs.frequency === opt.value ? 'rgba(91,124,240,0.06)' : 'var(--surface2)',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <span style={{
-                    width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                    border: `2px solid ${prefs.frequency === opt.value ? 'var(--primary)' : 'var(--border)'}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {prefs.frequency === opt.value && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)' }} />}
-                  </span>
-                  <div>
-                    <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{opt.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{opt.desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {/* What backend/src/routes/alerts.ts startAlertChecks actually does. */}
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>
+              <li><strong style={{ color: 'var(--text)' }}>Price alerts:</strong> about every 15 minutes, and you get an email when one is hit.</li>
+              <li><strong style={{ color: 'var(--text)' }}>Everything else</strong> (stop-loss, take-profit, watchlist signals, earnings reminders): every few hours, shown here in your feed.</li>
+              <li>Prices can be delayed by up to 20 minutes, so an alert can arrive a little after the price is reached. Press <strong style={{ color: 'var(--text)' }}>Check now</strong> to check straight away.</li>
+            </ul>
           </div>
 
           {/* Alert toggles */}
@@ -509,10 +511,34 @@ export default function NotificationsPage() {
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="New Price Alert">
         <form onSubmit={addAlert} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 6 }}>Ticker</label>
-            <input value={form.ticker} onChange={e => setForm(p => ({ ...p, ticker: e.target.value.toUpperCase() }))} placeholder="AAPL" required
+            <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 6 }}>Share code</label>
+            <input value={form.ticker} onChange={e => setForm(p => ({ ...p, ticker: e.target.value.toUpperCase() }))} placeholder="e.g. FPH or AAPL" required
+              autoComplete="off" autoCapitalize="characters"
               style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', outline: 'none' }}
             />
+            {/* Every market the code is on. Many NZX codes are also a different US company. */}
+            {looking && <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6 }}>Looking up {form.ticker.trim()}…</p>}
+            {!looking && listings && listings.length === 0 && (
+              <p style={{ fontSize: 12, color: 'var(--red)', marginTop: 6 }}>We can&apos;t find {form.ticker.trim()} on the NZX, ASX or US markets. Check the code.</p>
+            )}
+            {!looking && listings && listings.length > 1 && (
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6 }}>{listings[0].code} is on more than one market. Pick the one you mean:</p>
+            )}
+            {!looking && listings && listings.length > 0 && (
+              <div role="radiogroup" aria-label="Market" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                {listings.map(l => {
+                  const on = listing?.symbol === l.symbol
+                  return (
+                    <button key={l.symbol} type="button" role="radio" aria-checked={on} onClick={() => setListing(l)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 11px', borderRadius: 8, textAlign: 'left', cursor: 'pointer', background: on ? 'var(--primary-light)' : 'var(--surface2)', border: `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`, color: 'var(--text)' }}>
+                      <MarketBadge market={l.market} />
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: 'var(--text2)' }}>{priceIn(l.symbol, l.price)}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 6 }}>Condition</label>
@@ -524,12 +550,14 @@ export default function NotificationsPage() {
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 6 }}>Target price ($)</label>
+            <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 6 }}>
+              Target price {listing ? `(${CURRENCY_OF[listing.market]})` : '($)'}
+            </label>
             <input type="number" step="any" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="150.00" required
               style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', outline: 'none' }}
             />
           </div>
-          <button type="submit" style={{ width: '100%', background: 'var(--primary)', color: 'white', padding: '11px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+          <button type="submit" disabled={!listing} style={{ width: '100%', background: 'var(--primary)', color: 'white', padding: '11px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 700, border: 'none', cursor: listing ? 'pointer' : 'not-allowed', opacity: listing ? 1 : 0.5 }}>
             Create alert
           </button>
         </form>
