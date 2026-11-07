@@ -73,9 +73,10 @@ const STEPS: { title: string; what: string[]; stuck: string[]; shots: Shot[] }[]
   },
   {
     title: 'Copy your two tokens into Fennec',
-    shots: [{ file: '5-tokens.png', alt: 'Akahu’s Developers page showing the App ID Token and User Access Token, each with a copy button' }],
+    shots: [{ file: '5-tokens.png', alt: 'Akahu’s Developers page, with the App ID Token and the User Access Token (hidden, with a Show link) under Configuration' }],
     what: [
-      'Akahu now shows an App ID Token and a User Access Token. These are like keys that let Fennec read your accounts.',
+      'Akahu now shows an App ID Token and a User Access Token under Configuration. These are like keys that let Fennec read your accounts.',
+      'The User Access Token starts hidden as dots: press Show next to it first, then copy it.',
       'Copy each one into the matching box below, then press Connect Akahu. Each box shows a green tick when the token looks right.',
       'On a phone, do one token at a time: copy it, switch back to this tab, paste it, then go back to Akahu for the other.',
       'Keep them private, like a password.',
