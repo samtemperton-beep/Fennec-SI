@@ -19,6 +19,7 @@ import { PortfolioBalance } from '@/components/portfolio/PortfolioBalance'
 import { DividendIncome } from '@/components/portfolio/DividendIncome'
 import { yahooSymbol } from '@/lib/dividends'
 import { PerformanceVsMarket } from '@/components/portfolio/PerformanceVsMarket'
+import { FifTracker } from '@/components/portfolio/FifTracker'
 import { SnapshotHistory } from '@/components/shared/SnapshotHistory'
 import { BadgesDisplay } from '@/components/premium/BadgesDisplay'
 import { VerifyPortfolioModal } from '@/components/premium/VerifyPortfolioModal'
@@ -479,6 +480,8 @@ export default function PortfolioPage() {
       {!loading && holdings.length > 0 && <PortfolioBalance holdings={holdings} riskLevel={riskLevel} />}
 
       {!loading && holdings.length > 0 && <DividendIncome holdings={holdings} nzdPerUsd={fx?.rate} />}
+
+      {!loading && holdings.length > 0 && <FifTracker holdings={holdings} />}
 
       {!loading && !isPremium && maxHoldings > 0 && holdings.length >= maxHoldings - 2 && holdings.length < maxHoldings && (
         <div style={{ marginBottom: 16, padding: '8px 14px', borderRadius: 8, background: 'var(--amber-light)', border: '1px solid var(--amber)', fontSize: 12, color: 'var(--amber)' }}>
