@@ -31,9 +31,12 @@ export class PrivateFieldError extends Error {}
 
 export const isFieldEncrypted = (v: string) => v.startsWith(PREFIX);
 
-const aad = (userId: string, field: PrivateField) => Buffer.from(`${userId}:${field}`, 'utf8');
+// Also used for the saved property details (services/propertyStore.ts), which aren't a field the page edits.
+export type SealedField = PrivateField | 'property_details';
 
-export function encryptField(plain: string, userId: string, field: PrivateField): string {
+const aad = (userId: string, field: SealedField) => Buffer.from(`${userId}:${field}`, 'utf8');
+
+export function encryptField(plain: string, userId: string, field: SealedField): string {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', deriveKey(KEY_CONTEXT), iv);
   cipher.setAAD(aad(userId, field));
@@ -41,7 +44,7 @@ export function encryptField(plain: string, userId: string, field: PrivateField)
   return PREFIX + [iv, cipher.getAuthTag(), ct].map(b => b.toString('base64url')).join(':');
 }
 
-export function decryptField(stored: string, userId: string, field: PrivateField): string {
+export function decryptField(stored: string, userId: string, field: SealedField): string {
   const parts = stored.slice(PREFIX.length).split(':');
   if (!isFieldEncrypted(stored) || parts.length !== 3) throw new TokenDecryptError('Malformed encrypted value.');
   try {

@@ -12,6 +12,18 @@ import { api } from '@/lib/api'
 import { Secret } from '@/components/shared/Secret'
 
 const supabase = createClient()
+
+async function apiGet(path: string) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}${path}`, {
+    headers: { Authorization: `Bearer ${session?.access_token}` },
+  })
+  const result = await r.json()
+  if (!r.ok) throw new Error(result.error || "Couldn't look up the property")
+  return result
+}
+
+const savedOn = (iso?: string) => iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : null
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
 const currencyExact = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
 
@@ -53,6 +65,8 @@ interface PropertyData {
     bedrooms: number | null
     floor_area_sqm: number | null
   } | null
+  /** When it was looked up (saved on the server). */
+  saved_at?: string
 }
 
 export default function HomeLoanPage() {
@@ -81,6 +95,15 @@ export default function HomeLoanPage() {
       setAddressHint(fields.home_address.hint)
       setAddressVersion(v => v + 1)
     } catch { setAddressHint(null) }
+  }
+
+  // The last lookup and rates notice, saved by the server, so neither has to be redone each visit.
+  async function loadSavedProperty() {
+    try {
+      const saved = await apiGet('/api/finance/property/saved')
+      if (saved.property) setPropertyData({ ...saved.property, saved_at: saved.property_at })
+      if (saved.notice) setNotice({ ...saved.notice, saved_at: saved.notice_at })
+    } catch { /* nothing saved yet; the buttons still work */ }
   }
 
   async function showSavedAddress() {
@@ -126,6 +149,7 @@ export default function HomeLoanPage() {
 
     if (data) {
       loadAddressHint()
+      loadSavedProperty()
       const merged = { ...data, address: '', ...(liveBalance !== null ? { balance: liveBalance } : {}) }
       setLoan(merged)
       setDraft(merged)
@@ -143,7 +167,9 @@ export default function HomeLoanPage() {
     if (!user) { setSaving(false); return }
 
     // The address goes to the server separately, to be encrypted.
-    const { address, ...rest } = draft
+    // property_details is the server's (encrypted) saved lookup; writing back the
+    // copy loaded with the page would undo a newer lookup.
+    const { address, property_details, ...rest } = draft as LoanDetails & { property_details?: unknown }
     const payload = { ...rest, user_id: user.id }
     const { data: row, error } = loan.id
       ? await supabase.from('home_loan').update(payload).eq('id', loan.id).select('id').single()
@@ -157,6 +183,8 @@ export default function HomeLoanPage() {
       } catch (e: any) { toast.error(`Loan saved, but not the address: ${e.message}`) }
     }
     setLoan({ ...draft, id: row?.id ?? loan.id, address: '' })
+    // A new address: the saved lookup and notice were for the old one (the server clears them too).
+    if (addressEdited) { setPropertyData(null); setNotice(null) }
     setAddressEdited(false)
     setEditing(false)
     toast.success('Loan details saved')
@@ -178,15 +206,8 @@ export default function HomeLoanPage() {
     setFetchingProperty(true)
     setPropertyError('')
     try {
-      // The server looks up the address saved on the loan.
-      const API = process.env.NEXT_PUBLIC_API_URL || ''
-      const { data: { session } } = await supabase.auth.getSession()
-      const r = await fetch(`${API}/api/finance/property`, {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      })
-      const result = await r.json()
-      if (!r.ok) throw new Error(result.error || "Couldn't look up the property")
-      setPropertyData(result)
+      // The server looks up the address saved on the loan, and saves the result.
+      setPropertyData(await apiGet('/api/finance/property'))
     } catch (e: any) {
       setPropertyData(null)
       setPropertyError(e.message)
@@ -239,7 +260,9 @@ export default function HomeLoanPage() {
         {[shown.land_value && `Land ${currency.format(shown.land_value)}`, shown.improvements_value && `Buildings ${currency.format(shown.improvements_value)}`,
           shown.valuation_date && `valued ${new Date(shown.valuation_date).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })}`].filter(Boolean).join(' · ')}
       </p>
-      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>From {shown.source}</p>
+      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+        From {shown.source}{!rollValue && savedOn(notice?.saved_at) ? `, read ${savedOn(notice?.saved_at)}` : ''}
+      </p>
       {otherProperty && (
         <p style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>This notice doesn&apos;t look like it&apos;s for the address on your loan.</p>
       )}
@@ -248,6 +271,11 @@ export default function HomeLoanPage() {
           style={{ marginTop: 8, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--primary)', background: 'none', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
           Use as rateable value
         </button>
+      )}
+      {!rollValue && (
+        <div style={{ marginTop: 10 }}>
+          <RatesNoticeUpload onRead={setNotice} label="Upload a newer notice" />
+        </div>
       )}
     </div>
   ) : (
@@ -258,7 +286,7 @@ export default function HomeLoanPage() {
           : 'Upload your latest rates notice or revaluation letter and Fennec will read your council valuation (CV) off it.'}
       </p>
       <RatesNoticeUpload onRead={setNotice} />
-      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8 }}>PDF or photo. It&apos;s read once and not kept, and counts as one AI use.</p>
+      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8 }}>PDF or photo. The file isn&apos;t kept, only the values read off it. Counts as one AI use.</p>
     </div>
   )
 
@@ -429,7 +457,7 @@ export default function HomeLoanPage() {
                 </div>
               ))}
               <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, lineHeight: 1.5 }}>
-                Property details from LINZ. A rating valuation is set by your council every three years and isn&apos;t a market valuation.
+                Property details from LINZ{savedOn(propertyData.saved_at) ? `, looked up ${savedOn(propertyData.saved_at)}` : ''}. A rating valuation is set by your council every three years and isn&apos;t a market valuation.
               </p>
             </div>
           ) : (

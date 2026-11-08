@@ -6,6 +6,7 @@ import {
   PRIVATE_FIELDS, isPrivateField, hintFor, loadPrivateFields, savePrivateFields,
   PrivateFieldError, encryptLegacyFields, type PrivateField,
 } from '../services/privateFields';
+import { clearSavedProperty } from '../services/propertyStore';
 import { TokenKeyError, TokenDecryptError, encryptionAvailable } from '../services/tokenCrypto';
 
 // Encrypted personal details (IRD, GST and bank account numbers, home address).
@@ -75,6 +76,8 @@ router.put('/fields', requireAuth, async (req: any, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   try {
     await savePrivateFields(supabase, req.user.id, body);
+    // A new address makes the saved property lookup and rates notice out of date.
+    if ('home_address' in body) await clearSavedProperty(supabase, req.user.id);
     res.json({ ok: true });
   } catch (e) { fail(res, e); }
 });

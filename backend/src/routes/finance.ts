@@ -8,6 +8,7 @@ import { clearAkahuProblem } from '../services/akahuHealth';
 import { lookupProperty, LinzError } from '../services/linz';
 import { readRatesNotice, RatesNoticeError } from '../services/ratesNotice';
 import { loadPrivateFields } from '../services/privateFields';
+import { loadSavedProperty, saveProperty } from '../services/propertyStore';
 
 // "12 smith" from "12 Smith Street, Ponsonby": enough to spot a notice for another property.
 const streetKey = (a: string | null | undefined) => (a || '').toLowerCase().match(/\d+[a-z]?\s+[a-z]+/)?.[0] ?? null;
@@ -91,6 +92,12 @@ router.delete('/akahu', requireAuth, async (req: any, res) => {
   res.json({ ok: true });
 });
 
+// ── GET /api/finance/property/saved ───────────────────────────────────────────
+// The last lookup and rates notice, so the page can show them straight away.
+router.get('/property/saved', requireAuth, async (req: any, res) => {
+  res.json(await loadSavedProperty(supabase, req.user.id));
+});
+
 // ── GET /api/finance/property ─────────────────────────────────────────────────
 // Property details from LINZ (address, legal description, title, land area) for
 // the Home Loan page. See services/linz.ts for why there are no sales or values.
@@ -113,10 +120,18 @@ router.get('/property', requireAuth, async (req: any, res) => {
   // One key for everyone, set on the server. A key someone saved in Settings
   // before that existed still works as a fallback.
   const linzKey = process.env.LINZ_API_KEY || user.user_metadata?.linz_key;
-  if (!linzKey) return res.status(503).json({ error: "Area sales aren't set up yet." });
+  if (!linzKey) return res.status(503).json({ error: "Property lookup isn't set up yet." });
+  // Once the server has its own key, a copy saved on the account isn't needed.
+  if (process.env.LINZ_API_KEY && user.user_metadata?.linz_key) {
+    supabase.auth.admin.updateUserById(userId, { user_metadata: { linz_key: null } })
+      .then(({ error }) => { if (error) console.warn('[linz] old key not removed:', error.message); });
+  }
 
   try {
-    res.json(await lookupProperty(String(address).slice(0, 200), linzKey));
+    const property = await lookupProperty(String(address).slice(0, 200), linzKey);
+    const property_at = new Date().toISOString();
+    await saveProperty(supabase, userId, { property, property_at });
+    res.json({ ...property, saved_at: property_at });
   } catch (e: any) {
     if (e instanceof LinzError) return res.status(404).json({ error: e.message });
     console.error('[linz] lookup failed:', e?.message ?? e);
@@ -126,7 +141,8 @@ router.get('/property', requireAuth, async (req: any, res) => {
 
 // ── POST /api/finance/rates-notice ────────────────────────────────────────────
 // Reads the council valuation from an uploaded rates notice, for councils that
-// aren't in LINZ's open valuation roll. Counts as one AI use; nothing is stored.
+// aren't in LINZ's open valuation roll. Counts as one AI use. The file isn't
+// kept; the values read off it are saved (encrypted) so it needn't be read again.
 router.post('/rates-notice', requireAuth, async (req: any, res) => {
   const file = req.body?.file;
   if (!file?.data || !file?.type) return res.status(400).json({ error: 'Choose a file first.' });
@@ -141,7 +157,9 @@ router.post('/rates-notice', requireAuth, async (req: any, res) => {
       const a = streetKey(home), b = streetKey(notice.address);
       if (a && b) matches_home = a === b;
     } catch { /* no saved address to compare */ }
-    res.json({ ...notice, matches_home });
+    const notice_at = new Date().toISOString();
+    await saveProperty(supabase, req.user.id, { notice: { ...notice, matches_home }, notice_at });
+    res.json({ ...notice, matches_home, saved_at: notice_at });
   } catch (e: any) {
     if (e instanceof RatesNoticeError) return res.status(422).json({ error: e.message });
     console.error('[rates notice] read failed:', e?.message ?? e);

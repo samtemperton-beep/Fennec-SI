@@ -15,6 +15,8 @@ export interface RatesNoticeValues {
   annual_rates: number | null
   /** Whether the notice's address matches the saved home loan address (checked on the server). */
   matches_home?: boolean | null
+  /** When it was read (the values are saved on the server). */
+  saved_at?: string
 }
 
 const MAX_BYTES = 6 * 1024 * 1024

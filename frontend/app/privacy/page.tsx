@@ -36,7 +36,7 @@ export default function PrivacyPage() {
           <br /><br />
           <strong>Broker statements (optional, Premium):</strong> if you verify your portfolio, the statement you upload is read to confirm your holdings and isn&apos;t kept after verification.
           <br /><br />
-          <strong>Rates notices (optional):</strong> if you upload a rates notice or revaluation letter on the Home Loan page, it&apos;s read to find your council valuation and isn&apos;t kept. Only the values you choose to save are stored.
+          <strong>Rates notices (optional):</strong> if you upload a rates notice or revaluation letter on the Home Loan page, it&apos;s read to find your council valuation. The file itself isn&apos;t kept. The details read off it (the council, address, valuation reference and values) are saved, encrypted, so you don&apos;t need to upload it again, and are deleted if you change your address or delete your account.
           <br /><br />
           <strong>Partner sharing (optional):</strong> if you link with a partner, we record the link and what you&apos;ve chosen to share with them.
           <br /><br />
@@ -93,7 +93,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="7. Security">
-          Information is encrypted in transit (HTTPS) and at rest. On top of that, bank and Gmail connection keys, IRD, GST and bank account numbers, and your home address are encrypted with a key held separately from the database, so a copy of the database alone wouldn&apos;t reveal them. For KiwiSaver we keep only the month and year you were born, not the full date. On screen, dollar amounts and those details start hidden until you tap the eye, and you&apos;re signed out after a period without activity. You can adjust these in Settings → Security &amp; privacy. Database rules keep each person&apos;s records to themselves, and you can turn on two-factor sign-in in Settings. Bank access is read-only. No system is completely secure, so please use a strong, unique password, and tell us straight away if you think your account has been accessed by someone else.
+          Information is encrypted in transit (HTTPS) and at rest. On top of that, bank and Gmail connection keys, IRD, GST and bank account numbers, your home address and the property details looked up for it are encrypted with a key held separately from the database, so a copy of the database alone wouldn&apos;t reveal them. For KiwiSaver we keep only the month and year you were born, not the full date. On screen, dollar amounts and those details start hidden until you tap the eye, and you&apos;re signed out after a period without activity. You can adjust these in Settings → Security &amp; privacy. Database rules keep each person&apos;s records to themselves, and you can turn on two-factor sign-in in Settings. Bank access is read-only. No system is completely secure, so please use a strong, unique password, and tell us straight away if you think your account has been accessed by someone else.
         </Section>
 
         <Section title="8. Cookies and browser storage">
