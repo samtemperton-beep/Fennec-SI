@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { IconReceiptTax, IconRefresh } from '@tabler/icons-react'
 import { api } from '@/lib/api'
 import {
@@ -17,20 +17,21 @@ const MARKET_CURRENCY: Record<string, string> = { US: 'USD', ASX: 'AUD', NZX: 'N
 const currencyOf = (m?: string | null) => MARKET_CURRENCY[(m || 'US').toUpperCase()] ?? 'USD'
 const IRD_URL = 'https://www.ird.govt.nz/income-tax/income-tax-for-businesses-and-organisations/types-of-business-income/foreign-investment-funds-fifs'
 const nz = (n: number) => `NZ${fmtMoney(n, 'NZD', 0)}` // "NZ$": the rest of this page is in US$
-// The limits are public figures, so they stay shown when amounts are hidden.
-const LIMIT_CURRENT = `NZ$${FIF_LIMIT_CURRENT.toLocaleString('en-NZ')}`
-const LIMIT_PROPOSED = `NZ$${FIF_LIMIT_PROPOSED.toLocaleString('en-NZ')}`
+// The limits are public figures, so they stay shown when amounts are hidden
+// (PrivacyMode's masker skips data-amounts="show").
+const LIMIT_CURRENT = <span data-amounts="show">NZ${FIF_LIMIT_CURRENT.toLocaleString('en-NZ')}</span>
+const LIMIT_PROPOSED = <span data-amounts="show">NZ${FIF_LIMIT_PROPOSED.toLocaleString('en-NZ')}</span>
 
 const LEVEL_COLOR: Record<LimitStatus['level'], string> = {
   'well-under': 'var(--green)', 'getting-close': 'var(--amber)', close: 'var(--amber)', over: 'var(--red)',
 }
 
-function statusText(s: FifSummary): string {
+function statusText(s: FifSummary) {
   const cur = s.current, pro = s.proposed
-  if (cur.level === 'well-under') return `Well under the current ${LIMIT_CURRENT} limit, with about ${nz(cur.headroom)} of room.`
-  if (!cur.over) return `Getting close to the current ${LIMIT_CURRENT} limit, with about ${nz(cur.headroom)} of room left. If the cost of your overseas shares goes over it at any point in a tax year, the FIF rules apply for that year.`
-  if (!pro.over) return `At or over the current ${LIMIT_CURRENT} limit, so unless the proposed ${LIMIT_PROPOSED} limit has become law, the FIF rules apply to you. You'd be under the proposed limit, with about ${nz(pro.headroom)} of room.`
-  return `At or over both the current ${LIMIT_CURRENT} limit and the proposed ${LIMIT_PROPOSED} limit, so the FIF rules would apply to you either way.`
+  if (cur.level === 'well-under') return <>Well under the current {LIMIT_CURRENT} limit, with about {nz(cur.headroom)} of room.</>
+  if (!cur.over) return <>Getting close to the current {LIMIT_CURRENT} limit, with about {nz(cur.headroom)} of room left. If the cost of your overseas shares goes over it at any point in a tax year, the FIF rules apply for that year.</>
+  if (!pro.over) return <>At or over the current {LIMIT_CURRENT} limit, so unless the proposed {LIMIT_PROPOSED} limit has become law, the FIF rules apply to you. You&apos;d be under the proposed limit, with about {nz(pro.headroom)} of room.</>
+  return <>At or over both the current {LIMIT_CURRENT} limit and the proposed {LIMIT_PROPOSED} limit, so the FIF rules would apply to you either way.</>
 }
 
 export interface FifView {
@@ -43,7 +44,7 @@ export function FifCard({ view, marginalRate, onRate, onRetry }: { view: FifView
   const year = nzTaxYear(view.asOf)
   const scale = Math.max(FIF_LIMIT_PROPOSED * 1.05, s.costNzd * 1.05)
   const fdr = estimateFdr(s.valueNzd, marginalRate)
-  const tick = (limit: number, label: string, align: 'left' | 'right') => (
+  const tick = (limit: number, label: ReactNode, align: 'left' | 'right') => (
     <div style={{ position: 'absolute', left: `${(limit / scale) * 100}%`, top: -4, height: 16, borderLeft: '2px solid var(--text)' }}>
       <span style={{ position: 'absolute', top: 18, [align === 'left' ? 'left' : 'right']: 4, fontSize: 9, whiteSpace: 'nowrap', color: 'var(--text3)' }}>{label}</span>
     </div>
@@ -68,8 +69,8 @@ export function FifCard({ view, marginalRate, onRate, onRetry }: { view: FifView
 
       <div style={{ position: 'relative', height: 8, background: 'var(--surface3)', borderRadius: 4, margin: '6px 0 30px' }}>
         <div style={{ height: '100%', width: `${Math.min(100, (s.costNzd / scale) * 100)}%`, background: LEVEL_COLOR[s.current.level], borderRadius: 4 }} />
-        {tick(FIF_LIMIT_CURRENT, `${LIMIT_CURRENT} current rule`, 'right')}
-        {tick(FIF_LIMIT_PROPOSED, `${LIMIT_PROPOSED} proposed`, 'right')}
+        {tick(FIF_LIMIT_CURRENT, <>{LIMIT_CURRENT} current rule</>, 'right')}
+        {tick(FIF_LIMIT_PROPOSED, <>{LIMIT_PROPOSED} proposed</>, 'right')}
       </div>
 
       <p style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }}>{statusText(s)}</p>
