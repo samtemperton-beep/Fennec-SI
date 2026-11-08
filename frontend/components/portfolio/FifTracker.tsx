@@ -17,6 +17,9 @@ const MARKET_CURRENCY: Record<string, string> = { US: 'USD', ASX: 'AUD', NZX: 'N
 const currencyOf = (m?: string | null) => MARKET_CURRENCY[(m || 'US').toUpperCase()] ?? 'USD'
 const IRD_URL = 'https://www.ird.govt.nz/income-tax/income-tax-for-businesses-and-organisations/types-of-business-income/foreign-investment-funds-fifs'
 const nz = (n: number) => `NZ${fmtMoney(n, 'NZD', 0)}` // "NZ$": the rest of this page is in US$
+// The limits are public figures, so they stay shown when amounts are hidden.
+const LIMIT_CURRENT = `NZ$${FIF_LIMIT_CURRENT.toLocaleString('en-NZ')}`
+const LIMIT_PROPOSED = `NZ$${FIF_LIMIT_PROPOSED.toLocaleString('en-NZ')}`
 
 const LEVEL_COLOR: Record<LimitStatus['level'], string> = {
   'well-under': 'var(--green)', 'getting-close': 'var(--amber)', close: 'var(--amber)', over: 'var(--red)',
@@ -24,10 +27,10 @@ const LEVEL_COLOR: Record<LimitStatus['level'], string> = {
 
 function statusText(s: FifSummary): string {
   const cur = s.current, pro = s.proposed
-  if (cur.level === 'well-under') return `Well under the current ${nz(FIF_LIMIT_CURRENT)} limit, with about ${nz(cur.headroom)} of room.`
-  if (!cur.over) return `Getting close to the current ${nz(FIF_LIMIT_CURRENT)} limit, with about ${nz(cur.headroom)} of room left. If the cost of your overseas shares goes over it at any point in a tax year, the FIF rules apply for that year.`
-  if (!pro.over) return `At or over the current ${nz(FIF_LIMIT_CURRENT)} limit, so unless the proposed ${nz(FIF_LIMIT_PROPOSED)} limit has become law, the FIF rules apply to you. You'd be under the proposed limit, with about ${nz(pro.headroom)} of room.`
-  return `At or over both the current ${nz(FIF_LIMIT_CURRENT)} limit and the proposed ${nz(FIF_LIMIT_PROPOSED)} limit, so the FIF rules would apply to you either way.`
+  if (cur.level === 'well-under') return `Well under the current ${LIMIT_CURRENT} limit, with about ${nz(cur.headroom)} of room.`
+  if (!cur.over) return `Getting close to the current ${LIMIT_CURRENT} limit, with about ${nz(cur.headroom)} of room left. If the cost of your overseas shares goes over it at any point in a tax year, the FIF rules apply for that year.`
+  if (!pro.over) return `At or over the current ${LIMIT_CURRENT} limit, so unless the proposed ${LIMIT_PROPOSED} limit has become law, the FIF rules apply to you. You'd be under the proposed limit, with about ${nz(pro.headroom)} of room.`
+  return `At or over both the current ${LIMIT_CURRENT} limit and the proposed ${LIMIT_PROPOSED} limit, so the FIF rules would apply to you either way.`
 }
 
 export interface FifView {
@@ -60,19 +63,19 @@ export function FifCard({ view, marginalRate, onRate, onRetry }: { view: FifView
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
         <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 500 }}>≈ {nz(s.costNzd)}</p>
-        <p style={{ fontSize: 12, color: 'var(--text2)' }}>cost of your overseas shares, {Math.round(s.current.used * 100)}% of the current {nz(FIF_LIMIT_CURRENT)} limit</p>
+        <p style={{ fontSize: 12, color: 'var(--text2)' }}>cost of your overseas shares, {Math.round(s.current.used * 100)}% of the current {LIMIT_CURRENT} limit</p>
       </div>
 
       <div style={{ position: 'relative', height: 8, background: 'var(--surface3)', borderRadius: 4, margin: '6px 0 30px' }}>
         <div style={{ height: '100%', width: `${Math.min(100, (s.costNzd / scale) * 100)}%`, background: LEVEL_COLOR[s.current.level], borderRadius: 4 }} />
-        {tick(FIF_LIMIT_CURRENT, `${nz(FIF_LIMIT_CURRENT)} current rule`, 'right')}
-        {tick(FIF_LIMIT_PROPOSED, `${nz(FIF_LIMIT_PROPOSED)} proposed`, 'right')}
+        {tick(FIF_LIMIT_CURRENT, `${LIMIT_CURRENT} current rule`, 'right')}
+        {tick(FIF_LIMIT_PROPOSED, `${LIMIT_PROPOSED} proposed`, 'right')}
       </div>
 
       <p style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }}>{statusText(s)}</p>
 
       <p style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 12 }}>
-        <strong>The limit may be changing.</strong> Budget 2026 proposes raising it from {nz(FIF_LIMIT_CURRENT)} to {nz(FIF_LIMIT_PROPOSED)}, from 1 April 2026. Inland Revenue&apos;s information sheet of 28 May 2026 describes this as a proposal that could change in Parliament, so check{' '}
+        <strong>The limit may be changing.</strong> Budget 2026 proposes raising it from {LIMIT_CURRENT} to {LIMIT_PROPOSED}, from 1 April 2026. Inland Revenue&apos;s information sheet of 28 May 2026 describes this as a proposal that could change in Parliament, so check{' '}
         <a href={IRD_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>ird.govt.nz</a> for whether it has passed.
       </p>
 
