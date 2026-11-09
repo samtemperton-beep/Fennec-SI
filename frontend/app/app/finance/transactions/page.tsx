@@ -7,6 +7,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconSearch, IconX, IconCheck, IconArrowLeft, IconWand } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { suggestKeyword } from '@/lib/categoryRules'
+import { NewCategory } from '@/components/finance/NewCategory'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
@@ -88,10 +89,11 @@ function TransactionsPageInner() {
     setLoading(false)
   }
 
-  async function setCategory(txId: string, categoryId: string, description: string) {
+  async function setCategory(txId: string, categoryId: string, description: string, newName?: string) {
     const { error } = await supabase.from('fin_transactions').update({ category_id: categoryId, category_source: 'manual', shared_match_id: null }).eq('id', txId)
     if (error) { toast.error(error.message); return }
-    const cat = categories.find(c => c.id === categoryId)
+    // A category made a moment ago isn't in `categories` yet in this render.
+    const cat = newName ? { id: categoryId, name: newName } : categories.find(c => c.id === categoryId)
     setTransactions(prev => prev.map(t => t.id === txId
       ? { ...t, category_id: categoryId, category: cat ? { name: cat.name } : null, category_source: 'manual' as const, shared_match_id: null, shared_match: null }
       : t))
@@ -237,6 +239,12 @@ function TransactionsPageInner() {
                             {c.name}
                           </button>
                         ))}
+                        {/* Make a category of your own, and put this transaction in it. */}
+                        <NewCategory compact defaultKind={t.amount > 0 ? 'income' : 'spending'}
+                          onCreated={c => {
+                            setCategories(prev => [...prev, { id: c.id, name: c.name }].sort((a, b) => a.name.localeCompare(b.name)))
+                            setCategory(t.id, c.id, t.description, c.name)
+                          }} />
                         {t.category_source === 'shared' && t.shared_match_id && (
                           <button onClick={() => dismissShared(t)} title="Fennec’s shared list chose this category. This stops it for you."
                             style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--red)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>

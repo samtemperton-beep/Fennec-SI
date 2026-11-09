@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isIncomeCategory } from '@/lib/categories'
 import { api, type NetWorthResponse } from '@/lib/api'
 import { GOVT_MTC_FULL_AT, GOVT_MTC_MAX, GOVT_MTC_MAX_AGE, currentAge } from '@/lib/kiwisaver'
 import { matchEmailsToBills, isPayable, type Bill, type EmailItem } from '@/lib/bills'
@@ -121,16 +122,18 @@ async function budgetInsights({ supabase }: InsightContext): Promise<Insight[]> 
   const through = now.getDate() / daysInMonth
 
   const [{ data: cats, error }, { data: txs }] = await Promise.all([
-    supabase.from('fin_categories').select('id, name, monthly_budget').eq('scope', 'household').gt('monthly_budget', 0),
+    // '*' for kind: an income category's figure is expected income, not a spending limit.
+    supabase.from('fin_categories').select('*').eq('scope', 'household').gt('monthly_budget', 0),
     supabase.from('fin_transactions').select('category_id, amount').gte('date', monthStart).lt('amount', 0).not('category_id', 'is', null),
   ])
-  if (error || !cats?.length) return []
+  const budgets = (cats ?? []).filter((c: any) => !isIncomeCategory(c))
+  if (error || !budgets.length) return []
 
   const spent: Record<string, number> = {}
   for (const t of txs ?? []) spent[t.category_id] = (spent[t.category_id] ?? 0) + Math.abs(Number(t.amount))
 
   const out: Insight[] = []
-  for (const c of cats) {
+  for (const c of budgets) {
     const budget = Number(c.monthly_budget)
     const s = spent[c.id] ?? 0
     const used = s / budget
@@ -156,7 +159,7 @@ async function budgetInsights({ supabase }: InsightContext): Promise<Insight[]> 
     out.push({
       id: `budget-ok:${monthKey}`,
       severity: 'good', section: 'finance',
-      title: cats.length === 1 ? `Your ${cats[0].name} budget is on track` : `All ${cats.length} budgets are on track`,
+      title: budgets.length === 1 ? `Your ${budgets[0].name} budget is on track` : `All ${budgets.length} budgets are on track`,
       href: '/app/finance/budget',
     })
   }

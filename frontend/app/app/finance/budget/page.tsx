@@ -8,6 +8,8 @@ import { IconChevronLeft, IconChevronRight, IconBulb, IconRefresh, IconCoin, Ico
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { SavingsTip } from '@/lib/api'
+import { isIncomeCategory } from '@/lib/categories'
+import { NewCategory } from '@/components/finance/NewCategory'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
@@ -19,7 +21,8 @@ function catColor(name: string) {
   return CATEGORY_COLORS[h % CATEGORY_COLORS.length]
 }
 
-interface Category { id: string; name: string; monthly_budget: number | null }
+// For income categories, monthly_budget is the income you expect each month.
+interface Category { id: string; name: string; monthly_budget: number | null; kind?: string | null }
 
 function getMonthBounds(offset: number) {
   const now = new Date()
@@ -32,6 +35,7 @@ export default function BudgetPage() {
   const [offset, setOffset] = useState(0)
   const [categories, setCategories] = useState<Category[]>([])
   const [spent, setSpent] = useState<Record<string, number>>({})
+  const [received, setReceived] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
@@ -45,19 +49,25 @@ export default function BudgetPage() {
   async function load() {
     setLoading(true)
     const [{ data: cats }, { data: txs }] = await Promise.all([
-      supabase.from('fin_categories').select('id, name, monthly_budget').eq('scope', 'household').order('name'),
+      // '*' so this works before and after category_kind_migration.sql adds `kind`.
+      supabase.from('fin_categories').select('*').eq('scope', 'household').order('name'),
       supabase.from('fin_transactions')
         .select('category_id, amount')
         .gte('date', localDate(start))
         .lte('date', localDate(end))
-        .lt('amount', 0),
+        .not('category_id', 'is', null),
     ])
-    setCategories(cats || [])
-    const totals: Record<string, number> = {}
+    setCategories((cats || []) as Category[])
+    // Money out per category (spending), and money in per category (income received).
+    const out: Record<string, number> = {}
+    const into: Record<string, number> = {}
     for (const t of txs || []) {
-      if (t.category_id) totals[t.category_id] = (totals[t.category_id] || 0) + Math.abs(Number(t.amount))
+      const amt = Number(t.amount)
+      if (amt < 0) out[t.category_id] = (out[t.category_id] || 0) - amt
+      else if (amt > 0) into[t.category_id] = (into[t.category_id] || 0) + amt
     }
-    setSpent(totals)
+    setSpent(out)
+    setReceived(into)
     setLoading(false)
   }
 
@@ -82,10 +92,62 @@ export default function BudgetPage() {
     }
   }
 
-  const totalBudget = categories.reduce((s, c) => s + (c.monthly_budget || 0), 0)
-  const totalSpent = Object.values(spent).reduce((s, v) => s + v, 0)
-  const catsWithBudget = categories.filter(c => c.monthly_budget)
-  const catsWithSpend = categories.filter(c => spent[c.id])
+  // Income is set and tracked separately, and never counted in the budget.
+  const spendingCats = categories.filter(c => !isIncomeCategory(c))
+  const incomeCats = categories.filter(c => isIncomeCategory(c))
+  const totalBudget = spendingCats.reduce((s, c) => s + (Number(c.monthly_budget) || 0), 0)
+  const totalSpent = spendingCats.reduce((s, c) => s + (spent[c.id] || 0), 0)
+  const expectedIncome = incomeCats.reduce((s, c) => s + (Number(c.monthly_budget) || 0), 0)
+  const receivedIncome = incomeCats.reduce((s, c) => s + (received[c.id] || 0), 0)
+
+  const addCategory = (c: Category) => setCategories(prev => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))
+
+  // One row: the category, this month's amount, and its limit (or expected income), editable.
+  const row = (cat: Category, i: number, list: Category[], income: boolean) => {
+    const s = income ? (received[cat.id] || 0) : (spent[cat.id] || 0)
+    const budget = Number(cat.monthly_budget) || 0
+    const pct = budget > 0 ? Math.min((s / budget) * 100, 100) : 0
+    const over = !income && budget > 0 && s > budget
+    const statusColor = income ? 'var(--green)' : over ? 'var(--red)' : pct >= 80 ? 'var(--amber)' : 'var(--green)'
+    return (
+      <div key={cat.id} style={{ padding: '14px 20px', borderBottom: i < list.length - 1 ? '1px solid var(--border)' : 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 3, background: catColor(cat.name), flexShrink: 0 }} />
+          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, flex: 1 }}>{cat.name}</span>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: over ? 'var(--red)' : income && s > 0 ? 'var(--green)' : 'var(--text)' }}>{currency.format(s)}</span>
+          <span style={{ fontSize: 12, color: 'var(--text2)' }}>/</span>
+          {editing === cat.id ? (
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input autoFocus value={editVal} onChange={e => setEditVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveBudget(cat.id); if (e.key === 'Escape') setEditing(null) }}
+                aria-label={income ? `Expected ${cat.name} each month` : `Monthly budget for ${cat.name}`}
+                style={{ width: 80, padding: '3px 7px', borderRadius: 6, border: '1px solid var(--primary)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontFamily: 'DM Mono, monospace', outline: 'none' }} />
+              <button onClick={() => saveBudget(cat.id)} style={{ padding: '3px 8px', borderRadius: 6, background: 'var(--primary)', color: 'white', border: 'none', fontSize: 11, cursor: 'pointer' }}>Save</button>
+            </div>
+          ) : (
+            <button onClick={() => { setEditing(cat.id); setEditVal(String(budget || '')) }}
+              style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: 'var(--text2)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, textDecoration: budget ? 'none' : 'underline dotted' }}>
+              {budget ? currency.format(budget) : income ? 'Set expected' : 'Set budget'}
+            </button>
+          )}
+        </div>
+        {budget > 0 && (
+          <div style={{ height: 5, borderRadius: 3, background: 'var(--surface2)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, background: statusColor, borderRadius: 3, transition: 'width 0.4s' }} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const sectionHead = (title: string, note: string, kind: 'spending' | 'income') => (
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+      <div>
+        <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>{title}</h2>
+        <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{note}</p>
+      </div>
+      <NewCategory defaultKind={kind} onCreated={c => addCategory(c as Category)} />
+    </div>
+  )
 
   return (
     <div style={{ padding: 28 }}>
@@ -93,7 +155,7 @@ export default function BudgetPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Budget</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>Monthly spending vs. budget by category</p>
+          <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>Monthly spending against your budget, and income kept separate</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => setOffset(o => o - 1)} style={{ padding: 6, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text2)', cursor: 'pointer', lineHeight: 0 }}><IconChevronLeft size={16} /></button>
@@ -105,8 +167,8 @@ export default function BudgetPage() {
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: 16, marginBottom: 24 }}>
         {[
-          { label: 'Budgeted', value: totalBudget, color: 'var(--primary)' },
-          { label: 'Spent', value: totalSpent, color: totalSpent > totalBudget ? 'var(--red)' : 'var(--text)' },
+          { label: 'Monthly budget', value: totalBudget, color: 'var(--primary)' },
+          { label: 'Spent this month', value: totalSpent, color: totalSpent > totalBudget ? 'var(--red)' : 'var(--text)' },
           { label: 'Remaining', value: Math.max(0, totalBudget - totalSpent), color: 'var(--green)' },
         ].map(s => (
           <div key={s.label} className="card" style={{ padding: 20 }}>
@@ -161,43 +223,29 @@ export default function BudgetPage() {
       </div>
 
       {loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><LoadingSpinner size={28} /></div> : (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          {categories.length === 0 ? (
-            <p style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14 }}>No categories yet.</p>
-          ) : categories.map((cat, i) => {
-            const s = spent[cat.id] || 0
-            const budget = cat.monthly_budget || 0
-            const pct = budget > 0 ? Math.min((s / budget) * 100, 100) : 0
-            const over = budget > 0 && s > budget
-            const statusColor = over ? 'var(--red)' : pct >= 80 ? 'var(--amber)' : 'var(--green)'
-            return (
-              <div key={cat.id} style={{ padding: '14px 20px', borderBottom: i < categories.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 3, background: catColor(cat.name), flexShrink: 0 }} />
-                  <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, flex: 1 }}>{cat.name}</span>
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 13, color: over ? 'var(--red)' : 'var(--text)' }}>{currency.format(s)}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>/</span>
-                  {editing === cat.id ? (
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <input autoFocus value={editVal} onChange={e => setEditVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveBudget(cat.id); if (e.key === 'Escape') setEditing(null) }}
-                        style={{ width: 80, padding: '3px 7px', borderRadius: 6, border: '1px solid var(--primary)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontFamily: 'DM Mono, monospace', outline: 'none' }} />
-                      <button onClick={() => saveBudget(cat.id)} style={{ padding: '3px 8px', borderRadius: 6, background: 'var(--primary)', color: 'white', border: 'none', fontSize: 11, cursor: 'pointer' }}>Save</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => { setEditing(cat.id); setEditVal(String(budget || '')) }}
-                      style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: 'var(--text2)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, textDecoration: budget ? 'none' : 'underline dotted' }}>
-                      {budget ? currency.format(budget) : 'Set budget'}
-                    </button>
-                  )}
-                </div>
-                {budget > 0 && (
-                  <div style={{ height: 5, borderRadius: 3, background: 'var(--surface2)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: statusColor, borderRadius: 3, transition: 'width 0.4s' }} />
-                  </div>
-                )}
-              </div>
-            )
-          })}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {sectionHead('Monthly budget', 'Spent this month / your limit for each category. Tap a limit to change it.', 'spending')}
+            {spendingCats.length === 0
+              ? <p style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14 }}>No spending categories yet.</p>
+              : spendingCats.map((c, i) => row(c, i, spendingCats, false))}
+          </div>
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {sectionHead('Income', 'Received this month / what you expect each month. Not counted in your budget.', 'income')}
+            {incomeCats.length === 0
+              ? <p style={{ padding: 24, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>No income categories yet.</p>
+              : incomeCats.map((c, i) => row(c, i, incomeCats, true))}
+            {expectedIncome > 0 && (
+              <p style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                You expect <strong style={{ color: 'var(--text)' }}>{currency.format(expectedIncome)}</strong> a month and have budgeted <strong style={{ color: 'var(--text)' }}>{currency.format(totalBudget)}</strong>
+                {expectedIncome >= totalBudget
+                  ? <>, leaving <strong style={{ color: 'var(--green)' }}>{currency.format(expectedIncome - totalBudget)}</strong> unbudgeted to save or invest.</>
+                  : <>: <strong style={{ color: 'var(--red)' }}>{currency.format(totalBudget - expectedIncome)}</strong> more than you expect to earn.</>}
+                {receivedIncome > 0 && <> {currency.format(receivedIncome)} has come in so far this month.</>}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
