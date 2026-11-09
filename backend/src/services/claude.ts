@@ -176,6 +176,59 @@ Return JSON with: what_happened (string), why_it_matters (string), portfolio_imp
   return jsonMatch ? JSON.parse(jsonMatch[0]) : { what_happened: text };
 }
 
+export interface SavingsTip {
+  title: string;
+  saving: number;
+  detail: string;
+  action: string;
+  category: 'subscriptions' | 'dining' | 'groceries' | 'phone' | 'debt' | 'general';
+}
+
+export async function generateSavingsTips(
+  spendData: {
+    byCategory: Record<string, number>;
+    subscriptions: { name: string; amount: number }[];
+    totalExpenses: number;
+    totalIncome: number;
+  },
+  apiKey?: string,
+  model?: string
+): Promise<SavingsTip[]> {
+  const catLines = Object.entries(spendData.byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, amount]) => `${cat}: $${Math.round(amount)}/mo`)
+    .join('\n');
+
+  const subLine = spendData.subscriptions.length > 0
+    ? `\nSubscriptions: ${spendData.subscriptions.map(s => `${s.name} $${s.amount}`).join(', ')}`
+    : '';
+
+  const incomeExpense = spendData.totalIncome > 0
+    ? `\nMonthly income: $${Math.round(spendData.totalIncome)} | Total expenses: $${Math.round(spendData.totalExpenses)} | Savings rate: ${Math.round(((spendData.totalIncome - spendData.totalExpenses) / spendData.totalIncome) * 100)}%`
+    : `\nTotal expenses: $${Math.round(spendData.totalExpenses)}/mo`;
+
+  const prompt = `You are a sharp personal finance advisor. Analyse this person's actual spending data and generate 4–6 specific, actionable savings tips — each with a concrete dollar saving estimate.
+
+SPENDING DATA:
+${catLines}${subLine}${incomeExpense}
+
+For each tip:
+- Reference the actual numbers from the data
+- For subscriptions: name each service, its amount, and the rotation strategy specifically
+- Give a realistic monthly saving in dollars (not a range — pick the midpoint)
+- Keep the action step concrete and achievable this week
+- Do NOT invent categories or amounts not in the data
+
+Return JSON array only:
+[{ "title": "short title", "saving": 45, "detail": "2 sentences with specific amounts from the data", "action": "one concrete step to take this week", "category": "subscriptions|dining|groceries|phone|debt|general" }]
+
+Sort by saving amount descending. Max 6 tips.`;
+
+  const text = await complete({ model: model || MODEL, maxTokens: 1024, messages: [{ role: 'user', content: prompt }], apiKey });
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+}
+
 export async function draftPost(ticker: string, signal: string, context: string, apiKey?: string, model?: string) {
   const prompt = `Draft a concise, engaging community post (max 280 chars) for a stock investment community about ${ticker} with a ${signal} signal. Context: ${context}. Be direct and specific.`;
 
@@ -249,7 +302,27 @@ export async function* streamHelper(messages: Message[], apiKey?: string, contex
 
 **Personal finance expertise**: Budgeting, cash flow management, debt reduction, savings strategies, NZ-specific knowledge (KiwiSaver, PIE funds, IRD, NZ tax system, RBNZ OCR, NZ property market, NZ cost of living). Understanding of household financial planning, net worth building, and retirement planning.
 
-**NZ context**: You understand NZ-specific financial products, regulations, and norms. KiwiSaver contribution rates (3/4/6/8/10%), employer matching, government MTC ($521.43/year max), PIE tax rates, NZ Super at 65, and NZ bank products.${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}
+**NZ context**: You understand NZ-specific financial products, regulations, and norms. KiwiSaver contribution rates (3/4/6/8/10%), employer matching, government MTC ($521.43/year max), PIE tax rates, NZ Super at 65, and NZ bank products.
+
+**Savings & spending strategies** (draw on these when analysing the user's spending data or answering budgeting questions):
+
+*Subscription rotation*: Streaming services (Netflix, Disney+, Apple TV+, Neon, Binge, Paramount+, Stan, Sky Sport, YouTube Premium) often have overlapping content. Strategy: keep 1–2 core services year-round (the most-watched), and rotate the rest — subscribe one month, binge the content you want, cancel, pick up another next month. Most services have no penalty for rejoining. Example: keeping Netflix + Spotify year-round while rotating Disney+ ($20), Apple TV+ ($13) and Neon ($20) monthly saves ~$33–53/month ($396–636/year). When a user has 3+ streaming services, always flag this.
+
+*The 50/30/20 rule*: 50% needs (rent, groceries, utilities, transport, insurance, minimum debt payments), 30% wants (dining, entertainment, subscriptions, shopping), 20% savings/debt reduction. In Auckland/Wellington/Sydney where housing is 35–45% of take-home, adjust to 60% needs, 20% wants, 20% savings. If a user's savings rate is below 10%, flag it; below 5% is concerning.
+
+*The small-spend multiplier*: $5 coffee daily = $1,825/year. $12 work lunch = $3,120/year. $25 Uber Eats twice a week = $2,600/year. Total: $7,545/year on easily-reducible spending. Even cutting each by half frees $3,772/year — a significant holiday or investment boost.
+
+*Grocery savings (NZ)*: Pak'nSave is typically 15–25% cheaper than New World or Countdown on the same basket. Buying dry goods in bulk at Costco (Auckland, Wellington) saves 20–30%. Own-brand/home-brand products are 20–40% cheaper with comparable quality. A weekly meal plan before shopping reduces waste ~30%. If someone spends over $600/month on groceries for a couple, suggest Pak'nSave and meal planning.
+
+*Phone plans (NZ)*: 2degrees and Skinny offer plans from $14–$25/month with adequate data. Switching from a $60/month major carrier saves ~$480/year. Family plans add further discounts. Recommend reviewing every 12 months; contract lock-ins rarely offer better value.
+
+*Power (NZ)*: Compare annually at powerswitch.org.nz. Switching providers typically saves $200–$400/year. Flick Electric (spot pricing) can be cheaper for people who shift usage off-peak. A hot water timer (heating only 2–3 hours/day) saves ~$15–$30/month.
+
+*Debt priority*: Pay minimums on all debts; direct extra to: (1) Avalanche — highest interest rate first (mathematically optimal); (2) Snowball — smallest balance first (psychologically motivating). Credit card debt at 20% APR is equivalent to a guaranteed 20% return — always pay this off before investing, except getting your KiwiSaver employer match first (that's a 100% instant return).
+
+*Emergency fund*: Target 3–6 months of essential expenses in a separate high-interest account (Heartland Bank Online Saver, ASB Online Saver, Rabobank). Automate a fixed transfer every payday. If someone has no emergency fund and variable income, 6 months is safer.
+
+*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}
 
 **How to respond:**
 - Give expert, specific, actionable answers, like a knowledgeable friend who works in finance

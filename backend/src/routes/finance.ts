@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, checkAndIncrementUsage } from '../middleware/auth';
+import * as claude from '../services/claude';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { loadAkahuCredentials, saveAkahuCredentials, credentialsErrorResponse } from '../services/akahuCredentials';
@@ -164,6 +165,154 @@ router.post('/rates-notice', requireAuth, async (req: any, res) => {
     if (e instanceof RatesNoticeError) return res.status(422).json({ error: e.message });
     console.error('[rates notice] read failed:', e?.message ?? e);
     res.status(502).json({ error: "Couldn't read the document just now. Please try again." });
+  }
+});
+
+// ── GET /api/finance/spend-summary ───────────────────────────────────────────
+// Compact spending summary for Fennec's context — categories, subscriptions, savings rate.
+router.get('/spend-summary', requireAuth, async (req: any, res) => {
+  const userId: string = req.user.id;
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 7) + '-01';
+  const ninetyAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+
+  const [{ data: monthExpenses }, { data: monthIncome }, { data: recentTxs }] = await Promise.all([
+    supabase
+      .from('fin_transactions')
+      .select('amount, description, category:fin_categories!category_id(name)')
+      .eq('user_id', userId)
+      .gte('date', monthStart)
+      .lte('date', today)
+      .lt('amount', 0),
+    supabase
+      .from('fin_transactions')
+      .select('amount')
+      .eq('user_id', userId)
+      .gte('date', monthStart)
+      .lte('date', today)
+      .gt('amount', 0),
+    supabase
+      .from('fin_transactions')
+      .select('amount, description, date')
+      .eq('user_id', userId)
+      .gte('date', ninetyAgo)
+      .lte('date', today)
+      .lt('amount', 0),
+  ]);
+
+  if (!monthExpenses?.length) return res.json({ summary: null, byCategory: {}, subscriptions: [], totalExpenses: 0, totalIncome: 0 });
+
+  // Group by category
+  const byCategory: Record<string, number> = {};
+  for (const t of monthExpenses) {
+    const cat = (t.category as any)?.name || 'Uncategorised';
+    byCategory[cat] = (byCategory[cat] || 0) + Math.abs(Number(t.amount));
+  }
+
+  // Subscription detection
+  const SUB_KEYWORDS = [
+    'netflix', 'spotify', 'disney', 'apple one', 'apple tv', 'youtube premium',
+    'neon', 'binge', 'paramount', 'stan', 'amazon prime', 'sky sport', 'skysport',
+    'adobe', 'dropbox', 'icloud', 'google one', 'microsoft 365', 'office 365',
+    'chatgpt', 'openai', 'twitch', 'patreon', 'audible', 'kindle unlimited',
+  ];
+
+  // Collect recent amounts per subscription keyword
+  const subAmounts: Record<string, number[]> = {};
+  for (const t of recentTxs || []) {
+    const desc = (t.description || '').toLowerCase();
+    const matched = SUB_KEYWORDS.find(k => desc.includes(k));
+    if (matched) {
+      if (!subAmounts[matched]) subAmounts[matched] = [];
+      subAmounts[matched].push(Math.abs(Number(t.amount)));
+    }
+  }
+
+  const subscriptions = Object.entries(subAmounts).map(([key, amounts]) => ({
+    name: key.trim().replace(/\b\w/g, c => c.toUpperCase()),
+    amount: Math.round(amounts[amounts.length - 1] * 100) / 100, // most recent charge
+  })).sort((a, b) => b.amount - a.amount);
+
+  const totalExpenses = Object.values(byCategory).reduce((s, v) => s + v, 0);
+  const totalIncome = (monthIncome || []).reduce((s, t) => s + Number(t.amount), 0);
+  const surplus = totalIncome - totalExpenses;
+  const savingsRate = totalIncome > 0 ? Math.round((surplus / totalIncome) * 100) : null;
+
+  const catLines = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([cat, amount]) => `${cat}: $${Math.round(amount)}`)
+    .join(' | ');
+
+  let summary = `Spending this month: ${catLines}`;
+  if (totalIncome > 0) {
+    summary += `\nIncome: $${Math.round(totalIncome)} | Expenses: $${Math.round(totalExpenses)} | Surplus: $${Math.round(surplus)}`;
+    if (savingsRate !== null) summary += ` | Savings rate: ${savingsRate}%`;
+  }
+  if (subscriptions.length > 0) {
+    const subTotal = subscriptions.reduce((s, sub) => s + sub.amount, 0);
+    summary += `\n\nSubscriptions (~$${Math.round(subTotal)}/mo): ${subscriptions.map(s => `${s.name} $${s.amount}`).join(', ')}`;
+    const streamers = subscriptions.filter(s => ['netflix', 'disney', 'apple tv', 'neon', 'binge', 'paramount', 'stan', 'sky sport', 'skysport'].some(x => s.name.toLowerCase().includes(x)));
+    if (streamers.length >= 3) {
+      const rotateSaving = Math.round(streamers.slice(2).reduce((s, sub) => s + sub.amount, 0));
+      summary += `\n⚠ ${streamers.length} streaming services — rotating all but top 2 could save ~$${rotateSaving}/mo`;
+    }
+  }
+
+  res.json({ summary, byCategory, subscriptions, totalExpenses, totalIncome });
+});
+
+// ── POST /api/finance/savings-tips ────────────────────────────────────────────
+// AI-powered savings tips from actual spending data. Counts toward AI quota.
+router.post('/savings-tips', requireAuth, async (req: any, res) => {
+  if (!await checkAndIncrementUsage(req, res)) return;
+
+  const userId: string = req.user.id;
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 7) + '-01';
+  const ninetyAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+
+  const [{ data: monthExpenses }, { data: monthIncome }, { data: recentTxs }] = await Promise.all([
+    supabase.from('fin_transactions').select('amount, category:fin_categories!category_id(name)').eq('user_id', userId).gte('date', monthStart).lte('date', today).lt('amount', 0),
+    supabase.from('fin_transactions').select('amount').eq('user_id', userId).gte('date', monthStart).lte('date', today).gt('amount', 0),
+    supabase.from('fin_transactions').select('amount, description').eq('user_id', userId).gte('date', ninetyAgo).lte('date', today).lt('amount', 0),
+  ]);
+
+  if (!monthExpenses?.length) return res.json({ tips: [] });
+
+  const byCategory: Record<string, number> = {};
+  for (const t of monthExpenses) {
+    const cat = (t.category as any)?.name || 'Uncategorised';
+    byCategory[cat] = (byCategory[cat] || 0) + Math.abs(Number(t.amount));
+  }
+
+  const SUB_KEYWORDS = ['netflix', 'spotify', 'disney', 'apple one', 'apple tv', 'youtube premium', 'neon', 'binge', 'paramount', 'stan', 'amazon prime', 'sky sport', 'skysport', 'adobe', 'dropbox', 'icloud', 'google one', 'microsoft 365', 'office 365', 'chatgpt', 'openai', 'audible'];
+  const subAmounts: Record<string, number[]> = {};
+  for (const t of recentTxs || []) {
+    const desc = (t.description || '').toLowerCase();
+    const matched = SUB_KEYWORDS.find(k => desc.includes(k));
+    if (matched) {
+      if (!subAmounts[matched]) subAmounts[matched] = [];
+      subAmounts[matched].push(Math.abs(Number(t.amount)));
+    }
+  }
+  const subscriptions = Object.entries(subAmounts).map(([key, amounts]) => ({
+    name: key.trim().replace(/\b\w/g, c => c.toUpperCase()),
+    amount: Math.round(amounts[amounts.length - 1] * 100) / 100,
+  })).sort((a, b) => b.amount - a.amount);
+
+  const totalExpenses = Object.values(byCategory).reduce((s, v) => s + v, 0);
+  const totalIncome = (monthIncome || []).reduce((s, t) => s + Number(t.amount), 0);
+
+  try {
+    const user = req.user;
+    const tips = await claude.generateSavingsTips(
+      { byCategory, subscriptions, totalExpenses, totalIncome },
+      user.user_metadata?.anthropic_key,
+    );
+    res.json({ tips });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 

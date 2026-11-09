@@ -60,6 +60,14 @@ export interface CategoryMatch {
   status: 'pending' | 'approved' | 'rejected'; source: 'starter' | 'admin' | 'users'; suggestions: number
 }
 
+export interface SavingsTip {
+  title: string
+  saving: number
+  detail: string
+  action: string
+  category: 'subscriptions' | 'dining' | 'groceries' | 'phone' | 'debt' | 'general'
+}
+
 export const api = {
   searchStocks: (q: string) =>
     apiFetch(`/api/prices/search?q=${encodeURIComponent(q)}`),
@@ -225,6 +233,12 @@ export const api = {
 
   adminResetUsage: (userId: string) =>
     apiFetch(`/api/admin/users/${userId}/reset-usage`, { method: 'POST' }),
+
+  getSpendSummary: () =>
+    apiFetch('/api/finance/spend-summary'),
+
+  getSavingsTips: () =>
+    apiFetch('/api/finance/savings-tips', { method: 'POST' }),
 
   adminGetStats: () =>
     apiFetch('/api/admin/stats'),

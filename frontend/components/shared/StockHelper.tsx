@@ -15,6 +15,7 @@ interface HelperContext {
   portfolioSummary?: string
   watchlistSummary?: string
   recentNews?: string[]
+  monthlySpend?: string
 }
 
 async function getToken(): Promise<string | null> {
@@ -123,15 +124,19 @@ export function StockHelper() {
         watchlistSummary = watchlist.map(w => `${w.ticker}${w.name ? ` (${w.name})` : ''}${w.signal ? ` — ${w.signal}` : ''}`).join(', ')
       }
 
-      // Fetch recent news headlines using the token
       const token = await getToken()
+
+      // Fetch news, spending summary in parallel
       let recentNews: string[] = []
+      let monthlySpend: string | undefined
       try {
         const tickers = [...(holdings || []).map(h => h.ticker), ...(watchlist || []).map(w => w.ticker)].slice(0, 8)
-        const url = `${API}/api/news${tickers.length ? `?tickers=${tickers.join(',')}` : ''}`
-        const newsRes = await fetch(url, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        })
+        const newsUrl = `${API}/api/news${tickers.length ? `?tickers=${tickers.join(',')}` : ''}`
+        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+        const [newsRes, spendRes] = await Promise.all([
+          fetch(newsUrl, { headers }),
+          fetch(`${API}/api/finance/spend-summary`, { headers }),
+        ])
         if (newsRes.ok) {
           const newsData = await newsRes.json()
           recentNews = (newsData || []).slice(0, 25).map((n: any) => {
@@ -140,12 +145,17 @@ export function StockHelper() {
             return `${ticker}${n.headline}${summary}`
           })
         }
+        if (spendRes.ok) {
+          const spendData = await spendRes.json()
+          monthlySpend = spendData?.summary || undefined
+        }
       } catch {}
 
       const ctx: HelperContext = {
         portfolioSummary: portfolioSummary || undefined,
         watchlistSummary: watchlistSummary || undefined,
         recentNews: recentNews.length ? recentNews : undefined,
+        monthlySpend,
       }
       setContext(ctx)
       contextLoadedRef.current = true
@@ -156,13 +166,16 @@ export function StockHelper() {
         const topHolding = holdings[0]?.ticker
         if (topHolding) dynamicSuggestions.push(`What's the outlook for ${topHolding}?`)
       }
+      if (monthlySpend) {
+        dynamicSuggestions.push('Where am I overspending this month?')
+        dynamicSuggestions.push('How can I reduce my subscriptions?')
+      }
       if (recentNews.length) {
         dynamicSuggestions.push('What are the biggest market themes right now?')
       }
       dynamicSuggestions.push(
         'Analyse my portfolio risk',
         'How do rising interest rates affect my holdings?',
-        'Explain what a yield curve inversion means',
       )
       setSuggestions(dynamicSuggestions.slice(0, 5))
     } catch {}

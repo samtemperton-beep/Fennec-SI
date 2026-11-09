@@ -4,8 +4,10 @@ import { localDate } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
+import { IconChevronLeft, IconChevronRight, IconBulb, IconRefresh, IconCoin, IconDeviceTv, IconShoppingCart, IconPhone, IconCreditCard, IconChartLine } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { api } from '@/lib/api'
+import type { SavingsTip } from '@/lib/api'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
@@ -33,6 +35,8 @@ export default function BudgetPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
+  const [tips, setTips] = useState<SavingsTip[] | null>(null)
+  const [tipsLoading, setTipsLoading] = useState(false)
 
   const { start, end, label } = getMonthBounds(offset)
 
@@ -64,6 +68,18 @@ export default function BudgetPage() {
     if (error) { toast.error(error.message); return }
     setCategories(prev => prev.map(c => c.id === catId ? { ...c, monthly_budget: val } : c))
     setEditing(null)
+  }
+
+  async function loadTips() {
+    setTipsLoading(true)
+    try {
+      const { tips: data } = await api.getSavingsTips()
+      setTips(data || [])
+    } catch (e: any) {
+      toast.error(e.message || 'Could not load savings tips')
+    } finally {
+      setTipsLoading(false)
+    }
   }
 
   const totalBudget = categories.reduce((s, c) => s + (c.monthly_budget || 0), 0)
@@ -98,6 +114,50 @@ export default function BudgetPage() {
             <p style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 22, color: s.color }}>{currency.format(s.value)}</p>
           </div>
         ))}
+      </div>
+
+      {/* AI Savings Tips */}
+      <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: tips?.length ? 16 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <IconBulb size={16} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>AI Savings Tips</span>
+            {tips && <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>Based on your transactions this month</span>}
+          </div>
+          <button
+            onClick={() => { setTips(null); loadTips() }}
+            disabled={tipsLoading}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: tipsLoading ? 'var(--surface2)' : 'var(--accent)', color: tipsLoading ? 'var(--text2)' : '#fff', fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: tipsLoading ? 'default' : 'pointer', transition: 'all 0.15s' }}
+          >
+            {tipsLoading ? <><LoadingSpinner size={12} /><span>Analysing…</span></> : tips ? <><IconRefresh size={13} /><span>Refresh</span></> : <><IconBulb size={13} /><span>Get tips</span></>}
+          </button>
+        </div>
+        {tips && tips.length === 0 && (
+          <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 12 }}>No specific tips right now — your spending looks well-balanced!</p>
+        )}
+        {tips && tips.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 12 }}>
+            {tips.map((tip, i) => {
+              const Icon = tip.category === 'subscriptions' ? IconDeviceTv : tip.category === 'dining' ? IconCoin : tip.category === 'groceries' ? IconShoppingCart : tip.category === 'phone' ? IconPhone : tip.category === 'debt' ? IconCreditCard : IconChartLine
+              return (
+                <div key={i} style={{ padding: 14, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <Icon size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>{tip.title}</span>
+                    </div>
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 13, color: 'var(--green)', flexShrink: 0 }}>~${Math.round(tip.saving)}/mo</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, margin: 0 }}>{tip.detail}</p>
+                  <p style={{ fontSize: 11.5, color: 'var(--accent)', margin: 0, fontWeight: 500 }}>→ {tip.action}</p>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {!tips && !tipsLoading && (
+          <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 10 }}>Fennec will analyse your actual transactions to find personalised savings opportunities.</p>
+        )}
       </div>
 
       {loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><LoadingSpinner size={28} /></div> : (
