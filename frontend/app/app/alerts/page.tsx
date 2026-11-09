@@ -1,26 +1,29 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { NOTIFICATIONS_CHANGED } from '@/components/shared/NotificationBell'
 import { timeAgo } from '@/lib/utils'
 import { splitSymbol, priceIn, CURRENCY_OF, type Listing } from '@/lib/markets'
 import { MarketBadge } from '@/components/shared/MarketBadge'
 import {
   IconBell, IconPlus, IconTrash, IconRefresh, IconCheck,
-  IconChevronDown, IconArrowDown, IconArrowUp, IconEye,
-  IconBriefcase, IconClock, IconAdjustments,
+  IconArrowDown, IconArrowUp, IconEye, IconMail,
+  IconReceipt, IconChartPie, IconTarget, IconFileInvoice, IconPlugConnectedX, IconMessageCircle, IconCalendarEvent,
+  IconWallet, IconBuildingStore, IconUsers, IconChartLine,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Alert { id: number; ticker: string; type: string; price?: number; triggered: boolean; created_at: string }
-interface Notification { id: number; type: string; ticker: string | null; title: string; body: string; read: boolean; created_at: string }
+interface Notification { id: number; type: string; ticker: string | null; title: string; body: string; read: boolean; created_at: string; link?: string | null }
+type EmailMode = 'immediate' | 'daily' | 'off'
 interface Prefs {
-  frequency: 'morning' | 'hourly' | 'immediate'
   stop_loss_pct: number
   take_profit_pct: number
   portfolio_sell_alerts: boolean
@@ -28,23 +31,48 @@ interface Prefs {
   watchlist_sell_alerts: boolean
   price_alerts: boolean
   earnings_alerts: boolean
+  bill_alerts: boolean
+  budget_alerts: boolean
+  goal_alerts: boolean
+  invoice_alerts: boolean
+  sync_alerts: boolean
+  community_alerts: boolean
+  email_mode: EmailMode
+  weekly_summary: boolean
 }
+type BoolPref = { [K in keyof Prefs]: Prefs[K] extends boolean ? K : never }[keyof Prefs]
 
 type Tab = 'feed' | 'rules' | 'preferences'
+type Group = 'money' | 'business' | 'investing' | 'community'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const NOTIF_ICON: Record<string, { icon: typeof IconBell; color: string; bg: string }> = {
-  price_alert:       { icon: IconBell,      color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-  stop_loss:         { icon: IconArrowDown, color: '#ef4444', bg: 'rgba(239,68,68,0.12)'  },
-  take_profit:       { icon: IconArrowUp,   color: '#22c55e', bg: 'rgba(34,197,94,0.12)'  },
-  watchlist_signal:  { icon: IconEye,       color: '#5b7cf0', bg: 'rgba(91,124,240,0.12)' },
-  earnings_reminder: { icon: IconBell,      color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
+const NOTIF: Record<string, { icon: typeof IconBell; color: string; group: Group }> = {
+  bill_due:          { icon: IconReceipt,         color: '#f59e0b', group: 'money' },
+  budget_over:       { icon: IconChartPie,        color: '#ef4444', group: 'money' },
+  budget_near:       { icon: IconChartPie,        color: '#f59e0b', group: 'money' },
+  goal_reached:      { icon: IconTarget,          color: '#22c55e', group: 'money' },
+  goal_late:         { icon: IconTarget,          color: '#f59e0b', group: 'money' },
+  sync_problem:      { icon: IconPlugConnectedX,  color: '#ef4444', group: 'money' },
+  invoice_overdue:   { icon: IconFileInvoice,     color: '#ef4444', group: 'business' },
+  price_alert:       { icon: IconBell,            color: '#f59e0b', group: 'investing' },
+  stop_loss:         { icon: IconArrowDown,       color: '#ef4444', group: 'investing' },
+  take_profit:       { icon: IconArrowUp,         color: '#22c55e', group: 'investing' },
+  watchlist_signal:  { icon: IconEye,             color: '#5b7cf0', group: 'investing' },
+  earnings_reminder: { icon: IconCalendarEvent,   color: '#a855f7', group: 'investing' },
+  community_reply:   { icon: IconMessageCircle,   color: '#5b7cf0', group: 'community' },
 }
+const metaOf = (type: string) => NOTIF[type] ?? { icon: IconBell, color: '#5b7cf0', group: 'investing' as Group }
+const GROUPS: { id: Group | 'all'; label: string }[] = [
+  { id: 'all', label: 'All' }, { id: 'money', label: 'Money' }, { id: 'business', label: 'Business' },
+  { id: 'investing', label: 'Investing' }, { id: 'community', label: 'Community' },
+]
+const DEFAULT_LINK: Record<Group, string> = { money: '/app/dashboard', business: '/app/finance/business/invoices', investing: '/app/portfolio', community: '/app/community' }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button
+      role="switch" aria-checked={checked} aria-label={label}
       onClick={() => onChange(!checked)}
       style={{
         width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', flexShrink: 0,
@@ -60,10 +88,29 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   )
 }
 
+function Section({ icon: Icon, color, title, desc, children }: { icon: typeof IconBell; color: string; title: string; desc?: string; children: React.ReactNode }) {
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: `color-mix(in srgb, ${color} 14%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon size={16} style={{ color }} />
+        </div>
+        <div>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{title}</div>
+          {desc && <div style={{ fontSize: 12, color: 'var(--text2)' }}>{desc}</div>}
+        </div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function NotificationsPage() {
+  const router = useRouter()
   const [tab, setTab] = useState<Tab>('feed')
+  const [group, setGroup] = useState<Group | 'all'>('all')
   const [userId, setUserId] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
 
@@ -102,14 +149,19 @@ export default function NotificationsPage() {
 
   // Preferences
   const [prefs, setPrefs] = useState<Prefs>({
-    frequency: 'morning', stop_loss_pct: 10, take_profit_pct: 20,
+    stop_loss_pct: 10, take_profit_pct: 20,
     portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true, earnings_alerts: true,
+    bill_alerts: true, budget_alerts: true, goal_alerts: true, invoice_alerts: true, sync_alerts: true, community_alerts: true,
+    email_mode: 'daily', weekly_summary: false,
   })
-  const [savingPrefs, setSavingPrefs] = useState(false)
+  const [thresholds, setThresholds] = useState({ stop_loss_pct: '10', take_profit_pct: '20' })
 
   const supabase = createClient()
 
   useEffect(() => {
+    // Emails link straight to Preferences (?tab=preferences).
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t === 'preferences' || t === 'rules') setTab(t)
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return
       setUserId(data.user.id)
@@ -117,13 +169,14 @@ export default function NotificationsPage() {
       loadAlerts(data.user.id)
       loadPrefs()
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function loadNotifs() {
     setLoadingNotifs(true)
     try {
       const data = await api.getNotifications()
-      setNotifs(data || [])
+      setNotifs(Array.isArray(data) ? data : [])
     } catch {}
     setLoadingNotifs(false)
   }
@@ -138,7 +191,10 @@ export default function NotificationsPage() {
   async function loadPrefs() {
     try {
       const data = await api.getNotificationPrefs()
-      if (data && !data.error) setPrefs(prev => ({ ...prev, ...data }))
+      if (data && !data.error) {
+        setPrefs(prev => ({ ...prev, ...data }))
+        setThresholds({ stop_loss_pct: String(data.stop_loss_pct ?? 10), take_profit_pct: String(data.take_profit_pct ?? 20) })
+      }
     } catch {}
   }
 
@@ -147,8 +203,9 @@ export default function NotificationsPage() {
     try {
       const result = await api.checkAlerts()
       const count = result.count ?? result.triggered?.length ?? 0
-      toast.success(count > 0 ? `${count} new notification${count !== 1 ? 's' : ''}` : 'All clear — no alerts triggered')
+      toast.success(count > 0 ? `${count} new notification${count !== 1 ? 's' : ''}` : 'All checked. Nothing new.')
       await loadNotifs()
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED))
       if (userId) await loadAlerts(userId)
     } catch (e: any) {
       toast.error(e.message)
@@ -156,9 +213,21 @@ export default function NotificationsPage() {
     setChecking(false)
   }
 
-  async function markAllRead() {
-    await api.markNotificationsRead()
-    setNotifs(prev => prev.map(n => ({ ...n, read: true })))
+  async function markRead(ids?: number[]) {
+    setNotifs(prev => prev.map(n => (!ids || ids.includes(n.id) ? { ...n, read: true } : n)))
+    await api.markNotificationsRead(ids).catch(() => {})
+    window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED))
+  }
+
+  async function open(n: Notification) {
+    if (!n.read) markRead([n.id])
+    router.push(n.link || DEFAULT_LINK[metaOf(n.type).group])
+  }
+
+  async function clearRead() {
+    if (!confirm('Remove all read notifications?')) return
+    await api.clearReadNotifications().catch(() => {})
+    setNotifs(prev => prev.filter(n => !n.read))
   }
 
   async function addAlert(e: React.FormEvent) {
@@ -182,28 +251,49 @@ export default function NotificationsPage() {
     setAlerts(prev => prev.filter(a => a.id !== id))
   }
 
-  async function savePrefs() {
-    setSavingPrefs(true)
+  // Switches save as they change.
+  async function save(patch: Partial<Prefs>, quiet = false) {
+    const next = { ...prefs, ...patch }
+    setPrefs(next)
     try {
-      await api.saveNotificationPrefs(prefs)
-      toast.success('Preferences saved')
+      await api.saveNotificationPrefs(next)
+      if (!quiet) toast.success('Saved')
     } catch (e: any) {
       toast.error(e.message)
+      setPrefs(prefs)
     }
-    setSavingPrefs(false)
+  }
+  const toggle = (key: BoolPref) => (v: boolean) => save({ [key]: v } as Partial<Prefs>, true)
+
+  function saveThresholds() {
+    const sl = Number(thresholds.stop_loss_pct), tp = Number(thresholds.take_profit_pct)
+    if (!(sl >= 1 && sl <= 99) || !(tp >= 1 && tp <= 1000)) return toast.error('Use 1–99% for the fall and 1–1000% for the rise.')
+    save({ stop_loss_pct: Math.round(sl), take_profit_pct: Math.round(tp) })
   }
 
   const unreadCount = notifs.filter(n => !n.read).length
   const activeAlerts = alerts.filter(a => !a.triggered)
   const triggeredAlerts = alerts.filter(a => a.triggered)
+  const shown = group === 'all' ? notifs : notifs.filter(n => metaOf(n.type).group === group)
+  const unreadIn = (g: Group | 'all') => notifs.filter(n => !n.read && (g === 'all' || metaOf(n.type).group === g)).length
+
+  const Row = ({ k, label, desc }: { k: BoolPref; label: string; desc: string }) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '11px 0', borderTop: '1px solid var(--border)' }}>
+      <div>
+        <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>{label}</div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{desc}</div>
+      </div>
+      <Toggle checked={!!prefs[k]} onChange={toggle(k)} label={label} />
+    </div>
+  )
 
   return (
-    <div style={{ padding: 28, maxWidth: 760 }}>
+    <div style={{ padding: 28, maxWidth: 760 }} className="m-pad">
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Notifications</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Stay informed on your portfolio, watchlist, and market signals</p>
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Bills, budgets, goals, invoices, your shares and replies, in one place</p>
         </div>
         <button onClick={checkNow} disabled={checking}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, border: 'none', cursor: checking ? 'default' : 'pointer', opacity: checking ? 0.7 : 1 }}
@@ -214,15 +304,15 @@ export default function NotificationsPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 24, background: 'var(--surface)', borderRadius: 12, padding: 4, border: '1px solid var(--border)', width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: 'var(--surface)', borderRadius: 12, padding: 4, border: '1px solid var(--border)', width: 'fit-content', maxWidth: '100%', overflowX: 'auto' }}>
         {([
           { key: 'feed',        label: 'Feed',        badge: unreadCount },
-          { key: 'rules',       label: 'Alert Rules', badge: activeAlerts.length },
+          { key: 'rules',       label: 'Price alerts', badge: activeAlerts.length },
           { key: 'preferences', label: 'Preferences', badge: 0 },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             style={{
-              padding: '7px 18px', borderRadius: 9, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600,
+              padding: '7px 16px', borderRadius: 9, fontSize: 13, fontFamily: 'Syne, sans-serif', fontWeight: 600, whiteSpace: 'nowrap',
               border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
               background: tab === t.key ? 'var(--primary)' : 'transparent',
               color: tab === t.key ? 'white' : 'var(--text2)',
@@ -233,8 +323,7 @@ export default function NotificationsPage() {
             {t.badge > 0 && (
               <span style={{
                 fontSize: 10, fontWeight: 700, minWidth: 18, height: 18, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
-                background: tab === t.key ? 'rgba(255,255,255,0.25)' : 'var(--primary)',
-                color: tab === t.key ? 'white' : 'white',
+                background: tab === t.key ? 'rgba(255,255,255,0.25)' : 'var(--primary)', color: 'white',
               }}>{t.badge}</span>
             )}
           </button>
@@ -244,38 +333,48 @@ export default function NotificationsPage() {
       {/* ── Feed tab ── */}
       {tab === 'feed' && (
         <div>
-          {unreadCount > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-              <button onClick={markAllRead} style={{ fontSize: 12, color: 'var(--primary)', fontFamily: 'Syne, sans-serif', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <IconCheck size={13} /> Mark all as read
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+            {GROUPS.map(g => {
+              const on = group === g.id, n = unreadIn(g.id)
+              return (
+                <button key={g.id} onClick={() => setGroup(g.id)} aria-pressed={on}
+                  style={{ padding: '5px 12px', borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: on ? 'none' : '1px solid var(--border)', background: on ? 'var(--primary)' : 'var(--surface2)', color: on ? 'white' : 'var(--text2)' }}>
+                  {g.label}{n > 0 ? ` · ${n}` : ''}
+                </button>
+              )
+            })}
+            <span style={{ flex: 1 }} />
+            {unreadCount > 0 && (
+              <button onClick={() => markRead()} style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <IconCheck size={13} /> Mark all read
               </button>
-            </div>
-          )}
+            )}
+            {notifs.some(n => n.read) && (
+              <button onClick={clearRead} style={{ fontSize: 12, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear read</button>
+            )}
+          </div>
 
           {loadingNotifs ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}><LoadingSpinner size={32} /></div>
-          ) : notifs.length === 0 ? (
-            <div className="card text-center" style={{ padding: '48px 24px' }}>
+          ) : shown.length === 0 ? (
+            <div className="card text-center" style={{ padding: '40px 24px' }}>
               <IconBell size={36} style={{ color: 'var(--text3)', margin: '0 auto 12px' }} />
-              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 16, marginBottom: 8 }}>No notifications yet</p>
-              <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 20 }}>Click "Check now" to scan your portfolio and watchlist for signals</p>
-              <button onClick={checkNow} disabled={checking}
-                style={{ background: 'var(--primary)', color: 'white', padding: '10px 24px', borderRadius: 8, fontFamily: 'Syne, sans-serif', fontWeight: 600, border: 'none', cursor: 'pointer' }}
-              >
-                {checking ? 'Checking…' : 'Check now'}
-              </button>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 16, marginBottom: 8 }}>{notifs.length ? 'Nothing here' : 'No notifications yet'}</p>
+              <p style={{ color: 'var(--text2)', fontSize: 13, maxWidth: 420, margin: '0 auto' }}>
+                Fennec lets you know when a bill is due, a budget is nearly used, a goal is reached, an invoice is overdue, a share hits your target, or someone replies to your post. Choose what you get in Preferences.
+              </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {notifs.map(n => {
-                const meta = NOTIF_ICON[n.type] || NOTIF_ICON.price_alert
+              {shown.map(n => {
+                const meta = metaOf(n.type)
                 const Icon = meta.icon
                 return (
-                  <div key={n.id} className="card" style={{
-                    display: 'flex', gap: 14, padding: '14px 16px', opacity: n.read ? 0.65 : 1,
+                  <button key={n.id} onClick={() => open(n)} className="card" style={{
+                    display: 'flex', gap: 14, padding: '14px 16px', opacity: n.read ? 0.7 : 1, textAlign: 'left', cursor: 'pointer', width: '100%', color: 'inherit', font: 'inherit',
                     borderLeft: n.read ? '3px solid transparent' : `3px solid ${meta.color}`,
                   }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 9, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 9, background: `color-mix(in srgb, ${meta.color} 14%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Icon size={17} style={{ color: meta.color }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -283,10 +382,10 @@ export default function NotificationsPage() {
                         <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13 }}>{n.title}</span>
                         {!n.read && <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>New</span>}
                       </div>
-                      <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.55 }}>{n.body}</p>
+                      <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{n.body}</p>
                       <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 5 }}>{timeAgo(n.created_at)}</p>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -294,216 +393,140 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {/* ── Alert Rules tab ── */}
+      {/* ── Price alerts tab ── */}
       {tab === 'rules' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-
-          {/* Portfolio alerts info */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconBriefcase size={16} style={{ color: '#22c55e' }} />
-              </div>
-              <div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Portfolio alerts</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)' }}>Stop-loss and take-profit thresholds — configure in Preferences</div>
-              </div>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, color: 'var(--text2)', flex: 1, minWidth: 220 }}>
+              Get told when a share rises above or drops below a price. Checked about every 15 minutes{prefs.email_mode === 'off' ? '' : ', and emailed straight away'}.
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Stop loss</div>
-                <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 700, color: '#ef4444' }}>−{prefs.stop_loss_pct}%</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>Alert when any holding falls this much from your buy price</div>
-              </div>
-              <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Take profit</div>
-                <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 700, color: '#22c55e' }}>+{prefs.take_profit_pct}%</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>Alert when any holding gains this much from your buy price</div>
-              </div>
-            </div>
+            <button onClick={() => setAddOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 8, background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}
+            >
+              <IconPlus size={13} /> New alert
+            </button>
           </div>
 
-          {/* Watchlist signal alerts */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(91,124,240,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconEye size={16} style={{ color: '#5b7cf0' }} />
-              </div>
-              <div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Watchlist signals</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)' }}>Alerts when AI signals change on stocks you're watching</div>
-              </div>
+          {loadingAlerts ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}><LoadingSpinner size={24} /></div>
+          ) : activeAlerts.length === 0 && triggeredAlerts.length === 0 ? (
+            <div className="card text-center" style={{ padding: '28px 20px' }}>
+              <p style={{ color: 'var(--text2)', fontSize: 13 }}>No price alerts yet. Add one to get started.</p>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { label: 'BUY signals', desc: 'Alert when a watchlist stock gets a BUY signal', prefKey: 'watchlist_buy_alerts' as const },
-                { label: 'SELL signals', desc: 'Alert when a watchlist stock gets a SELL signal', prefKey: 'watchlist_sell_alerts' as const },
-              ].map(row => (
-                <div key={row.prefKey} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div>
-                    <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>{row.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{row.desc}</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {activeAlerts.map(a => (
+                <div key={a.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <IconBell size={15} style={{ color: '#f59e0b' }} />
                   </div>
-                  <Toggle checked={(prefs as any)[row.prefKey]} onChange={v => setPrefs(p => ({ ...p, [row.prefKey]: v }))} />
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, marginRight: 6 }}>{splitSymbol(a.ticker).code}</span>
+                    <MarketBadge market={splitSymbol(a.ticker).market} />
+                    <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 8, textTransform: 'capitalize' }}>{a.type}</span>
+                    {a.price != null && <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#f59e0b', marginLeft: 8 }}>{priceIn(a.ticker, a.price)}</span>}
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Created {timeAgo(a.created_at)}</div>
+                  </div>
+                  <button onClick={() => removeAlert(a.id)} aria-label="Delete alert" style={{ color: 'var(--text3)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}><IconTrash size={15} /></button>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Price alerts */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconBell size={16} style={{ color: '#f59e0b' }} />
-                </div>
-                <div>
-                  <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Price alerts</div>
-                  <div style={{ fontSize: 12, color: 'var(--text2)' }}>Checked about every 15 minutes. You get an email when one is hit.</div>
-                </div>
-              </div>
-              <button onClick={() => setAddOpen(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 8, background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}
-              >
-                <IconPlus size={13} /> New alert
-              </button>
-            </div>
-
-            {loadingAlerts ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}><LoadingSpinner size={24} /></div>
-            ) : activeAlerts.length === 0 && triggeredAlerts.length === 0 ? (
-              <div className="card text-center" style={{ padding: '28px 20px' }}>
-                <p style={{ color: 'var(--text2)', fontSize: 13 }}>No price alerts yet — add one to get started</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {activeAlerts.map(a => (
-                  <div key={a.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <IconBell size={15} style={{ color: '#f59e0b' }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 13, marginRight: 6 }}>{splitSymbol(a.ticker).code}</span>
-                      <MarketBadge market={splitSymbol(a.ticker).market} />
-                      <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 8, textTransform: 'capitalize' }}>{a.type}</span>
-                      {a.price != null && <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#f59e0b', marginLeft: 8 }}>{priceIn(a.ticker, a.price)}</span>}
-                      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Created {timeAgo(a.created_at)}</div>
-                    </div>
-                    <button onClick={() => removeAlert(a.id)} style={{ color: 'var(--text3)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}><IconTrash size={15} /></button>
+              {triggeredAlerts.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'Syne, sans-serif', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', padding: '10px 4px 4px' }}>
+                    Triggered ({triggeredAlerts.length})
                   </div>
-                ))}
-                {triggeredAlerts.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'Syne, sans-serif', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', padding: '10px 4px 4px' }}>
-                      Triggered ({triggeredAlerts.length})
-                    </div>
-                    {triggeredAlerts.map(a => (
-                      <div key={a.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', opacity: 0.55 }}>
-                        <IconCheck size={15} style={{ color: '#22c55e', flexShrink: 0 }} />
-                        <div style={{ flex: 1, fontSize: 13 }}>
-                          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, marginRight: 6 }}>{splitSymbol(a.ticker).code}</span>
-                          <MarketBadge market={splitSymbol(a.ticker).market} />
-                          <span style={{ color: 'var(--text2)', marginLeft: 8 }}>{a.type} {a.price != null ? priceIn(a.ticker, a.price) : ''}, triggered</span>
-                        </div>
-                        <button onClick={() => removeAlert(a.id)} style={{ color: 'var(--text3)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}><IconTrash size={15} /></button>
+                  {triggeredAlerts.map(a => (
+                    <div key={a.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', opacity: 0.55 }}>
+                      <IconCheck size={15} style={{ color: '#22c55e', flexShrink: 0 }} />
+                      <div style={{ flex: 1, fontSize: 13 }}>
+                        <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, marginRight: 6 }}>{splitSymbol(a.ticker).code}</span>
+                        <MarketBadge market={splitSymbol(a.ticker).market} />
+                        <span style={{ color: 'var(--text2)', marginLeft: 8 }}>{a.type} {a.price != null ? priceIn(a.ticker, a.price) : ''}, triggered</span>
                       </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+                      <button onClick={() => removeAlert(a.id)} aria-label="Delete alert" style={{ color: 'var(--text3)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}><IconTrash size={15} /></button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {/* ── Preferences tab ── */}
       {tab === 'preferences' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 12, color: 'var(--text3)', margin: 0 }}>Changes save as you make them.</p>
 
-          {/* Frequency */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(91,124,240,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconClock size={16} style={{ color: '#5b7cf0' }} />
-              </div>
-              <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>When Fennec checks</div>
+          <Section icon={IconMail} color="#5b7cf0" title="Email" desc="Everything also shows in your feed and on the bell">
+            <div role="radiogroup" aria-label="How to email you" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              {([
+                { id: 'immediate', label: 'Straight away', desc: 'An email as things happen (checked every 15 minutes)' },
+                { id: 'daily', label: 'Morning summary', desc: 'One email at about 7am with anything new. Price alerts still come straight away.' },
+                { id: 'off', label: 'Don’t email me', desc: 'Only the feed and the bell' },
+              ] as const).map(o => {
+                const on = prefs.email_mode === o.id
+                return (
+                  <button key={o.id} role="radio" aria-checked={on} onClick={() => save({ email_mode: o.id })}
+                    style={{ textAlign: 'left', padding: '9px 12px', borderRadius: 9, cursor: 'pointer', border: `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`, background: on ? 'var(--primary-light)' : 'transparent', color: 'var(--text)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{o.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text2)' }}>{o.desc}</div>
+                  </button>
+                )
+              })}
             </div>
-            {/* What backend/src/routes/alerts.ts startAlertChecks actually does. */}
-            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>
-              <li><strong style={{ color: 'var(--text)' }}>Price alerts:</strong> about every 15 minutes, and you get an email when one is hit.</li>
-              <li><strong style={{ color: 'var(--text)' }}>Everything else</strong> (stop-loss, take-profit, watchlist signals, earnings reminders): every few hours, shown here in your feed.</li>
-              <li>Prices can be delayed by up to 20 minutes, so an alert can arrive a little after the price is reached. Press <strong style={{ color: 'var(--text)' }}>Check now</strong> to check straight away.</li>
-            </ul>
-          </div>
+            <div style={{ marginTop: 10 }}>
+              <Row k="weekly_summary" label="Weekly summary" desc="Monday morning: budget so far this month, bills in the next 7 days and progress on your goals" />
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>Emails include amounts, such as what a bill is for. They go to the email you sign in with.</p>
+          </Section>
 
-          {/* Alert toggles */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconAdjustments size={16} style={{ color: '#f59e0b' }} />
-              </div>
-              <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>What to watch for</div>
-            </div>
-            {[
-              { key: 'portfolio_sell_alerts', label: 'Portfolio stop-loss & take-profit', desc: 'Alert when holdings hit your % thresholds below' },
-              { key: 'watchlist_buy_alerts',  label: 'Watchlist AI signals',              desc: 'Alert when a watched stock gets a BUY or SELL signal' },
-              { key: 'earnings_alerts',       label: 'Earnings reminders',               desc: 'Alert 1 day before a stock in your portfolio or watchlist reports earnings' },
-              { key: 'price_alerts',          label: 'Custom price alerts',               desc: 'Alert when a stock crosses your set price' },
-            ].map(row => (
-              <div key={row.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                <div>
-                  <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>{row.label}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{row.desc}</div>
-                </div>
-                <Toggle
-                  checked={(prefs as any)[row.key]}
-                  onChange={v => setPrefs(p => ({ ...p, [row.key]: v }))}
-                />
-              </div>
-            ))}
-          </div>
+          <Section icon={IconWallet} color="#22c55e" title="Money">
+            <Row k="bill_alerts" label="Bills due" desc="Once, up to two days before it’s due" />
+            <Row k="budget_alerts" label="Budgets" desc="When a category is 90% used, and when it goes over" />
+            <Row k="goal_alerts" label="Goals" desc="When you reach a goal, or one passes its date" />
+            <Row k="sync_alerts" label="Bank connection" desc="When your accounts stop updating and need reconnecting" />
+          </Section>
 
-          {/* Thresholds */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconArrowDown size={16} style={{ color: '#ef4444' }} />
-              </div>
-              <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>Portfolio thresholds</div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 6 }}>
-                  Stop loss — alert when down
+          <Section icon={IconBuildingStore} color="#f59e0b" title="Business">
+            <Row k="invoice_alerts" label="Overdue invoices" desc="When an invoice you've sent passes its due date" />
+          </Section>
+
+          <Section icon={IconChartLine} color="#5b7cf0" title="Investing">
+            <Row k="price_alerts" label="Price alerts" desc="When a share crosses a price you set on Price alerts" />
+            <Row k="portfolio_sell_alerts" label="Big moves in your holdings" desc="When a holding is down or up by the percentages below, from your buy price" />
+            <Row k="watchlist_buy_alerts" label="Watchlist BUY ratings" desc="When Fennec's AI analysis rates a watched share BUY" />
+            <Row k="watchlist_sell_alerts" label="Watchlist SELL ratings" desc="When Fennec's AI analysis rates a watched share SELL" />
+            <Row k="earnings_alerts" label="Earnings dates" desc="The day before a company you hold or watch reports results" />
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {([
+                { k: 'stop_loss_pct', label: 'Tell me when down', color: '#ef4444', icon: IconArrowDown },
+                { k: 'take_profit_pct', label: 'Tell me when up', color: '#22c55e', icon: IconArrowUp },
+              ] as const).map(f => (
+                <label key={f.k} style={{ flex: 1, minWidth: 130, fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}><f.icon size={13} style={{ color: f.color }} /> {f.label}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="number" min={1} max={f.k === 'stop_loss_pct' ? 99 : 1000} value={thresholds[f.k]}
+                      onChange={e => setThresholds(t => ({ ...t, [f.k]: e.target.value }))}
+                      style={{ flex: 1, minWidth: 0, padding: '9px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700 }} />
+                    <span style={{ fontWeight: 700, color: f.color }}>%</span>
+                  </span>
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="number" min={1} max={99} value={prefs.stop_loss_pct}
-                    onChange={e => setPrefs(p => ({ ...p, stop_loss_pct: Number(e.target.value) }))}
-                    style={{ flex: 1, padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, outline: 'none' }}
-                  />
-                  <span style={{ fontSize: 14, color: '#ef4444', fontWeight: 700 }}>%</span>
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', fontFamily: 'Syne, sans-serif', fontWeight: 600, marginBottom: 6 }}>
-                  Take profit — alert when up
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="number" min={1} max={500} value={prefs.take_profit_pct}
-                    onChange={e => setPrefs(p => ({ ...p, take_profit_pct: Number(e.target.value) }))}
-                    style={{ flex: 1, padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, outline: 'none' }}
-                  />
-                  <span style={{ fontSize: 14, color: '#22c55e', fontWeight: 700 }}>%</span>
-                </div>
-              </div>
+              ))}
+              <button onClick={saveThresholds}
+                disabled={Number(thresholds.stop_loss_pct) === prefs.stop_loss_pct && Number(thresholds.take_profit_pct) === prefs.take_profit_pct}
+                style={{ padding: '9px 16px', borderRadius: 8, background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', opacity: Number(thresholds.stop_loss_pct) === prefs.stop_loss_pct && Number(thresholds.take_profit_pct) === prefs.take_profit_pct ? 0.5 : 1 }}>
+                Save
+              </button>
             </div>
-          </div>
+            <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8 }}>
+              Shares are checked every few hours; prices can be up to 20 minutes delayed. These are reminders you set, not advice to buy or sell.
+            </p>
+          </Section>
 
-          <button onClick={savePrefs} disabled={savingPrefs}
-            style={{ padding: '12px 28px', borderRadius: 10, background: 'var(--primary)', color: 'white', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14, border: 'none', cursor: savingPrefs ? 'default' : 'pointer', opacity: savingPrefs ? 0.7 : 1, alignSelf: 'flex-start' }}
-          >
-            {savingPrefs ? 'Saving…' : 'Save preferences'}
-          </button>
+          <Section icon={IconUsers} color="#a855f7" title="Community">
+            <Row k="community_alerts" label="Replies to your posts" desc="When someone replies to something you posted" />
+          </Section>
         </div>
       )}
 

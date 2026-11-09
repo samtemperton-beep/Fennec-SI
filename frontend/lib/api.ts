@@ -195,6 +195,12 @@ export const api = {
   markNotificationsRead: (ids?: number[]) =>
     apiFetch('/api/alerts/notifications/mark-read', { method: 'POST', body: JSON.stringify({ ids }) }),
 
+  getUnreadCount: (): Promise<{ count: number }> =>
+    apiFetch('/api/alerts/notifications/unread-count'),
+
+  clearReadNotifications: () =>
+    apiFetch('/api/alerts/notifications', { method: 'DELETE' }),
+
   getNotificationPrefs: () =>
     apiFetch('/api/alerts/prefs'),
 

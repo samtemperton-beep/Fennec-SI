@@ -10,6 +10,7 @@ import aiRouter from './routes/ai';
 import newsRouter from './routes/news';
 import importRouter from './routes/import';
 import alertsRouter, { startAlertChecks } from './routes/alerts';
+import { startNotificationJobs } from './services/notify';
 import adminRouter from './routes/admin';
 import premiumRouter from './routes/premium';
 import socialRouter from './routes/social';
@@ -85,6 +86,8 @@ app.listen(PORT, () => {
     // Price targets, stop-loss, signals and earnings reminders, checked and
     // emailed without anyone opening the Alerts page.
     startAlertChecks();
+    // Bills, budgets, goals, invoices and bank problems, and all the emails.
+    startNotificationJobs();
     // Same key as the live server, so only here: a local copy with another key
     // would encrypt details the live server can't read.
     encryptLegacyOnStartup();

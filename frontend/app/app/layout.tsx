@@ -18,6 +18,7 @@ import { PremiumBadge } from '@/components/premium/PremiumBadge'
 import { PremiumLock } from '@/components/premium/PremiumLock'
 import { Feedback, openFeedback } from '@/components/shared/Feedback'
 import { PrivacyToggle, AmountMasker } from '@/components/shared/PrivacyMode'
+import { NotificationBell } from '@/components/shared/NotificationBell'
 import { SecurityGuard } from '@/components/shared/SecurityGuard'
 import { usePlan, PlanFeature } from '@/lib/plan'
 
@@ -339,6 +340,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           {/* Hide every dollar amount on screen; remembered on this device */}
           <PrivacyToggle className="topnav-settings topnav-privacy" />
+
+          {/* Unread notifications, on every page */}
+          <NotificationBell pathname={pathname} />
 
           {/* Settings — in the account menu on phones */}
           <Link

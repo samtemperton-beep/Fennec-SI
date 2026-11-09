@@ -53,7 +53,7 @@ export default function PrivacyPage() {
 
         <Section title="3. How we use it">
           <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
-            <li>To run Fennec for you: show your money in one place, sync connected accounts, and send reminders and alerts you&apos;ve asked for</li>
+            <li>To run Fennec for you: show your money in one place, sync connected accounts, and send the reminders, alerts and summaries you choose in Notifications → Preferences (these emails can include amounts, such as what a bill is for)</li>
             <li>To produce AI answers, analysis and summaries based on your own figures</li>
             <li>To share what you&apos;ve chosen with a linked partner</li>
             <li>To apply plan features and limits, and handle Premium requests</li>
