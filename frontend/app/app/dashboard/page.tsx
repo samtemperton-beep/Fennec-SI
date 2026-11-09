@@ -16,6 +16,7 @@ import { GoalsCard } from '@/components/dashboard/GoalsCard'
 import { QuickLinksCard } from '@/components/dashboard/QuickLinksCard'
 import { LayoutEditor } from '@/components/dashboard/LayoutEditor'
 import { GettingStarted } from '@/components/dashboard/GettingStarted'
+import { AboutYouPrompt } from '@/components/dashboard/AboutYouPrompt'
 import { CARD_INFO, DEFAULT_LAYOUT, normaliseLayout, type CardId, type LayoutItem } from '@/components/dashboard/layout'
 
 export default function DashboardPage() {
@@ -225,6 +226,7 @@ export default function DashboardPage() {
       ) : (
         <>
         <GettingStarted userId={userId} />
+        <AboutYouPrompt userId={userId} />
         <div className="dash-grid">
           {layout.filter(l => !l.hidden).map(l => (
             <div key={l.id} className={CARD_INFO[l.id].half ? 'dash-cell half' : 'dash-cell'}>

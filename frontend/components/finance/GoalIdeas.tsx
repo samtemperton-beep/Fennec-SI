@@ -46,7 +46,7 @@ export function GoalIdeas({ existing, onAdded }: { existing: string[]; onAdded: 
 
   function update(patch: AboutYou) {
     setAbout(a => ({ ...a, ...patch }))
-    saveAboutYou(supabase, patch)
+    saveAboutYou(supabase, { ...patch, asked: true })
   }
   const toggleInterest = (id: InterestId) => {
     const now = new Set(about?.interests ?? [])

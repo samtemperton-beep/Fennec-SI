@@ -174,8 +174,9 @@ export default function OnboardingPage() {
         onboarding_complete: true,
       }
       // Optional answers, for goal and budget ideas and the fox (lib/aboutYou.ts).
-      const about = { ...(ageBand ? { ageBand } : {}), ...(interests.size ? { interests: [...interests] } : {}) }
-      let { error } = await supabase.from('profiles').upsert((Object.keys(about).length ? { ...row, about } : row) as Record<string, unknown>)
+      // asked: they've seen the questions, so the dashboard won't ask them again.
+      const about = { asked: true, ...(ageBand ? { ageBand } : {}), ...(interests.size ? { interests: [...interests] } : {}) }
+      let { error } = await supabase.from('profiles').upsert({ ...row, about } as Record<string, unknown>)
       // If profiles.about isn't there yet, finishing onboarding matters more than these.
       if (error && /about/.test(error.message)) ({ error } = await supabase.from('profiles').upsert(row))
       if (error) {

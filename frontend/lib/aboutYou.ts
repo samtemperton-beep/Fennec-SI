@@ -33,6 +33,8 @@ export interface AboutYou {
   ageBand?: AgeBand
   interests?: InterestId[]
   household?: HouseholdAnswers
+  /** Shown the questions already (in onboarding, or the dashboard prompt), so don't ask again. */
+  asked?: boolean
 }
 
 export async function loadAboutYou(supabase: SupabaseClient): Promise<AboutYou> {
