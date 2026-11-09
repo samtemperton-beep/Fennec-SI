@@ -1,6 +1,8 @@
 'use client'
 import { localDate } from '@/lib/utils'
 import { loadSavingsData, savingsSummaryText } from '@/lib/savingsData'
+import { loadAboutYou, aboutYouText } from '@/lib/aboutYou'
+import { ASK_FENNEC_EVENT } from '@/lib/askFennec'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { IconX, IconSend, IconRefresh } from '@tabler/icons-react'
 import { createClient } from '@/lib/supabase'
@@ -26,6 +28,7 @@ interface FennecContext {
   goalsSummary?: string
   kiwiSaverSummary?: string
   savingsSummary?: string
+  aboutSummary?: string
   // Business
   businessPLSummary?: string
   businessTopExpenses?: string
@@ -321,7 +324,11 @@ async function loadFinanceContext(): Promise<Partial<FennecContext>> {
     if (savings) savingsSummary = savingsSummaryText(savings)
   } catch { /* the fox still has everything else */ }
 
-  return { accountsSummary, monthlySpend, goalsSummary, kiwiSaverSummary, savingsSummary }
+  // What they've told Fennec about themselves (age range, what they're working towards, household).
+  let aboutSummary: string | undefined
+  try { aboutSummary = aboutYouText(await loadAboutYou(supabase)) } catch { /* optional */ }
+
+  return { accountsSummary, monthlySpend, goalsSummary, kiwiSaverSummary, savingsSummary, aboutSummary }
 }
 
 async function loadBusinessContext(): Promise<Partial<FennecContext>> {
@@ -416,6 +423,7 @@ export function FennecAI() {
   const [loading, setLoading] = useState(false)
   const [context, setContext] = useState<FennecContext | null>(null)
   const [contextLoading, setContextLoading] = useState(false)
+  const [contextTried, setContextTried] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>(pageConfig.suggestions)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -460,11 +468,32 @@ export function FennecAI() {
       }
     } catch {}
     setContextLoading(false)
+    setContextTried(pathname)
   }, [pathname, contextLoading])
 
   useEffect(() => {
     if (open && !contextLoadedRef.current) loadContext()
   }, [open, loadContext])
+
+  // A page can open the fox with a question (lib/askFennec.ts). It's sent once
+  // the page's context has loaded, so the answer can use the person's figures.
+  const [pending, setPending] = useState<string | null>(null)
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const q = (e as CustomEvent<{ question?: string }>).detail?.question
+      if (q) { setOpen(true); setPending(q) }
+    }
+    window.addEventListener(ASK_FENNEC_EVENT, onAsk)
+    return () => window.removeEventListener(ASK_FENNEC_EVENT, onAsk)
+  }, [])
+  useEffect(() => {
+    if (!pending || loading || contextLoading) return
+    if (!context && contextTried !== pathname) return
+    const q = pending
+    setPending(null)
+    send(q)
+  }, [pending, loading, contextLoading, context, contextTried, pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
 
   async function send(text: string) {
     const question = text.trim()
@@ -537,7 +566,7 @@ export function FennecAI() {
   // The plan doesn't include the chat: no fox button at all
   if (!can('helper')) return null
 
-  const hasContext = !!(context?.portfolioSummary || context?.accountsSummary || context?.kiwiSaverSummary || context?.savingsSummary || context?.businessPLSummary)
+  const hasContext = !!(context?.portfolioSummary || context?.accountsSummary || context?.kiwiSaverSummary || context?.savingsSummary || context?.aboutSummary || context?.businessPLSummary)
 
   return (
     <>

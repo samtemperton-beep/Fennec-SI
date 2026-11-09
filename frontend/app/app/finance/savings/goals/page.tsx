@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconPlus, IconCheck, IconTrophy } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { SavingsTabs } from '@/components/savings/SavingsTabs'
+import { GoalIdeas } from '@/components/finance/GoalIdeas'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
@@ -172,6 +173,8 @@ export default function GoalsPage() {
           <IconPlus size={14} /> New Goal
         </button>
       </div>
+
+      {!loading && <GoalIdeas existing={goals.filter(g => g.status !== 'completed').map(g => g.name)} onAdded={load} />}
 
       {showAdd && (
         <form onSubmit={addGoal} className="card" style={{ marginBottom: 24, padding: 20 }}>

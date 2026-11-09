@@ -12,6 +12,7 @@ import { SetupHelpChat } from '@/components/onboarding/SetupHelpChat'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconCheck, IconArrowRight, IconPlugConnected, IconUpload, IconExternalLink, IconChartBar, IconWallet, IconNewSection, IconUsers, IconBriefcase, IconShieldLock } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { AGE_BANDS, INTERESTS, type AgeBand, type InterestId } from '@/lib/aboutYou'
 
 const FEATURES = [
   {
@@ -109,6 +110,8 @@ export default function OnboardingPage() {
   const [akahuConnected, setAkahuConnected] = useState(false)
   const [riskLevel, setRiskLevel] = useState(5)
   const [investorType, setInvestorType] = useState('')
+  const [ageBand, setAgeBand] = useState<AgeBand | null>(null)
+  const [interests, setInterests] = useState<Set<InterestId>>(new Set())
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -162,14 +165,19 @@ export default function OnboardingPage() {
       // Supabase returns errors rather than throwing, so check it: a silent
       // failure left onboarding_complete false and bounced the user straight
       // back here from the dashboard.
-      const { error } = await supabase.from('profiles').upsert({
+      const row = {
         id: userId,
         username: name.trim() || null,
         risk_level: riskLevel,
         profession: investorType || null,
         enabled_features: [...selectedFeatures],
         onboarding_complete: true,
-      })
+      }
+      // Optional answers, for goal and budget ideas and the fox (lib/aboutYou.ts).
+      const about = { ...(ageBand ? { ageBand } : {}), ...(interests.size ? { interests: [...interests] } : {}) }
+      let { error } = await supabase.from('profiles').upsert((Object.keys(about).length ? { ...row, about } : row) as Record<string, unknown>)
+      // If profiles.about isn't there yet, finishing onboarding matters more than these.
+      if (error && /about/.test(error.message)) ({ error } = await supabase.from('profiles').upsert(row))
       if (error) {
         setSaving(false)
         if (error.code === '23505') {
@@ -419,6 +427,32 @@ export default function OnboardingPage() {
                   <button key={t} onClick={() => setInvestorType(t)}
                     style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${investorType === t ? 'var(--primary)' : 'var(--border)'}`, background: investorType === t ? 'var(--primary-light)' : 'var(--surface2)', color: investorType === t ? 'var(--primary)' : 'var(--text2)', transition: 'all 0.15s' }}
                   >{t}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>What are you working towards?</label>
+              <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 10 }}>Pick any. Fennec uses these to suggest goals and budgets. Optional.</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {INTERESTS.map(i => {
+                  const on = interests.has(i.id)
+                  return (
+                    <button key={i.id} aria-pressed={on} onClick={() => setInterests(prev => { const n = new Set(prev); on ? n.delete(i.id) : n.add(i.id); return n })}
+                      style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', border: on ? '1.5px solid var(--primary)' : '1.5px solid var(--border)', background: on ? 'var(--primary-light)' : 'var(--surface2)', color: on ? 'var(--primary)' : 'var(--text2)', transition: 'all 0.15s' }}
+                    >{i.label}</button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Your age <span style={{ fontWeight: 400, color: 'var(--text2)' }}>(optional)</span></label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {AGE_BANDS.map(b => (
+                  <button key={b} aria-pressed={ageBand === b} onClick={() => setAgeBand(a => a === b ? null : b)}
+                    style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', border: ageBand === b ? '1.5px solid var(--primary)' : '1.5px solid var(--border)', background: ageBand === b ? 'var(--primary-light)' : 'var(--surface2)', color: ageBand === b ? 'var(--primary)' : 'var(--text2)', transition: 'all 0.15s' }}
+                  >{b}</button>
                 ))}
               </div>
             </div>

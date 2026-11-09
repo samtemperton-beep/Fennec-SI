@@ -10,6 +10,8 @@ import { api } from '@/lib/api'
 import type { SavingsTip } from '@/lib/api'
 import { isIncomeCategory } from '@/lib/categories'
 import { NewCategory } from '@/components/finance/NewCategory'
+import { BudgetHelper } from '@/components/finance/BudgetHelper'
+import { IconWand } from '@tabler/icons-react'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 })
@@ -36,6 +38,7 @@ export default function BudgetPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [spent, setSpent] = useState<Record<string, number>>({})
   const [received, setReceived] = useState<Record<string, number>>({})
+  const [helperOpen, setHelperOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
@@ -145,7 +148,15 @@ export default function BudgetPage() {
         <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15 }}>{title}</h2>
         <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{note}</p>
       </div>
-      <NewCategory defaultKind={kind} onCreated={c => addCategory(c as Category)} />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {kind === 'spending' && !helperOpen && (
+          <button onClick={() => setHelperOpen(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, background: 'var(--primary)', color: 'white', border: 'none', fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
+            <IconWand size={13} /> Suggest budgets
+          </button>
+        )}
+        <NewCategory defaultKind={kind} onCreated={c => addCategory(c as Category)} />
+      </div>
     </div>
   )
 
@@ -226,6 +237,13 @@ export default function BudgetPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {sectionHead('Monthly budget', 'Spent this month / your limit for each category. Tap a limit to change it.', 'spending')}
+            {helperOpen && (
+              <BudgetHelper categories={spendingCats} expectedIncome={expectedIncome} onClose={() => setHelperOpen(false)}
+                onApplied={updates => {
+                  setCategories(prev => prev.map(c => { const u = updates.find(x => x.id === c.id); return u ? { ...c, monthly_budget: u.monthly_budget } : c }))
+                  setHelperOpen(false)
+                }} />
+            )}
             {spendingCats.length === 0
               ? <p style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14 }}>No spending categories yet.</p>
               : spendingCats.map((c, i) => row(c, i, spendingCats, false))}

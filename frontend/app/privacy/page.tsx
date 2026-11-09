@@ -38,6 +38,8 @@ export default function PrivacyPage() {
           <br /><br />
           <strong>Rates notices (optional):</strong> if you upload a rates notice or revaluation letter on the Home Loan page, it&apos;s read to find your council valuation. The file itself isn&apos;t kept. The details read off it (the council, address, valuation reference and values) are saved, encrypted, so you don&apos;t need to upload it again, and are deleted if you change your address or delete your account.
           <br /><br />
+          <strong>About you (optional):</strong> if you choose to, your age range, what you&apos;re working towards (such as buying a home or paying off debt), and household details you give the budget helper (how many adults and children, take-home pay, rent or mortgage, and whether you run a car). These are used to suggest budgets and goals and to give Fennec&apos;s AI context, and you can change them on the Goals page.
+          <br /><br />
           <strong>Partner sharing (optional):</strong> if you link with a partner, we record the link and what you&apos;ve chosen to share with them.
           <br /><br />
           <strong>Category rules:</strong> when you save a rule that uses one of Fennec&apos;s standard categories, its keyword and category (for example &quot;woolworths&quot; and Groceries) may be suggested for Fennec&apos;s shared category list, which the team reviews before anyone&apos;s transactions use it. Nothing that identifies you or your transactions is kept with the suggestion.

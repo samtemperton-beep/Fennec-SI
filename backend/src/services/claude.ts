@@ -248,6 +248,7 @@ export interface HelperContext {
   goalsSummary?: string;
   kiwiSaverSummary?: string;
   savingsSummary?: string;
+  aboutSummary?: string;
 }
 
 export async function* streamHelper(messages: Message[], apiKey?: string, context?: HelperContext, model?: string) {
@@ -287,6 +288,13 @@ USER'S SAVINGS (and how they compare with investing and KiwiSaver, as on the Sav
 ${String(context.savingsSummary).slice(0, 3000)}`
     : '';
 
+  const aboutSection = context?.aboutSummary
+    ? `
+
+ABOUT THE USER (what they chose to tell Fennec):
+${String(context.aboutSummary).slice(0, 600)}`
+    : '';
+
   // Page-specific focus hint
   const pageHints: Record<string, string> = {
     portfolio: 'The user is viewing their investment portfolio. Prioritise portfolio analysis, stock signals, and position-level insights.',
@@ -296,7 +304,7 @@ ${String(context.savingsSummary).slice(0, 3000)}`
     budget: 'The user is viewing their budget. Help them understand their spending patterns, whether they are on track, and how to optimise.',
     transactions: 'The user is viewing their transactions. Focus on spending analysis, category trends, and cash flow.',
     bills: 'The user is viewing their recurring bills. Help them manage, reduce, or negotiate household costs.',
-    goals: 'The user is viewing their savings goals. Focus on goal progress, strategies to accelerate savings, and prioritisation.',
+    goals: 'The user is viewing their savings goals. Focus on goal progress, strategies to accelerate savings, and prioritisation. When asked for goal ideas, suggest 3-5 specific goals with a target amount, a timeframe and the monthly amount that needs, using their spending, savings, age range and what they are working towards; usually an emergency fund and clearing high-interest debt come first.',
     savings: 'The user is viewing their Savings page: savings balance, interest earned, RWT, a 5-10 year projection, and a comparison of savings, investing and KiwiSaver. Use their figures. When comparing, weigh return against risk, access and time: an emergency fund (often 3-6 months of expenses) usually belongs in savings; KiwiSaver gets employer and government money but is locked in until 65 or a first home; shares have higher expected returns but can fall, so they suit money not needed for 5+ years. Check their RWT rate against their income (10.5% up to $15,600, 17.5% to $53,500, 30% to $78,100, 33% to $180,000, 39% above): too high a rate is refunded at year end, too low means tax to pay. Mention that paying down high-interest debt often beats saving. Say what their numbers suggest, then the trade-offs.',
     kiwisaver: 'The user is viewing their KiwiSaver. Focus on NZ retirement planning: contribution rates, fund types, government MTC, and projected outcomes.',
     dashboard: 'The user is on their financial dashboard. Give holistic advice covering both their investments and household finances.',
@@ -331,7 +339,7 @@ ${String(context.savingsSummary).slice(0, 3000)}`
 
 *Emergency fund*: Target 3–6 months of essential expenses in a separate high-interest account (Heartland Bank Online Saver, ASB Online Saver, Rabobank). Automate a fixed transfer every payday. If someone has no emergency fund and variable income, 6 months is safer.
 
-*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}${savingsSection}
+*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}${savingsSection}${aboutSection}
 
 **How to respond:**
 - Give expert, specific, actionable answers, like a knowledgeable friend who works in finance

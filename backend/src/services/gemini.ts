@@ -89,7 +89,7 @@ export async function draftPost(ticker: string, signal: string, context: string)
   return text.trim();
 }
 
-export async function* streamHelper(messages: any[], context?: { pageHint?: string; portfolioSummary?: string; watchlistSummary?: string; recentNews?: string[]; accountsSummary?: string; monthlySpend?: string; goalsSummary?: string; kiwiSaverSummary?: string; savingsSummary?: string }) {
+export async function* streamHelper(messages: any[], context?: { pageHint?: string; portfolioSummary?: string; watchlistSummary?: string; recentNews?: string[]; accountsSummary?: string; monthlySpend?: string; goalsSummary?: string; kiwiSaverSummary?: string; savingsSummary?: string; aboutSummary?: string }) {
   const client = getClient();
 
   const sections = [
@@ -101,6 +101,7 @@ export async function* streamHelper(messages: any[], context?: { pageHint?: stri
     context?.goalsSummary ? `\nSavings goals: ${context.goalsSummary}` : '',
     context?.kiwiSaverSummary ? `\nKiwiSaver: ${context.kiwiSaverSummary}` : '',
     context?.savingsSummary ? `\nSavings: ${String(context.savingsSummary).slice(0, 3000)}` : '',
+    context?.aboutSummary ? `\nAbout the user: ${String(context.aboutSummary).slice(0, 600)}` : '',
   ].join('');
 
   const system = `You are Fennec, an expert AI financial adviser for NZ users. You cover both investing (equities, ETFs, macro, US/ASX/NZX markets) and personal finance (budgeting, savings, KiwiSaver, NZ tax). Give specific, data-driven answers. Reference the user's actual data when relevant. Use bold for key terms, bullet points for lists. Be direct and concise (150-250 words). Note this is information, not regulated financial advice.${sections}`;
