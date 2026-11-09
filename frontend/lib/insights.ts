@@ -180,7 +180,7 @@ async function goalInsights({ supabase }: InsightContext, today: string): Promis
         id: `goal-done:${g.id}`, severity: 'good', section: 'finance',
         title: `${g.name} goal reached 🎉`,
         detail: `${money(saved)} saved. Mark it complete on Goals.`,
-        href: '/app/finance/goals',
+        href: '/app/finance/savings/goals',
       })
       continue
     }
@@ -191,7 +191,7 @@ async function goalInsights({ supabase }: InsightContext, today: string): Promis
           id: `goal-late:${g.id}:${g.target_date}`, severity: 'warning', section: 'finance',
           title: `${g.name} passed its target date`,
           detail: `${money(left)} still to go. Pick a new date or adjust the target.`,
-          href: '/app/finance/goals',
+          href: '/app/finance/savings/goals',
         })
         continue
       }
@@ -202,14 +202,14 @@ async function goalInsights({ supabase }: InsightContext, today: string): Promis
           id: `goal-behind:${g.id}:${Math.round(needed)}`, severity: 'warning', section: 'finance',
           title: `${g.name} is behind schedule`,
           detail: `Needs ${money(needed)}/month to hit ${money(target)} by ${niceDate(g.target_date)}; you're putting in ${money(putting)}.`,
-          href: '/app/finance/goals',
+          href: '/app/finance/savings/goals',
         })
       } else if (putting >= needed * 0.95) {
         out.push({
           id: `goal-ontrack:${g.id}`, severity: 'good', section: 'finance',
           title: `${g.name} is on track`,
           detail: `${Math.round((saved / target) * 100)}% saved, on course for ${niceDate(g.target_date)}.`,
-          href: '/app/finance/goals',
+          href: '/app/finance/savings/goals',
         })
       }
     } else if (saved / target >= 0.75) {
@@ -217,7 +217,7 @@ async function goalInsights({ supabase }: InsightContext, today: string): Promis
         id: `goal-close:${g.id}`, severity: 'good', section: 'finance',
         title: `${g.name} is ${Math.round((saved / target) * 100)}% there`,
         detail: `${money(left)} to go.`,
-        href: '/app/finance/goals',
+        href: '/app/finance/savings/goals',
       })
     }
   }

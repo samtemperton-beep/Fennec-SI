@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { WealthChart, type Series } from '@/components/savings/WealthChart'
+import { SavingsTabs } from '@/components/savings/SavingsTabs'
 import { RWT_RATES, afterTaxRate, toMonthly, type Frequency } from '@/lib/savings'
 import {
   saveSavingsPrefs, buildPots, extraMonthlyGrowth,
@@ -71,6 +72,7 @@ export function SavingsView({ data, persist = true }: { data: SavingsData; persi
 
   return (
     <div style={{ padding: '24px 16px', maxWidth: 820, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div><SavingsTabs /></div>
       <div>
         <h1 style={{ fontSize: 22, fontWeight: 800, fontFamily: 'Plus Jakarta Sans, sans-serif', margin: 0 }}>Savings</h1>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>What your savings earn, where they could be, and how they compare with investing and KiwiSaver.</p>

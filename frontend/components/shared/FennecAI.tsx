@@ -69,7 +69,7 @@ function getPageConfig(pathname: string): {
     ],
     loadInvesting: false, loadFinance: true,
   }
-  if (pathname.includes('/finance/savings')) return {
+  if (pathname.includes('/finance/savings') && !pathname.includes('/goals')) return {
     pageHint: 'savings',
     label: 'Fennec AI',
     description: 'Ask about your savings, interest, and how they compare with investing and KiwiSaver.',
@@ -82,7 +82,7 @@ function getPageConfig(pathname: string): {
     ],
     loadInvesting: false, loadFinance: true,
   }
-  if (pathname.includes('/finance/goals')) return {
+  if (pathname.includes('/goals')) return {
     pageHint: 'goals',
     label: 'Fennec AI',
     description: 'Ask about your savings goals or how to reach them faster.',

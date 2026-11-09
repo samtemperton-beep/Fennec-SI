@@ -10,7 +10,7 @@ const LINKS = [
   { href: '/app/finance/accounts', label: 'Accounts', icon: IconBuildingBank, section: 'Finance', feature: 'finance' },
   { href: '/app/finance/transactions', label: 'Transactions', icon: IconArrowsExchange, section: 'Finance', feature: 'finance' },
   { href: '/app/finance/budget', label: 'Budget', icon: IconWallet, section: 'Finance', feature: 'finance' },
-  { href: '/app/finance/goals', label: 'Goals', icon: IconTarget, section: 'Finance', feature: 'finance' },
+  { href: '/app/finance/savings/goals', label: 'Goals', icon: IconTarget, section: 'Finance', feature: 'finance' },
   { href: '/app/finance/kiwisaver', label: 'KiwiSaver', icon: IconPigMoney, section: 'Finance', feature: 'finance' },
   { href: '/app/finance/homeloan', label: 'Home Loan', icon: IconHome, section: 'Finance', feature: 'finance' },
   { href: '/app/finance/business/invoices', label: 'Invoices', icon: IconFileInvoice, section: 'Business', feature: 'business' },

@@ -15,13 +15,13 @@ export function GoalsCard({ goals, loading }: { goals: any[]; loading: boolean }
           <span className="cf-title">Savings goals</span>
         </div>
         {goals.length > 0 && (
-          <Link href="/app/finance/goals" className="cf-link">View all <IconArrowRight size={12} /></Link>
+          <Link href="/app/finance/savings/goals" className="cf-link">View all <IconArrowRight size={12} /></Link>
         )}
       </div>
       {loading ? (
         <div className="skeleton" style={{ height: 40 }} />
       ) : goals.length === 0 ? (
-        <Link href="/app/finance/goals" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--primary)', textDecoration: 'none' }}>
+        <Link href="/app/finance/savings/goals" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--primary)', textDecoration: 'none' }}>
           <IconPlus size={14} /> Set your first savings goal
         </Link>
       ) : (
