@@ -230,7 +230,9 @@ Sort by saving amount descending. Max 6 tips.`;
 }
 
 export async function draftPost(ticker: string, signal: string, context: string, apiKey?: string, model?: string) {
-  const prompt = `Draft a concise, engaging community post (max 280 chars) for a stock investment community about ${ticker} with a ${signal} signal. Context: ${context}. Be direct and specific.`;
+  const view = /bull/i.test(signal) ? 'positive' : /bear/i.test(signal) ? 'negative' : 'neutral';
+  const prompt = `Draft a short community post (max 280 characters) for a New Zealand investing community, written in the first person, about ${ticker}. The writer's own view is ${view}. Context: ${context}.
+Frame it as the writer's personal opinion and reasons, not a recommendation. Don't tell others to buy or sell, don't give price targets or promise returns, and don't invent figures or news. Plain text only, no hashtags.`;
 
   const text = await complete({ model: model || MODEL, maxTokens: 256, messages: [{ role: 'user', content: prompt }], apiKey });
   return text.trim();

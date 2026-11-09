@@ -83,7 +83,7 @@ Return JSON only: { "recommendation": "STRONG_BUY"|"WATCH"|"SKIP", "score": 1-10
 
 export async function draftPost(ticker: string, signal: string, context: string) {
   const text = await generate(
-    `Draft a concise community post (max 280 chars) about ${ticker} with a ${signal} signal. Context: ${context}. Be direct and specific. No hashtags.`,
+    `Draft a short community post (max 280 characters) for a New Zealand investing community, written in the first person, about ${ticker}. The writer's own view is ${/bull/i.test(signal) ? 'positive' : /bear/i.test(signal) ? 'negative' : 'neutral'}. Context: ${context}. Frame it as the writer's personal opinion and reasons, not a recommendation. Don't tell others to buy or sell, don't give price targets or promise returns, and don't invent figures or news. Plain text only, no hashtags.`,
     256
   );
   return text.trim();

@@ -5,10 +5,11 @@ import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import {
   IconShield, IconUsers, IconBrain, IconSettings2,
-  IconRefresh, IconCrown, IconActivity, IconCheck, IconX, IconLock, IconHeartbeat, IconTags,
+  IconRefresh, IconCrown, IconActivity, IconCheck, IconX, IconLock, IconHeartbeat, IconTags, IconMessages,
 } from '@tabler/icons-react'
 import { HealthPanel } from '@/components/admin/HealthPanel'
 import { CategoryMatchesPanel } from '@/components/admin/CategoryMatchesPanel'
+import { CommunityReportsPanel } from '@/components/admin/CommunityReportsPanel'
 
 const GEMINI = 'gemini-2.5-flash'
 const HAIKU = 'claude-haiku-4-5-20251001'
@@ -58,7 +59,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 export default function AdminPage() {
   const router = useRouter()
   const [checking, setChecking] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'health' | 'categories' | 'models' | 'users'>('overview')
+  const [tab, setTab] = useState<'overview' | 'health' | 'categories' | 'community' | 'models' | 'users'>('overview')
 
   // Stats
   const [stats, setStats] = useState<any>(null)
@@ -202,6 +203,7 @@ export default function AdminPage() {
     { id: 'overview', label: 'Overview', icon: IconActivity },
     { id: 'health', label: 'Health', icon: IconHeartbeat },
     { id: 'categories', label: 'Categories', icon: IconTags },
+    { id: 'community', label: 'Community', icon: IconMessages },
     { id: 'models', label: 'Plans & AI', icon: IconBrain },
     { id: 'users', label: 'Users', icon: IconUsers },
   ] as const
@@ -318,6 +320,7 @@ export default function AdminPage() {
 
       {tab === 'health' && <HealthPanel />}
       {tab === 'categories' && <CategoryMatchesPanel />}
+      {tab === 'community' && <CommunityReportsPanel />}
 
       {/* PLANS & AI TAB */}
       {tab === 'models' && (

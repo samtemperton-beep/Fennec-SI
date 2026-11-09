@@ -28,7 +28,7 @@ Finance (household):
 
 Business (Premium): business accounts and transactions, invoices, and GST and income tax estimates. Business accounts are kept out of the household pages.
 
-Community: posts, the leaderboard (Premium verified portfolios), and Notifications, including price alerts.
+Community: posts (Discussion, Share ideas, Milestones, News takes) with likes and replies, the leaderboard (Premium verified portfolios), and Notifications, including price alerts. Tap a name to see someone's badges and recent posts, or to block them; the flag reports a post or reply to the Fennec team. Posts are members' opinions, not advice. Tapping a share code asks you about it.
 
 Settings: profile, plan, bank connection (Akahu Sync, with the same step-by-step guide as sign-up behind "Not sure how? Show me step by step"), partner sharing, Security & privacy, two-factor sign-in, and Delete account. Gmail is connected from the Bills page.
 

@@ -172,7 +172,7 @@ router.get('/leaderboard', requireAuth, async (_req, res) => {
     .map(([uid, stats]) => {
       const gainPct = stats.cost > 0 ? ((stats.value - stats.cost) / stats.cost) * 100 : 0;
       const profile = profileMap.get(uid);
-      return { userId: uid, username: profile?.username, avatarColor: profile?.avatar_color, avatarEmoji: profile?.avatar_emoji, avatarUrl: profile?.avatar_url, gainPct: Math.round(gainPct * 100) / 100, portfolioValue: Math.round(stats.value * 100) / 100 };
+      return { userId: uid, username: profile?.username, avatarColor: profile?.avatar_color, avatarEmoji: profile?.avatar_emoji, avatarUrl: profile?.avatar_url, gainPct: Math.round(gainPct * 100) / 100 };
     })
     .sort((a, b) => b.gainPct - a.gainPct)
     .slice(0, 50)

@@ -17,7 +17,7 @@ export default function PrivacyPage() {
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 16px' }}>
         <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 8 }}>Privacy Policy</h1>
-        <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 40 }}>Last updated: 6 November 2026</p>
+        <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 40 }}>Last updated: 10 November 2026</p>
 
         <Section title="1. Who we are">
           Fennec SI (short for Save &amp; Invest, and called Fennec in this policy) is a New Zealand app for saving and investing in one place, available at fennecsi.com. This policy explains what personal information we collect, how we use and protect it, and your rights under the New Zealand Privacy Act 2020.
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
           <br /><br />
           <strong>Category rules:</strong> when you save a rule that uses one of Fennec&apos;s standard categories, its keyword and category (for example &quot;woolworths&quot; and Groceries) may be suggested for Fennec&apos;s shared category list, which the team reviews before anyone&apos;s transactions use it. Nothing that identifies you or your transactions is kept with the suggestion.
           <br /><br />
-          <strong>Community:</strong> posts and comments you publish, and, if you verify your portfolio, your leaderboard entry.
+          <strong>Community:</strong> posts and replies you publish, posts you like, people you block, reports you make, and, if you verify your portfolio, your leaderboard entry. Reports are seen only by Fennec&apos;s administrator, not by the person reported.
           <br /><br />
           <strong>Feedback:</strong> messages you send with the Feedback button, any screenshot you attach, the page you were on, and your browser type.
           <br /><br />
@@ -67,10 +67,10 @@ export default function PrivacyPage() {
           Your information is stored under your account, and our database only lets a signed-in person read or change their own records. Other Fennec users can&apos;t see it, except:
           <ul style={{ paddingLeft: 20, lineHeight: 2, marginTop: 8 }}>
             <li>accounts, bills and goals you choose to share with a linked partner</li>
-            <li>community posts, which other users can read</li>
+            <li>community posts and replies, which other users can read, along with your username, avatar, badges and whether your portfolio is verified</li>
             <li>the leaderboard, which shows your username and percentage performance, never dollar amounts</li>
           </ul>
-          Fennec&apos;s administrator can see account emails, usernames, plans and AI usage counts to run the service. The admin tools don&apos;t show anyone&apos;s accounts, transactions or investments.
+          Fennec&apos;s administrator can see account emails, usernames, plans and AI usage counts to run the service. The administrator also reviews community posts and replies that have been reported. The admin tools don&apos;t show anyone&apos;s accounts, transactions or investments.
         </Section>
 
         <Section title="5. AI processing">

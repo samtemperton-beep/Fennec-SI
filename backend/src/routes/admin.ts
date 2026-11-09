@@ -272,4 +272,59 @@ router.post('/category-matches/from-my-data', requireAuth, requireAdmin, async (
   res.json({ added: added?.length ?? 0, considered: rows.length });
 });
 
+// ── Community reports (community_migration.sql) ──────────────────────────────
+// Grouped by post or comment, newest first. Reporters stay anonymous here too.
+
+// GET /api/admin/reports?status=open|closed
+router.get('/reports', requireAuth, requireAdmin, async (req, res) => {
+  const open = req.query.status !== 'closed';
+  const { data: reports, error } = await supabase.from('post_reports')
+    .select('id, post_id, comment_id, reason, note, status, created_at')
+    .in('status', open ? ['open'] : ['hidden', 'removed', 'dismissed'])
+    .order('created_at', { ascending: false }).limit(300);
+  if (error) return res.status(500).json({ error: error.message });
+
+  const postIds = [...new Set((reports ?? []).filter(r => r.post_id).map(r => r.post_id))];
+  const commentIds = [...new Set((reports ?? []).filter(r => r.comment_id).map(r => r.comment_id))];
+  const [{ data: posts }, { data: comments }] = await Promise.all([
+    postIds.length ? supabase.from('posts').select('id, user_id, username, body, ticker, hidden, created_at').in('id', postIds) : Promise.resolve({ data: [] as any[] }),
+    commentIds.length ? supabase.from('post_comments').select('id, post_id, user_id, username, body, hidden, created_at').in('id', commentIds) : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const postMap = new Map((posts ?? []).map((p: any) => [p.id, p]));
+  const commentMap = new Map((comments ?? []).map((c: any) => [c.id, c]));
+
+  const groups = new Map<string, any>();
+  for (const r of reports ?? []) {
+    const key = r.comment_id ? `c${r.comment_id}` : `p${r.post_id}`;
+    const item = r.comment_id ? commentMap.get(r.comment_id) : postMap.get(r.post_id);
+    const g = groups.get(key) ?? {
+      key, kind: r.comment_id ? 'comment' : 'post', id: r.comment_id ?? r.post_id, item: item ?? null,
+      status: r.status, reports: [] as any[],
+    };
+    g.reports.push({ reason: r.reason, note: r.note, created_at: r.created_at });
+    groups.set(key, g);
+  }
+  res.json({ groups: [...groups.values()] });
+});
+
+// POST /api/admin/reports/resolve { kind: 'post'|'comment', id, action: 'keep'|'hide'|'remove' }
+router.post('/reports/resolve', requireAuth, requireAdmin, async (req, res) => {
+  const kind = req.body?.kind === 'comment' ? 'comment' : 'post';
+  const id = Number(req.body?.id);
+  const action = String(req.body?.action);
+  if (!id || !['keep', 'hide', 'remove'].includes(action)) return res.status(400).json({ error: 'Bad request' });
+  const table = kind === 'comment' ? 'post_comments' : 'posts';
+  const col = kind === 'comment' ? 'comment_id' : 'post_id';
+
+  // "keep" also un-hides something that three reports hid.
+  const status = action === 'keep' ? 'dismissed' : action === 'hide' ? 'hidden' : 'removed';
+  await supabase.from('post_reports').update({ status }).eq(col, id).eq('status', 'open');
+
+  const { error } = action === 'remove'
+    ? await supabase.from(table).delete().eq('id', id)
+    : await supabase.from(table).update({ hidden: action === 'hide' }).eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
 export default router;

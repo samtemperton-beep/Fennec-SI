@@ -14,7 +14,6 @@ interface LeaderboardEntry {
   avatarEmoji?: string
   avatarUrl?: string
   gainPct: number
-  portfolioValue: number
 }
 
 const RANK_MEDALS = ['🥇', '🥈', '🥉']
@@ -83,7 +82,7 @@ export default function LeaderboardPage() {
                   <IconShieldCheck size={13} style={{ color: 'var(--green)', flexShrink: 0 }} title="Verified portfolio" />
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>
-                  Portfolio value: ${entry.portfolioValue.toLocaleString()}
+                  Verified portfolio
                 </span>
               </div>
 

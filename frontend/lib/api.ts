@@ -60,6 +60,18 @@ export interface CategoryMatch {
   status: 'pending' | 'approved' | 'rejected'; source: 'starter' | 'admin' | 'users'; suggestions: number
 }
 
+export interface CommunityPerson {
+  id: string; username: string | null
+  avatarColor: string | null; avatarEmoji: string | null; avatarUrl: string | null
+  joined: string | null; verified: boolean
+  badges: { id: string; name: string; icon: string }[]
+}
+export interface ReportGroup {
+  key: string; kind: 'post' | 'comment'; id: number; status: string
+  item: { id: number; user_id: string; username: string; body: string; ticker?: string | null; hidden: boolean; created_at: string } | null
+  reports: { reason: string; note: string | null; created_at: string }[]
+}
+
 export interface SavingsTip {
   title: string
   saving: number
@@ -260,6 +272,18 @@ export const api = {
 
   adminSuggestCategoryMatches: (): Promise<{ added: number; considered?: number }> =>
     apiFetch('/api/admin/category-matches/from-my-data', { method: 'POST' }),
+
+  adminGetReports: (status: 'open' | 'closed'): Promise<{ groups: ReportGroup[] }> =>
+    apiFetch(`/api/admin/reports?status=${status}`),
+
+  adminResolveReport: (kind: 'post' | 'comment', id: number, action: 'keep' | 'hide' | 'remove') =>
+    apiFetch('/api/admin/reports/resolve', { method: 'POST', body: JSON.stringify({ kind, id, action }) }),
+
+  communityPeople: (ids: string[]): Promise<{ people: CommunityPerson[] }> =>
+    apiFetch(`/api/social/people?ids=${ids.join(',')}`),
+
+  reportContent: (body: { postId?: number; commentId?: number; reason: string; note?: string }): Promise<{ ok: boolean; hidden?: boolean; already?: boolean }> =>
+    apiFetch('/api/social/report', { method: 'POST', body: JSON.stringify(body) }),
 
   adminGetUsageStats: () =>
     apiFetch('/api/admin/usage-stats'),

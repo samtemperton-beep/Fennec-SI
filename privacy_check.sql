@@ -41,7 +41,7 @@ select '2. Tables with no row rules', coalesce(string_agg(name, ', '), 'none'),
 from no_rules
 union all
 select '3. Rules open to everyone', coalesce(string_agg(name, ', '), 'none'),
-       case when bool_and(cmd = 'SELECT' and tablename in ('ai_cache', 'badges', 'newsletter_digests', 'post_likes', 'posts')) is not false then 'OK' else 'CHECK' end
+       case when bool_and(cmd = 'SELECT' and tablename in ('ai_cache', 'badges', 'newsletter_digests', 'post_likes')) is not false then 'OK' else 'CHECK' end
 from open_rules
 union all
 select '4. Views that skip row rules', coalesce(string_agg(name, ', '), 'none'),
