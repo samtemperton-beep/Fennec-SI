@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { IconSearch, IconX, IconCheck, IconArrowLeft, IconWand } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { suggestKeyword } from '@/lib/categoryRules'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
@@ -117,33 +118,38 @@ function TransactionsPageInner() {
     toast.success(`Won’t match “${t.shared_match?.keyword ?? 'this'}” again. ${n} transaction${n === 1 ? '' : 's'} uncategorised.`)
   }
 
-  async function saveRule(pattern: string) {
+  async function saveRule(pattern: string, overrideOthers: boolean) {
     if (!creatingRule || savingRule) return
     setSavingRule(true)
-    const keyword = pattern.trim().toLowerCase()
+    const keyword = cleanPattern(pattern)
+    if (keyword.length < 2) { toast.error('Use a keyword of at least 2 letters.'); setSavingRule(false); return }
     const { error } = await supabase.from('fin_category_rules').upsert(
       { pattern: keyword, category_id: creatingRule.categoryId },
       { onConflict: 'user_id,pattern' }
     )
     if (error) { toast.error(error.message); setSavingRule(false); return }
 
-    // Bulk-apply to matching uncategorised household transactions
+    // Apply to the household transactions that already match: uncategorised and
+    // shared-list ones always; ones already in another category only if asked.
     const { data: household } = await supabase.from('fin_accounts').select('id').eq('is_business', false)
-    const { data: updated } = await supabase.from('fin_transactions')
+    let q = supabase.from('fin_transactions')
       .update({ category_id: creatingRule.categoryId, category_source: 'rule', shared_match_id: null })
       .in('account_id', (household || []).map(a => a.id))
       .ilike('description', `%${keyword}%`)
-      .or('category_id.is.null,category_source.eq.shared')
-      .select('id')
-    const count = updated?.length ?? 0
+      .neq('id', creatingRule.txId)
+    if (!overrideOthers) q = q.or('category_id.is.null,category_source.eq.shared')
+    const { data: updated, error: applyError } = await q.select('id')
+    if (applyError) toast.error(`Rule saved, but it couldn't be applied to past transactions: ${applyError.message}`)
+    const updatedIds = new Set((updated ?? []).map(u => u.id))
+    const count = updatedIds.size
 
     // Also update local state for any visible matches
     setTransactions(prev => prev.map(t =>
-      t.description?.toLowerCase().includes(keyword) && (!t.category_id || t.category_source === 'shared')
+      updatedIds.has(t.id)
         ? { ...t, category_id: creatingRule.categoryId, category: { name: creatingRule.categoryName }, category_source: 'rule' as const, shared_match_id: null, shared_match: null }
         : t
     ))
-    toast.success(`Rule saved — auto-categorised ${count ?? 0} existing transactions`)
+    toast.success(count ? `Rule saved and applied to ${count} other transaction${count === 1 ? '' : 's'}. New ones will be categorised too.` : 'Rule saved. New matching transactions will be categorised automatically.')
     setCreatingRule(null)
     setSavingRule(false)
   }
@@ -191,6 +197,9 @@ function TransactionsPageInner() {
       {/* Create rule banner */}
       {creatingRule && (
         <CreateRuleBanner
+          key={creatingRule.txId}
+          txId={creatingRule.txId}
+          categoryId={creatingRule.categoryId}
           description={creatingRule.description}
           categoryName={creatingRule.categoryName}
           saving={savingRule}
@@ -259,15 +268,38 @@ function TransactionsPageInner() {
 
 // ── Create Rule Banner ────────────────────────────────────────────────────────
 
-function CreateRuleBanner({ description, categoryName, saving, onSave, onDismiss }: {
-  description: string; categoryName: string; saving: boolean
-  onSave: (pattern: string) => void; onDismiss: () => void
+// A rule's keyword, as saved and matched: lower case, single spaces, and no
+// characters that are wildcards in the database's "contains" match.
+const cleanPattern = (s: string) => s.toLowerCase().replace(/[%_\\]/g, '').replace(/\s+/g, ' ').trim()
+
+function CreateRuleBanner({ txId, categoryId, description, categoryName, saving, onSave, onDismiss }: {
+  txId: string; categoryId: string; description: string; categoryName: string; saving: boolean
+  onSave: (pattern: string, overrideOthers: boolean) => void; onDismiss: () => void
 }) {
-  const [pattern, setPattern] = useState(() => {
-    // Auto-suggest: first 2-3 meaningful words from description
-    const words = description.replace(/[^a-zA-Z0-9 ]/g, ' ').trim().split(/\s+/).filter(w => w.length > 2)
-    return words.slice(0, 3).join(' ').toLowerCase()
-  })
+  // A piece of the description itself, so it matches the same merchant elsewhere.
+  const [pattern, setPattern] = useState(() => suggestKeyword(description))
+  const [override, setOverride] = useState(false)
+  // How many other transactions the keyword would catch, counted as you type.
+  const [matches, setMatches] = useState<{ open: number; other: number } | null>(null)
+  useEffect(() => {
+    const keyword = cleanPattern(pattern)
+    if (keyword.length < 2) { setMatches(null); return }
+    let cancelled = false
+    const t = setTimeout(async () => {
+      const { data: household } = await supabase.from('fin_accounts').select('id').eq('is_business', false)
+      const { data } = await supabase.from('fin_transactions')
+        .select('category_id, category_source')
+        .in('account_id', (household || []).map(a => a.id))
+        .ilike('description', `%${keyword}%`)
+        .neq('id', txId)
+        .limit(2000)
+      if (cancelled || !data) return
+      const open = data.filter(d => !d.category_id || d.category_source === 'shared').length
+      const other = data.filter(d => d.category_id && d.category_source !== 'shared' && d.category_id !== categoryId).length
+      setMatches({ open, other })
+    }, 350)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [pattern, txId, categoryId])
 
   return (
     <div style={{
@@ -293,19 +325,29 @@ function CreateRuleBanner({ description, categoryName, saving, onSave, onDismiss
           value={pattern}
           onChange={e => setPattern(e.target.value)}
           style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, fontFamily: 'DM Mono, monospace', outline: 'none' }}
-          onKeyDown={e => { if (e.key === 'Enter') onSave(pattern) }}
+          onKeyDown={e => { if (e.key === 'Enter') onSave(pattern, override) }}
           autoFocus
         />
         <button
-          onClick={() => onSave(pattern)}
+          onClick={() => onSave(pattern, override)}
           disabled={saving || !pattern.trim()}
           style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--primary)', color: 'white', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 12, cursor: 'pointer', opacity: saving || !pattern.trim() ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 5 }}>
           {saving ? <LoadingSpinner size={12} /> : <IconCheck size={13} />} Save rule
         </button>
       </div>
-      <p style={{ fontSize: 10, color: 'var(--text3)', marginTop: 8 }}>
-        This will also apply to existing uncategorised transactions that match.
+      <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8 }}>
+        {matches === null
+          ? 'Type a word or two that appears in this kind of transaction.'
+          : matches.open + matches.other === 0
+            ? 'No other transactions contain this yet. New ones that do will be categorised automatically.'
+            : `${matches.open} other uncategorised transaction${matches.open === 1 ? '' : 's'} will be tagged ${categoryName} now, and new ones from here on.`}
       </p>
+      {matches && matches.other > 0 && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text2)', marginTop: 6, cursor: 'pointer' }}>
+          <input type="checkbox" checked={override} onChange={e => setOverride(e.target.checked)} />
+          Also change the {matches.other} already in another category
+        </label>
+      )}
     </div>
   )
 }

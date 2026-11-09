@@ -247,6 +247,7 @@ export interface HelperContext {
   monthlySpend?: string;
   goalsSummary?: string;
   kiwiSaverSummary?: string;
+  savingsSummary?: string;
 }
 
 export async function* streamHelper(messages: Message[], apiKey?: string, context?: HelperContext, model?: string) {
@@ -279,6 +280,13 @@ export async function* streamHelper(messages: Message[], apiKey?: string, contex
     ? `\n\nUSER'S KIWISAVER:\n${context.kiwiSaverSummary}`
     : '';
 
+  const savingsSection = context?.savingsSummary
+    ? `
+
+USER'S SAVINGS (and how they compare with investing and KiwiSaver, as on the Savings page):
+${String(context.savingsSummary).slice(0, 3000)}`
+    : '';
+
   // Page-specific focus hint
   const pageHints: Record<string, string> = {
     portfolio: 'The user is viewing their investment portfolio. Prioritise portfolio analysis, stock signals, and position-level insights.',
@@ -289,6 +297,7 @@ export async function* streamHelper(messages: Message[], apiKey?: string, contex
     transactions: 'The user is viewing their transactions. Focus on spending analysis, category trends, and cash flow.',
     bills: 'The user is viewing their recurring bills. Help them manage, reduce, or negotiate household costs.',
     goals: 'The user is viewing their savings goals. Focus on goal progress, strategies to accelerate savings, and prioritisation.',
+    savings: 'The user is viewing their Savings page: savings balance, interest earned, RWT, a 5-10 year projection, and a comparison of savings, investing and KiwiSaver. Use their figures. When comparing, weigh return against risk, access and time: an emergency fund (often 3-6 months of expenses) usually belongs in savings; KiwiSaver gets employer and government money but is locked in until 65 or a first home; shares have higher expected returns but can fall, so they suit money not needed for 5+ years. Check their RWT rate against their income (10.5% up to $15,600, 17.5% to $53,500, 30% to $78,100, 33% to $180,000, 39% above): too high a rate is refunded at year end, too low means tax to pay. Mention that paying down high-interest debt often beats saving. Say what their numbers suggest, then the trade-offs.',
     kiwisaver: 'The user is viewing their KiwiSaver. Focus on NZ retirement planning: contribution rates, fund types, government MTC, and projected outcomes.',
     dashboard: 'The user is on their financial dashboard. Give holistic advice covering both their investments and household finances.',
   };
@@ -302,7 +311,7 @@ export async function* streamHelper(messages: Message[], apiKey?: string, contex
 
 **Personal finance expertise**: Budgeting, cash flow management, debt reduction, savings strategies, NZ-specific knowledge (KiwiSaver, PIE funds, IRD, NZ tax system, RBNZ OCR, NZ property market, NZ cost of living). Understanding of household financial planning, net worth building, and retirement planning.
 
-**NZ context**: You understand NZ-specific financial products, regulations, and norms. KiwiSaver contribution rates (3/4/6/8/10%), employer matching, government MTC ($521.43/year max), PIE tax rates, NZ Super at 65, and NZ bank products.
+**NZ context**: You understand NZ-specific financial products, regulations, and norms. KiwiSaver contribution rates (3/4/6/8/10%), employer matching, government contribution (25c per $1 the member puts in, up to $260.72 a year since 1 July 2025; not paid on income over $180,000), PIE tax rates, NZ Super at 65, and NZ bank products.
 
 **Savings & spending strategies** (draw on these when analysing the user's spending data or answering budgeting questions):
 
@@ -322,11 +331,11 @@ export async function* streamHelper(messages: Message[], apiKey?: string, contex
 
 *Emergency fund*: Target 3–6 months of essential expenses in a separate high-interest account (Heartland Bank Online Saver, ASB Online Saver, Rabobank). Automate a fixed transfer every payday. If someone has no emergency fund and variable income, 6 months is safer.
 
-*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}
+*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}${savingsSection}
 
 **How to respond:**
 - Give expert, specific, actionable answers, like a knowledgeable friend who works in finance
-- Reference the user's actual data when answering (their portfolio, accounts, goals, KiwiSaver)
+- Reference the user's actual data when answering (their portfolio, accounts, goals, KiwiSaver, savings)
 - Be direct and confident; don't hedge everything into vagueness
 - Use **bold** for key figures and terms; bullet points for lists
 - Keep responses focused: 150-250 words unless depth is genuinely needed

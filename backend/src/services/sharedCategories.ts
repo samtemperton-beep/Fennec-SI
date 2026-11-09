@@ -3,7 +3,7 @@
 
 export const DEFAULT_CATEGORIES: Record<'household' | 'business', string[]> = {
   household: ['Groceries', 'Rent/Mortgage', 'Utilities', 'Transport', 'Dining Out', 'Entertainment',
-    'Subscriptions', 'Health & Wellness', 'Shopping', 'Insurance', 'Savings', 'Income', 'Miscellaneous'],
+    'Subscriptions', 'Health & Wellness', 'Shopping', 'Insurance', 'Savings', 'Income', 'Interest', 'Withholding tax', 'Miscellaneous'],
   business: ['Sales', 'Materials', 'Subcontractors', 'Vehicle', 'Tools & Equipment', 'Software', 'Office',
     'Insurance', 'Accounting', 'Tax', 'Drawings', 'Miscellaneous'],
 };

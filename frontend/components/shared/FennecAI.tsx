@@ -1,5 +1,6 @@
 'use client'
 import { localDate } from '@/lib/utils'
+import { loadSavingsData, savingsSummaryText } from '@/lib/savingsData'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { IconX, IconSend, IconRefresh } from '@tabler/icons-react'
 import { createClient } from '@/lib/supabase'
@@ -24,6 +25,7 @@ interface FennecContext {
   monthlySpend?: string
   goalsSummary?: string
   kiwiSaverSummary?: string
+  savingsSummary?: string
   // Business
   businessPLSummary?: string
   businessTopExpenses?: string
@@ -64,6 +66,19 @@ function getPageConfig(pathname: string): {
       'How should I allocate my income?',
       'What\'s a good savings rate for my situation?',
       'Explain the 50/30/20 rule',
+    ],
+    loadInvesting: false, loadFinance: true,
+  }
+  if (pathname.includes('/finance/savings')) return {
+    pageHint: 'savings',
+    label: 'Fennec AI',
+    description: 'Ask about your savings, interest, and how they compare with investing and KiwiSaver.',
+    suggestions: [
+      'How are my savings doing?',
+      'Savings, investing or KiwiSaver: where is my money working hardest?',
+      'Am I on the right RWT rate?',
+      'How much should I keep in savings before investing?',
+      'What would an extra $50 a week do in 10 years?',
     ],
     loadInvesting: false, loadFinance: true,
   }
@@ -299,7 +314,14 @@ async function loadFinanceContext(): Promise<Partial<FennecContext>> {
     kiwiSaverSummary = `KiwiSaver: ${fmt(Number(ks.current_balance))} with ${ks.provider || 'unknown provider'} (${ks.fund_type} fund, ${ks.expected_return}% expected return, retiring at ${ks.retirement_age})`
   }
 
-  return { accountsSummary, monthlySpend, goalsSummary, kiwiSaverSummary }
+  // Savings, interest, RWT and the savings / investing / KiwiSaver comparison, worked out as on the Savings page.
+  let savingsSummary: string | undefined
+  try {
+    const savings = await loadSavingsData(supabase)
+    if (savings) savingsSummary = savingsSummaryText(savings)
+  } catch { /* the fox still has everything else */ }
+
+  return { accountsSummary, monthlySpend, goalsSummary, kiwiSaverSummary, savingsSummary }
 }
 
 async function loadBusinessContext(): Promise<Partial<FennecContext>> {
@@ -515,7 +537,7 @@ export function FennecAI() {
   // The plan doesn't include the chat: no fox button at all
   if (!can('helper')) return null
 
-  const hasContext = !!(context?.portfolioSummary || context?.accountsSummary || context?.kiwiSaverSummary || context?.businessPLSummary)
+  const hasContext = !!(context?.portfolioSummary || context?.accountsSummary || context?.kiwiSaverSummary || context?.savingsSummary || context?.businessPLSummary)
 
   return (
     <>
