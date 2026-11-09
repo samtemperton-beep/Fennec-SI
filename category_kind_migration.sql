@@ -1,13 +1,13 @@
-/* Categories you make yourself, and income kept out of the budget.
-
-   - fin_categories.kind: 'spending' (counted in your monthly budget) or
-     'income' (its monthly_budget is the income you expect; never counted as
-     spending). Income and Interest are income; everything else is spending.
-   - New sign-ups get the same kinds.
-   - People can already add their own categories (the table's policy lets each
-     person write their own rows); this only adds the kind.
-
-   Safe to run more than once. */
+-- Categories you make yourself, and income kept out of the budget.
+--
+-- - fin_categories.kind: 'spending' (counted in your monthly budget) or
+--   'income' (its monthly_budget is the income you expect; never counted as
+--   spending). Income and Interest are income; everything else is spending.
+-- - New sign-ups get the same kinds.
+-- - People can already add their own categories (the table's policy lets each
+--   person write their own rows); this only adds the kind.
+--
+-- Safe to run more than once.
 
 begin;
 
