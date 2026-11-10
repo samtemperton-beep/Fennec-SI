@@ -112,6 +112,9 @@ export default function OnboardingPage() {
   const [investorType, setInvestorType] = useState('')
   const [ageBand, setAgeBand] = useState<AgeBand | null>(null)
   const [interests, setInterests] = useState<Set<InterestId>>(new Set())
+  // Emails are off unless chosen here or later in Notifications → Preferences.
+  const [emails, setEmails] = useState<'off' | 'weekly' | 'daily' | 'immediate'>('off')
+  const [weeklyToo, setWeeklyToo] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -189,6 +192,12 @@ export default function OnboardingPage() {
           toast.error(`Couldn't save your details: ${error.message}`)
         }
         return
+      }
+      if (emails !== 'off') {
+        await api.saveNotificationPrefs({
+          email_mode: emails === 'weekly' ? 'off' : emails,
+          weekly_summary: emails === 'weekly' || weeklyToo,
+        }).catch(() => toast.message('Couldn’t save your email choice. You can set it in Notifications → Preferences.'))
       }
       // Trigger Akahu sync if connected
       if (akahuConnected) api.syncAkahu().catch(() => {})
@@ -456,6 +465,31 @@ export default function OnboardingPage() {
                   >{b}</button>
                 ))}
               </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Email updates</label>
+              <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 10 }}>Bills due, budgets, goals and your alerts. Everything also shows on the bell in the app. Change this any time in Notifications → Preferences.</p>
+              <div role="radiogroup" aria-label="Email updates" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {([
+                  { id: 'off', label: 'No emails' },
+                  { id: 'weekly', label: 'Weekly round-up' },
+                  { id: 'daily', label: 'Daily morning summary' },
+                  { id: 'immediate', label: 'As things happen' },
+                ] as const).map(o => {
+                  const on = emails === o.id
+                  return (
+                    <button key={o.id} role="radio" aria-checked={on} onClick={() => setEmails(o.id)}
+                      style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontFamily: 'Syne, sans-serif', fontWeight: 600, cursor: 'pointer', border: on ? '1.5px solid var(--primary)' : '1.5px solid var(--border)', background: on ? 'var(--primary-light)' : 'var(--surface2)', color: on ? 'var(--primary)' : 'var(--text2)', transition: 'all 0.15s' }}
+                    >{o.label}</button>
+                  )
+                })}
+              </div>
+              {(emails === 'daily' || emails === 'immediate') && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text2)', marginTop: 10, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={weeklyToo} onChange={e => setWeeklyToo(e.target.checked)} /> Also send a Monday round-up of my budget, bills and goals
+                </label>
+              )}
             </div>
 
             <div style={{ marginBottom: 28 }}>

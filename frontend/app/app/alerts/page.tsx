@@ -14,7 +14,7 @@ import {
   IconBell, IconPlus, IconTrash, IconRefresh, IconCheck,
   IconArrowDown, IconArrowUp, IconEye, IconMail,
   IconReceipt, IconChartPie, IconTarget, IconFileInvoice, IconPlugConnectedX, IconMessageCircle, IconCalendarEvent,
-  IconWallet, IconBuildingStore, IconUsers, IconChartLine,
+  IconWallet, IconBuildingStore, IconUsers, IconChartLine, IconMedal, IconHandStop, IconHeartHandshake,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
@@ -37,6 +37,9 @@ interface Prefs {
   invoice_alerts: boolean
   sync_alerts: boolean
   community_alerts: boolean
+  reward_alerts: boolean
+  pledge_alerts: boolean
+  buddy_alerts: boolean
   email_mode: EmailMode
   weekly_summary: boolean
 }
@@ -61,6 +64,10 @@ const NOTIF: Record<string, { icon: typeof IconBell; color: string; group: Group
   watchlist_signal:  { icon: IconEye,             color: '#5b7cf0', group: 'investing' },
   earnings_reminder: { icon: IconCalendarEvent,   color: '#a855f7', group: 'investing' },
   community_reply:   { icon: IconMessageCircle,   color: '#5b7cf0', group: 'community' },
+  badge_earned:      { icon: IconMedal,           color: '#22c55e', group: 'money' },
+  pledge_slip:       { icon: IconHandStop,        color: '#f59e0b', group: 'money' },
+  buddy_update:      { icon: IconHeartHandshake,  color: '#a855f7', group: 'money' },
+  buddy_invite:      { icon: IconHeartHandshake,  color: '#a855f7', group: 'money' },
 }
 const metaOf = (type: string) => NOTIF[type] ?? { icon: IconBell, color: '#5b7cf0', group: 'investing' as Group }
 const GROUPS: { id: Group | 'all'; label: string }[] = [
@@ -152,7 +159,8 @@ export default function NotificationsPage() {
     stop_loss_pct: 10, take_profit_pct: 20,
     portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true, earnings_alerts: true,
     bill_alerts: true, budget_alerts: true, goal_alerts: true, invoice_alerts: true, sync_alerts: true, community_alerts: true,
-    email_mode: 'daily', weekly_summary: false,
+    reward_alerts: true, pledge_alerts: true, buddy_alerts: true,
+    email_mode: 'off', weekly_summary: false,
   })
   const [thresholds, setThresholds] = useState({ stop_loss_pct: '10', take_profit_pct: '20' })
 
@@ -293,7 +301,7 @@ export default function NotificationsPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Notifications</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Bills, budgets, goals, invoices, your shares and replies, in one place</p>
+          <p style={{ color: 'var(--text2)', fontSize: 13 }}>Bills, budgets, goals, pledges, invoices, your shares and replies, in one place</p>
         </div>
         <button onClick={checkNow} disabled={checking}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, border: 'none', cursor: checking ? 'default' : 'pointer', opacity: checking ? 0.7 : 1 }}
@@ -486,6 +494,9 @@ export default function NotificationsPage() {
             <Row k="budget_alerts" label="Budgets" desc="When a category is 90% used, and when it goes over" />
             <Row k="goal_alerts" label="Goals" desc="When you reach a goal, or one passes its date" />
             <Row k="sync_alerts" label="Bank connection" desc="When your accounts stop updating and need reconnecting" />
+            <Row k="reward_alerts" label="Badges" desc="When you earn a new badge on Budget → Wins" />
+            <Row k="pledge_alerts" label="Pledge slips" desc="When spending shows up somewhere you've pledged not to spend" />
+            <Row k="buddy_alerts" label="Your buddies" desc="When someone you're an accountability buddy for slips, goes over budget or misses a goal" />
           </Section>
 
           <Section icon={IconBuildingStore} color="#f59e0b" title="Business">

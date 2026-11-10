@@ -40,6 +40,8 @@ export default function PrivacyPage() {
           <br /><br />
           <strong>About you (optional):</strong> if you choose to, your age range, what you&apos;re working towards (such as buying a home or paying off debt), and household details you give the budget helper (how many adults and children, take-home pay, rent or mortgage, and whether you run a car). These are used to suggest budgets and goals and to give Fennec&apos;s AI context, and you can change them on the Goals page.
           <br /><br />
+          <strong>Pledges and accountability buddies (optional):</strong> places you pledge not to spend, and transactions that match them. If you invite a buddy, we keep the email address you give and send it one invitation. Once they accept, they see what you choose to share: your pledges, streaks and level, slips (with amounts only if you allow it), and the names of budgets you go over or goals that pass their date. Your points and badges are worked out from your own budgets, transactions and goals.
+          <br /><br />
           <strong>Partner sharing (optional):</strong> if you link with a partner, we record the link and what you&apos;ve chosen to share with them.
           <br /><br />
           <strong>Category rules:</strong> when you save a rule that uses one of Fennec&apos;s standard categories, its keyword and category (for example &quot;woolworths&quot; and Groceries) may be suggested for Fennec&apos;s shared category list, which the team reviews before anyone&apos;s transactions use it. Nothing that identifies you or your transactions is kept with the suggestion.
@@ -67,6 +69,7 @@ export default function PrivacyPage() {
           Your information is stored under your account, and our database only lets a signed-in person read or change their own records. Other Fennec users can&apos;t see it, except:
           <ul style={{ paddingLeft: 20, lineHeight: 2, marginTop: 8 }}>
             <li>accounts, bills and goals you choose to share with a linked partner</li>
+            <li>what you choose to share with an accountability buddy who has accepted your invitation</li>
             <li>community posts and replies, which other users can read, along with your username, avatar, badges and whether your portfolio is verified</li>
             <li>the leaderboard, which shows your username and percentage performance, never dollar amounts</li>
           </ul>

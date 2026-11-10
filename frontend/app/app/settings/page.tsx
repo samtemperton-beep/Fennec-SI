@@ -11,6 +11,7 @@ import { api } from '@/lib/api'
 import { DeleteAccount } from '@/components/settings/DeleteAccount'
 import { PartnerCard } from '@/components/settings/PartnerCard'
 import { SecurityCard } from '@/components/settings/SecurityCard'
+import { EmailCard } from '@/components/settings/EmailCard'
 import { openFeedback } from '@/components/shared/Feedback'
 import { AkahuGuide, AkahuBeforeYouStart } from '@/components/onboarding/AkahuGuide'
 import { AkahuTokenInput } from '@/components/onboarding/AkahuTokenInput'
@@ -384,6 +385,9 @@ export default function SettingsPage() {
 
           </div>
         </div>
+
+        {/* Email updates: off unless chosen */}
+        <EmailCard />
 
         {/* Investment Profile */}
         <div className="card">

@@ -24,7 +24,8 @@ alter table public.notification_prefs add column if not exists invoice_alerts bo
 alter table public.notification_prefs add column if not exists sync_alerts boolean not null default true;
 alter table public.notification_prefs add column if not exists community_alerts boolean not null default true;
 -- immediate = as they happen, daily = one morning email, off = no emails (the feed still fills).
-alter table public.notification_prefs add column if not exists email_mode text not null default 'daily';
+-- Off unless someone chooses otherwise (in onboarding or Notifications → Preferences).
+alter table public.notification_prefs add column if not exists email_mode text not null default 'off';
 alter table public.notification_prefs drop constraint if exists notification_prefs_email_mode_check;
 alter table public.notification_prefs add constraint notification_prefs_email_mode_check check (email_mode in ('immediate', 'daily', 'off'));
 alter table public.notification_prefs add column if not exists weekly_summary boolean not null default false;

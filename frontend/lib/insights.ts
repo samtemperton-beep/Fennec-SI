@@ -504,6 +504,54 @@ async function syncInsights({ supabase, userId }: InsightContext): Promise<Insig
   return out
 }
 
+// Pledges (rewards_migration.sql): a recent slip, a buddy invite waiting, a
+// streak worth celebrating, and new badges.
+async function pledgeInsights({ supabase }: InsightContext, today: string): Promise<Insight[]> {
+  const weekAgo = isoLocal(addDays(new Date(), -7))
+  const [{ data: pledges, error }, { data: slips }, { data: badges }] = await Promise.all([
+    supabase.from('pledges').select('id, name, created_at').eq('active', true),
+    supabase.from('pledge_slips').select('id, pledge_id, amount, date').gte('date', isoLocal(addDays(new Date(), -120))).order('date', { ascending: false }),
+    supabase.from('money_rewards').select('ref, earned_at').eq('kind', 'badge').gte('earned_at', new Date(Date.now() - 7 * 86_400_000).toISOString()),
+  ])
+  if (error) return []
+  const out: Insight[] = []
+  for (const p of pledges ?? []) {
+    const mine = (slips ?? []).filter(s => s.pledge_id === p.id)
+    const recent = mine.filter(s => s.date >= weekAgo)
+    if (recent.length) {
+      const total = recent.reduce((s, x) => s + Number(x.amount), 0)
+      out.push({
+        id: `pledge-slip:${recent[0].id}`, severity: 'warning', section: 'finance',
+        title: `${recent.length === 1 ? 'A slip' : `${recent.length} slips`} on your “${p.name}” pledge this week`,
+        detail: `${money(total)}. Every day from here counts towards a new streak.`,
+        href: '/app/finance/budget/pledges',
+      })
+      continue
+    }
+    const from = mine[0]?.date ?? isoLocal(new Date(p.created_at))
+    const kept = daysBetween(from, today)
+    for (const m of [90, 60, 30, 14, 7]) {
+      if (kept >= m) {
+        out.push({
+          id: `pledge-kept:${p.id}:${m}`, severity: 'good', section: 'finance',
+          title: `${kept} days without breaking your “${p.name}” pledge 💪`,
+          href: '/app/finance/budget/pledges',
+        })
+        break
+      }
+    }
+  }
+  if (badges?.length) {
+    out.push({
+      id: `badges:${badges.map(b => b.ref).join(',')}`, severity: 'good', section: 'finance',
+      title: `${badges.length === 1 ? 'New badge' : `${badges.length} new badges`} this week 🏅`,
+      detail: 'See them on Budget → Wins.',
+      href: '/app/finance/budget/wins',
+    })
+  }
+  return out
+}
+
 // ── entry point ─────────────────────────────────────────────────────────────
 
 export function sortInsights(list: Insight[]): Insight[] {
@@ -518,6 +566,7 @@ export async function gatherInsights(ctx: InsightContext): Promise<Insight[]> {
     on('finance') ? billInsights(ctx, today) : Promise.resolve([]),
     on('finance') ? budgetInsights(ctx) : Promise.resolve([]),
     on('finance') ? goalInsights(ctx, today) : Promise.resolve([]),
+    on('finance') ? pledgeInsights(ctx, today) : Promise.resolve([]),
     on('business') || on('finance') ? invoiceInsights(ctx, today) : Promise.resolve([]),
     on('investments') ? investingInsights(ctx, today) : Promise.resolve([]),
     kiwisaverInsights(ctx),

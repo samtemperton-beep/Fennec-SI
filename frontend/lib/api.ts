@@ -60,6 +60,26 @@ export interface CategoryMatch {
   status: 'pending' | 'approved' | 'rejected'; source: 'starter' | 'admin' | 'users'; suggestions: number
 }
 
+export interface MyBuddy {
+  id: string; email: string; status: 'pending' | 'active'; name: string | null
+  shareAmounts: boolean; shareBudgets: boolean; shareGoals: boolean
+}
+export interface FollowedPerson {
+  id: string; name: string
+  avatarColor: string | null; avatarEmoji: string | null; avatarUrl: string | null
+  points: number; streakWeeks: number
+  pledges: { name: string; keptDays: number }[]
+  slips: { pledge: string; date: string; amount: number | null }[]
+  overBudget: string[] | null
+  goalsMissed: string[] | null
+}
+export interface BuddiesResponse {
+  ready: boolean
+  mine: MyBuddy[]
+  invites: { id: string; from: string }[]
+  following: FollowedPerson[]
+}
+
 export interface CommunityPerson {
   id: string; username: string | null
   avatarColor: string | null; avatarEmoji: string | null; avatarUrl: string | null
@@ -197,6 +217,20 @@ export const api = {
 
   getUnreadCount: (): Promise<{ count: number }> =>
     apiFetch('/api/alerts/notifications/unread-count'),
+
+  // ── Rewards, pledges and accountability buddies ──
+  refreshRewards: (): Promise<{ ok: boolean; new: number }> =>
+    apiFetch('/api/accountability/refresh', { method: 'POST' }),
+  getBuddies: (): Promise<BuddiesResponse> =>
+    apiFetch('/api/accountability/buddies'),
+  inviteBuddy: (email: string) =>
+    apiFetch('/api/accountability/buddies', { method: 'POST', body: JSON.stringify({ email }) }),
+  acceptBuddy: (id: string) =>
+    apiFetch(`/api/accountability/buddies/${id}/accept`, { method: 'POST' }),
+  removeBuddy: (id: string) =>
+    apiFetch(`/api/accountability/buddies/${id}`, { method: 'DELETE' }),
+  updateBuddy: (id: string, body: { shareAmounts?: boolean; shareBudgets?: boolean; shareGoals?: boolean }) =>
+    apiFetch(`/api/accountability/buddies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   clearReadNotifications: () =>
     apiFetch('/api/alerts/notifications', { method: 'DELETE' }),

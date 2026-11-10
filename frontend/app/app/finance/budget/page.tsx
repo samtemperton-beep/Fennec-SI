@@ -11,6 +11,8 @@ import type { SavingsTip } from '@/lib/api'
 import { isIncomeCategory } from '@/lib/categories'
 import { NewCategory } from '@/components/finance/NewCategory'
 import { BudgetHelper } from '@/components/finance/BudgetHelper'
+import { BudgetTabs } from '@/components/budget/BudgetTabs'
+import { ProgressStrip } from '@/components/budget/ProgressStrip'
 import { IconWand } from '@tabler/icons-react'
 
 const supabase = createClient()
@@ -161,13 +163,20 @@ export default function BudgetPage() {
   )
 
   return (
-    <div style={{ padding: 28 }}>
+    <div style={{ padding: 28 }} className="m-pad">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Budget</h1>
           <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 4 }}>Monthly spending against your budget, and income kept separate</p>
         </div>
+        <BudgetTabs />
+      </div>
+
+      {/* Level and streak; tap for Wins */}
+      <ProgressStrip />
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => setOffset(o => o - 1)} style={{ padding: 6, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text2)', cursor: 'pointer', lineHeight: 0 }}><IconChevronLeft size={16} /></button>
           <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, minWidth: 130, textAlign: 'center' }}>{label}</span>

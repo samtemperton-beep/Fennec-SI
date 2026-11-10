@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import ws from 'ws';
 import { escapeHtml } from './adminEmail';
+import { notifyBuddies, refreshFor } from './rewards';
 
 // One place that writes notifications and emails them (notifications_migration.sql).
 //
@@ -29,6 +30,7 @@ export interface NotifyPrefs {
   price_alerts: boolean; earnings_alerts: boolean
   bill_alerts: boolean; budget_alerts: boolean; goal_alerts: boolean; invoice_alerts: boolean
   sync_alerts: boolean; community_alerts: boolean
+  reward_alerts: boolean; pledge_alerts: boolean; buddy_alerts: boolean
   email_mode: EmailMode; weekly_summary: boolean
   digest_sent_on?: string | null; weekly_sent_on?: string | null
 }
@@ -39,7 +41,8 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   price_alerts: true, earnings_alerts: true,
   bill_alerts: true, budget_alerts: true, goal_alerts: true, invoice_alerts: true,
   sync_alerts: true, community_alerts: true,
-  email_mode: 'daily', weekly_summary: false,
+  reward_alerts: true, pledge_alerts: true, buddy_alerts: true,
+  email_mode: 'off', weekly_summary: false,
 };
 
 export async function prefsFor(userId: string): Promise<NotifyPrefs> {
@@ -112,8 +115,9 @@ export async function checkMoney(userId: string, p?: NotifyPrefs): Promise<numbe
     }
   }
 
-  // Budgets: nearly used (90%) and over, once each a month.
-  if (prefs.budget_alerts) {
+  // Budgets: nearly used (90%) and over, once each a month. Worked out even
+  // with the person's own alerts off, since an accountability buddy may follow them.
+  {
     const { data: cats } = await supabase.from('fin_categories').select('*')
       .eq('user_id', userId).eq('scope', 'household').gt('monthly_budget', 0);
     const budgets = (cats ?? []).filter(c => !isIncome(c));
@@ -126,12 +130,17 @@ export async function checkMoney(userId: string, p?: NotifyPrefs): Promise<numbe
         const budget = Number(c.monthly_budget);
         const s = spent[c.id] ?? 0;
         if (s > budget) {
-          await add({
+          await notifyBuddies(userId, 'budgets', name => ({
+            key: `buddy-budget:${c.id}:${month}`,
+            title: `${name} went over their ${c.name} budget`,
+            body: 'Over budget this month. A friendly nudge can help.',
+          }));
+          if (prefs.budget_alerts) await add({
             type: 'budget_over', key: `budget-over:${c.id}:${month}`, link: '/app/finance/budget',
             title: `Over budget on ${c.name}`,
             body: `${money(s)} spent this month against a budget of ${money(budget)}.`,
           });
-        } else if (s >= budget * 0.9) {
+        } else if (s >= budget * 0.9 && prefs.budget_alerts) {
           await add({
             type: 'budget_near', key: `budget-near:${c.id}:${month}`, link: '/app/finance/budget',
             title: `${c.name} budget is ${Math.round((s / budget) * 100)}% used`,
@@ -142,21 +151,26 @@ export async function checkMoney(userId: string, p?: NotifyPrefs): Promise<numbe
     }
   }
 
-  // Goals: reached, or past their date.
-  if (prefs.goal_alerts) {
+  // Goals: reached, or past their date (buddies hear about missed ones).
+  {
     const { data: goals } = await supabase.from('fin_goals').select('id, name, target_amount, current_amount, target_date')
       .eq('user_id', userId).eq('status', 'active');
     for (const g of goals ?? []) {
       const target = Number(g.target_amount), saved = Number(g.current_amount);
       if (target <= 0) continue;
       if (saved >= target) {
-        await add({
+        if (prefs.goal_alerts) await add({
           type: 'goal_reached', key: `goal-done:${g.id}`, link: '/app/finance/savings/goals',
           title: `You reached your ${g.name} goal 🎉`,
           body: `${money(saved)} saved. Mark it complete on Goals, or set a new target.`,
         });
       } else if (g.target_date && g.target_date < today) {
-        await add({
+        await notifyBuddies(userId, 'goals', name => ({
+          key: `buddy-goal:${g.id}:${g.target_date}`,
+          title: `${name} missed the date for their ${g.name} goal`,
+          body: 'It passed its target date before it was reached. Maybe check in on how it is going.',
+        }));
+        if (prefs.goal_alerts) await add({
           type: 'goal_late', key: `goal-late:${g.id}:${g.target_date}`, link: '/app/finance/savings/goals',
           title: `${g.name} has passed its target date`,
           body: `${money(target - saved)} still to go. Pick a new date or change the target on Goals.`,
@@ -328,7 +342,7 @@ export async function notificationTick() {
       if (morning) lastMoneyDay = now.date;
       let made = 0;
       for (const id of ids) {
-        try { made += await checkMoney(id, pOf(id)); }
+        try { made += await checkMoney(id, pOf(id)); made += await refreshFor(id, pOf(id)); }
         catch (e: any) { console.error(`[notify] money check ${id.slice(0, 8)} failed: ${e?.message ?? e}`); }
       }
       if (made) console.log(`[notify] ${made} money notification(s)`);
