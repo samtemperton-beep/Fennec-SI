@@ -12,6 +12,7 @@ import { DeleteAccount } from '@/components/settings/DeleteAccount'
 import { PartnerCard } from '@/components/settings/PartnerCard'
 import { SecurityCard } from '@/components/settings/SecurityCard'
 import { EmailCard } from '@/components/settings/EmailCard'
+import { PasswordCard } from '@/components/settings/PasswordCard'
 import { openFeedback } from '@/components/shared/Feedback'
 import { AkahuGuide, AkahuBeforeYouStart } from '@/components/onboarding/AkahuGuide'
 import { AkahuTokenInput } from '@/components/onboarding/AkahuTokenInput'
@@ -620,6 +621,7 @@ export default function SettingsPage() {
       <div className="mt-6"><PartnerCard /></div>
 
       {/* Security & privacy: what starts on, and what can be eased off */}
+      <PasswordCard />
       <SecurityCard userId={user?.id ?? null} twoFactorOn={mfaFactors.length > 0} />
 
       {/* Two-Factor Authentication */}
