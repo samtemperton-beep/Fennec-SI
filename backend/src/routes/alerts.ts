@@ -187,13 +187,30 @@ export async function checkAlertsForUser(user: { id: string; email?: string | nu
   // 3. Watchlist AI ratings, once per rating (again if it changes).
   if (p.watchlist_buy_alerts || p.watchlist_sell_alerts) {
     const { data: watchlist } = await supabase.from('watchlist').select('*').eq('user_id', user.id).in('signal', ['BUY', 'SELL']);
-    for (const w of watchlist ?? []) {
-      if (w.signal === 'BUY' ? !p.watchlist_buy_alerts : !p.watchlist_sell_alerts) continue;
+    const wanted = (watchlist ?? []).filter(w => (w.signal === 'BUY' ? p.watchlist_buy_alerts : p.watchlist_sell_alerts));
+    const keyOf = (w: any) => `watch:${w.id}:${w.signal}`;
+    const { data: seen } = wanted.length
+      ? await supabase.from('notifications').select('dedupe_key').eq('user_id', user.id).in('dedupe_key', wanted.map(keyOf))
+      : { data: [] as any[] };
+    const seenKeys = new Set((seen ?? []).map((r: any) => r.dedupe_key));
+    const fresh = wanted.filter(w => !seenKeys.has(keyOf(w)));
+    const BATCH = 3;
+    for (const w of fresh) {
       if (await notify(user.id, {
-        type: 'watchlist_signal', ticker: w.ticker, link: '/app/watchlist', key: `watch:${w.id}:${w.signal}`,
+        type: 'watchlist_signal', ticker: w.ticker, link: '/app/watchlist', key: keyOf(w), silent: fresh.length > BATCH,
         title: `${w.ticker}: Fennec's AI rating is ${w.signal}`,
         body: `${w.name || w.ticker} on your watchlist is rated ${w.signal} by Fennec's automated analysis. It's a computer-generated signal, not advice; see the reasons on Watchlist.`,
-      })) triggered.push({ ticker: w.ticker, category: 'watchlist_signal', signal: w.signal });
+      }) && fresh.length <= BATCH) triggered.push({ ticker: w.ticker, category: 'watchlist_signal', signal: w.signal });
+    }
+    if (fresh.length > BATCH) {
+      const buys = fresh.filter(w => w.signal === 'BUY').length;
+      const sells = fresh.length - buys;
+      const parts = [buys ? `${buys} BUY` : '', sells ? `${sells} SELL` : ''].filter(Boolean).join(' and ');
+      if (await notify(user.id, {
+        type: 'watchlist_signal', link: '/app/watchlist', key: `watch-batch:${new Date().toISOString().slice(0, 13)}:${fresh.length}`,
+        title: `${fresh.length} shares on your watchlist have AI ratings`,
+        body: `${parts}, from Fennec's automated analysis. These are computer-generated signals, not advice; see the reasons on Watchlist.`,
+      })) triggered.push({ category: 'watchlist_signal', count: fresh.length });
     }
   }
 

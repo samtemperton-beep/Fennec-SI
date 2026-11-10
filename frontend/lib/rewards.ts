@@ -8,7 +8,7 @@ export interface Badge { id: string; name: string; icon: string; points: number;
 export const BADGES: Badge[] = [
   { id: 'budget_set',   name: 'Plan Made',       icon: '📝', points: 20,  how: 'Set budgets for 3 or more categories' },
   { id: 'week_1',       name: 'First Week Win',  icon: '🌱', points: 25,  how: 'Finish a week (Monday to Sunday) under budget' },
-  { id: 'streak_4',     name: 'Month of Wins',   icon: '🔥', points: 75,  how: '4 weeks in a row under budget' },
+  { id: 'streak_4',     name: 'Month of Wins',   icon: '🔥', points: 75,  how: '4 weeks in a row under budget, any time' },
   { id: 'streak_8',     name: 'On a Roll',       icon: '⚡', points: 150, how: '8 weeks in a row under budget' },
   { id: 'streak_12',    name: 'Unstoppable',     icon: '🏆', points: 250, how: '12 weeks in a row under budget' },
   { id: 'month_1',      name: 'Month Mastered',  icon: '📅', points: 50,  how: 'A whole month under budget' },

@@ -62,11 +62,13 @@ export interface NewNotification {
   link?: string | null
   /** Same key, same person: only the first is kept. */
   key?: string | null
+  /** Record it as already seen: no unread count, no email. For batches summarised by another notification. */
+  silent?: boolean
 }
 
 /** Adds to the feed. Returns false if it was already notified. */
 export async function notify(userId: string, n: NewNotification): Promise<boolean> {
-  const row: any = { user_id: userId, type: n.type, ticker: n.ticker ?? null, title: n.title, body: n.body, link: n.link ?? null, dedupe_key: n.key ?? null };
+  const row: any = { user_id: userId, type: n.type, ticker: n.ticker ?? null, title: n.title, body: n.body, link: n.link ?? null, dedupe_key: n.key ?? null, ...(n.silent ? { read: true, emailed: true } : {}) };
   let { error } = await supabase.from('notifications').insert(row);
   if (error?.code === '23505') return false;
   // Before notifications_migration.sql: no link or key columns.

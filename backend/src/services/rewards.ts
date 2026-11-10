@@ -176,7 +176,7 @@ export async function computeRewards(userId: string, prefs?: NotifyPrefs): Promi
   }
   const weeks = [...have].filter(k => k.startsWith('week_under:')).map(k => k.slice(11));
   if (weeks.length) badge('week_1');
-  const streak = weekStreak(weeks, today);
+  const streak = bestRun(weeks);
   if (streak >= 4) badge('streak_4');
   if (streak >= 8) badge('streak_8');
   if (streak >= 12) badge('streak_12');
@@ -223,6 +223,19 @@ export async function computeRewards(userId: string, prefs?: NotifyPrefs): Promi
     }
   }
   return sent;
+}
+
+/** The longest run of weeks in a row (Monday dates), anywhere in the history. */
+export function bestRun(weekStarts: string[]) {
+  const set = new Set(weekStarts);
+  let best = 0;
+  for (const ws of set) {
+    if (set.has(addDays(ws, -7))) continue; // not the start of a run
+    let n = 0, w = ws;
+    while (set.has(w)) { n++; w = addDays(w, 7); }
+    best = Math.max(best, n);
+  }
+  return best;
 }
 
 /** Weeks in a row under budget, ending with last week (or this week if it's in). */
