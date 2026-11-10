@@ -8,6 +8,7 @@ import { syncFinanceAccounts } from '../services/financeSync';
 import { clearAkahuProblem } from '../services/akahuHealth';
 import { lookupProperty, LinzError } from '../services/linz';
 import { readRatesNotice, RatesNoticeError } from '../services/ratesNotice';
+import { readKiwiSaverStatement, KiwiSaverStatementError } from '../services/kiwisaverStatement';
 import { loadPrivateFields } from '../services/privateFields';
 import { loadSavedProperty, saveProperty } from '../services/propertyStore';
 
@@ -165,6 +166,22 @@ router.post('/rates-notice', requireAuth, async (req: any, res) => {
     if (e instanceof RatesNoticeError) return res.status(422).json({ error: e.message });
     console.error('[rates notice] read failed:', e?.message ?? e);
     res.status(502).json({ error: "Couldn't read the document just now. Please try again." });
+  }
+});
+
+// ── POST /api/finance/kiwisaver-statement ───────────────────────────────────
+// Reads the balance from a screenshot or statement, for providers Akahu can't
+// connect. Returns the values for the person to check; nothing is saved here.
+router.post('/kiwisaver-statement', requireAuth, async (req: any, res) => {
+  const file = req.body?.file;
+  if (!file?.data || !file?.type) return res.status(400).json({ error: 'Choose a file first.' });
+  if (!await checkAndIncrementUsage(req, res)) return;
+  try {
+    res.json(await readKiwiSaverStatement({ type: String(file.type), data: String(file.data) }));
+  } catch (e: any) {
+    if (e instanceof KiwiSaverStatementError) return res.status(422).json({ error: e.message });
+    console.error('[kiwisaver statement] read failed:', e?.message ?? e);
+    res.status(502).json({ error: "Couldn't read that just now. Please try again." });
   }
 });
 

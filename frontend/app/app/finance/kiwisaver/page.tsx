@@ -7,6 +7,7 @@ import { projectRange, EMPLOYEE_RATES, FUND_RETURNS, RANGE_SPREAD, GOVT_MTC_MAX,
 import { WhatIf } from '@/components/kiwisaver/WhatIf'
 import { SalaryCalculator } from '@/components/kiwisaver/SalaryCalculator'
 import { MonthYearInput } from '@/components/shared/MonthYearInput'
+import { KiwiSaverStatementUpload, type KiwiSaverStatementValues } from '@/components/finance/KiwiSaverStatementUpload'
 import { toast } from 'sonner'
 import { IconPigMoney, IconEdit, IconCheck, IconX, IconTrendingUp, IconCalendar, IconTarget, IconCoin, IconRefresh } from '@tabler/icons-react'
 
@@ -209,6 +210,21 @@ export default function KiwiSaverPage() {
     toast.success('Projection updated with your new salary')
   }
 
+  // From a screenshot or statement: fill the form for the person to check and save.
+  function applyStatement(v: KiwiSaverStatementValues) {
+    setEditing(true)
+    const provider = v.provider ? (PROVIDERS.find(p => v.provider!.toLowerCase().startsWith(p.toLowerCase()) || p.toLowerCase().startsWith(v.provider!.toLowerCase())) ?? 'Other') : null
+    setForm((f: any) => ({
+      ...f,
+      ...(provider ? { provider } : {}),
+      ...(v.fund_type ? { fund_type: v.fund_type, expected_return: FUND_TYPES[v.fund_type]?.defaultReturn ?? f.expected_return } : {}),
+      ...(v.balance ? { current_balance: v.balance } : {}),
+      ...(v.employee_rate && (EMPLOYEE_RATES as readonly number[]).includes(v.employee_rate) ? { employee_rate: v.employee_rate } : {}),
+    }))
+    const asAt = v.as_at ? ` as at ${new Date(`${v.as_at}T12:00:00`).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''
+    toast.success(`Read ${v.fund_name ? `${v.fund_name}, ` : ''}balance ${v.balance?.toLocaleString('en-NZ', { style: 'currency', currency: 'NZD' })}${asAt}. Check the details, then Save.`)
+  }
+
   const num = (v: any, fallback: number) => (v == null || v === '' || Number.isNaN(Number(v)) ? fallback : Number(v))
   const projectionInput: ProjectionInput | null = useMemo(() => settings ? {
     dob: settings.date_of_birth,
@@ -275,6 +291,7 @@ export default function KiwiSaverPage() {
       {editing && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px', marginBottom: 22 }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Your KiwiSaver details</h3>
+          {!isSynced && <KiwiSaverStatementUpload onRead={applyStatement} />}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {/* Provider */}
             <div>

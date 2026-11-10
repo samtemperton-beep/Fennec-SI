@@ -38,6 +38,8 @@ export default function PrivacyPage() {
           <br /><br />
           <strong>Rates notices (optional):</strong> if you upload a rates notice or revaluation letter on the Home Loan page, it&apos;s read to find your council valuation. The file itself isn&apos;t kept. The details read off it (the council, address, valuation reference and values) are saved, encrypted, so you don&apos;t need to upload it again, and are deleted if you change your address or delete your account.
           <br /><br />
+          <strong>KiwiSaver screenshots (optional):</strong> if your KiwiSaver provider can&apos;t be connected, you can upload a screenshot or statement on the KiwiSaver page. It&apos;s read to fill in your provider, fund and balance for you to check, and the file itself isn&apos;t kept.
+          <br /><br />
           <strong>About you (optional):</strong> if you choose to, your age range, what you&apos;re working towards (such as buying a home or paying off debt), and household details you give the budget helper (how many adults and children, take-home pay, rent or mortgage, and whether you run a car). These are used to suggest budgets and goals and to give Fennec&apos;s AI context, and you can change them on the Goals page.
           <br /><br />
           <strong>Pledges and accountability buddies (optional):</strong> places you pledge not to spend, and transactions that match them. If you invite a buddy, we keep the email address you give and send it one invitation. Once they accept, they see what you choose to share: your pledges, streaks and level, slips (with amounts only if you allow it), and the names of budgets you go over or goals that pass their date. Your points and badges are worked out from your own budgets, transactions and goals.
@@ -77,7 +79,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="5. AI processing">
-          Fennec&apos;s AI features use Anthropic (Claude) and Google (Gemini). When you use one, we send the provider what it needs for that answer: for example your question and a summary of the relevant figures, a holding you&apos;ve asked to analyse, the text of a bill email, a rates notice you&apos;ve uploaded, or a broker statement you&apos;ve uploaded for verification. We don&apos;t send your password or bank login.
+          Fennec&apos;s AI features use Anthropic (Claude) and Google (Gemini). When you use one, we send the provider what it needs for that answer: for example your question and a summary of the relevant figures, a holding you&apos;ve asked to analyse, the text of a bill email, a rates notice or KiwiSaver screenshot you&apos;ve uploaded, or a broker statement you&apos;ve uploaded for verification. We don&apos;t send your password or bank login.
           <br /><br />
           We use these providers through their business APIs, under their terms for data handling. We don&apos;t use your information to train AI models. AI answers can be wrong, and they&apos;re general information, not financial advice.
         </Section>
