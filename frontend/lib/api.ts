@@ -46,6 +46,14 @@ export interface NetWorthResponse {
 }
 
 export interface PartnerInfo { name: string; email: string | null }
+
+export interface BankAccountHealth { name: string; bank: string; type: string; status: string; refreshedTx: string | null; refreshedBalance: string | null; newestTx: string | null; fetched: number; error?: string }
+export interface BankFinding { level: 'ok' | 'info' | 'warn' | 'problem'; title: string; fix: string }
+export interface BankHealthResponse {
+  connected: boolean
+  findings: BankFinding[]
+  health: { checked_at: string; ok: boolean; error: string | null; accounts: BankAccountHealth[]; added: number; last_ok_at: string | null; last_added_at: string | null } | null
+}
 export type PartnerStatus =
   | { status: 'none' }
   | { status: 'pending'; code: string }
@@ -149,6 +157,10 @@ export const api = {
     apiFetch('/api/finance/credentials', { method: 'POST', body: JSON.stringify({ app_token: appToken, user_token: userToken }) }),
 
   disconnectAkahu: () => apiFetch('/api/finance/akahu', { method: 'DELETE' }),
+  bankHealth: (): Promise<BankHealthResponse> => apiFetch('/api/finance/connection-health'),
+  syncBank: (): Promise<{ accounts: number; accountsNew: number; transactions: number }> => apiFetch('/api/finance/sync', { method: 'POST', body: JSON.stringify({}) }),
+  akahuRefresh: (): Promise<{ ok: true; message: string }> => apiFetch('/api/finance/akahu-refresh', { method: 'POST', body: JSON.stringify({}) }),
+  sendConnectionReport: (note: string) => apiFetch('/api/finance/connection-report', { method: 'POST', body: JSON.stringify({ note }) }),
 
   partnerStatus: (): Promise<PartnerStatus> => apiFetch('/api/partner'),
   partnerInvite: (): Promise<{ code: string }> => apiFetch('/api/partner/invite', { method: 'POST', body: JSON.stringify({}) }),

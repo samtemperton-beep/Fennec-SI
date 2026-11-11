@@ -6,6 +6,9 @@ import ws from 'ws';
 import { loadAkahuCredentials, saveAkahuCredentials, credentialsErrorResponse } from '../services/akahuCredentials';
 import { syncFinanceAccounts } from '../services/financeSync';
 import { clearAkahuProblem } from '../services/akahuHealth';
+import { requestAkahuRefresh } from '../services/bankHealth';
+import { bankHealthFor } from '../services/bankHealthReport';
+import { emailAdmins, escapeHtml } from '../services/adminEmail';
 import { lookupProperty, LinzError } from '../services/linz';
 import { readRatesNotice, RatesNoticeError } from '../services/ratesNotice';
 import { readKiwiSaverStatement, KiwiSaverStatementError } from '../services/kiwisaverStatement';
@@ -331,6 +334,69 @@ router.post('/savings-tips', requireAuth, async (req: any, res) => {
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Bank connection health ───────────────────────────────────────────────────
+// Lets people (and the fox chat) see why transactions aren't updating, without
+// the Fennec team needing to look inside their account.
+
+// GET /api/finance/connection-health
+router.get('/connection-health', requireAuth, async (req: any, res) => {
+  try {
+    const { connected, health, findings } = await bankHealthFor(supabase, req.user.id);
+    res.json({ connected, health, findings });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/finance/akahu-refresh: ask Akahu to fetch from the bank now.
+// Akahu ignores repeats within a few minutes; Fennec allows one every 15.
+router.post('/akahu-refresh', requireAuth, async (req: any, res) => {
+  const userId: string = req.user.id;
+  const { data: row } = await supabase.from('bank_sync_health').select('refresh_requested_at').eq('user_id', userId).maybeSingle();
+  const last = (row as any)?.refresh_requested_at;
+  if (last && Date.now() - Date.parse(last) < 15 * 60_000) {
+    return res.status(429).json({ error: 'Akahu was asked to fetch less than 15 minutes ago. Press Sync to bring in anything new.' });
+  }
+  let creds;
+  try { creds = await loadAkahuCredentials(supabase, userId); } catch (e: any) { return credentialsErrorResponse(res, e); }
+  if (!creds) return res.status(400).json({ error: 'Connect your bank in Settings → Akahu Sync first.' });
+  const result = await requestAkahuRefresh(creds.appToken, creds.userToken);
+  await supabase.from('bank_sync_health').upsert({ user_id: userId, refresh_requested_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  res.status(result.ok ? 200 : 502).json(result.ok ? result : { error: result.message });
+});
+
+// POST /api/finance/connection-report { note? }: the person chooses to send
+// their connection health to the Fennec team. Bank and account names, statuses,
+// dates and errors only; no balances or transactions.
+router.post('/connection-report', requireAuth, async (req: any, res) => {
+  const userId: string = req.user.id;
+  const note = String(req.body?.note ?? '').trim().slice(0, 2000);
+  const { data: row } = await supabase.from('bank_sync_health').select('report_sent_at').eq('user_id', userId).maybeSingle();
+  const last = (row as any)?.report_sent_at;
+  if (last && Date.now() - Date.parse(last) < 60 * 60_000) {
+    return res.status(429).json({ error: 'A report was sent in the last hour. The Fennec team will reply by email.' });
+  }
+  const { text } = await bankHealthFor(supabase, userId);
+  const { data: profile } = await supabase.from('profiles').select('username').eq('id', userId).maybeSingle();
+  const who = (profile as any)?.username || req.user.email;
+  const error = await emailAdmins(supabase, {
+    replyTo: req.user.email,
+    subject: `Bank connection report from ${who}`,
+    html: `<h2>Bank connection report</h2>
+<p><strong>From:</strong> ${escapeHtml(String(who))} (${escapeHtml(req.user.email || '')})<br>
+<strong>Browser:</strong> ${escapeHtml(String(req.headers['user-agent'] || '').slice(0, 200))}</p>
+${note ? `<p><strong>Their note:</strong></p><p style="white-space:pre-wrap">${escapeHtml(note)}</p>` : ''}
+<pre style="white-space:pre-wrap;font-size:13px">${escapeHtml(text)}</pre>
+<p style="color:#888;font-size:12px">Sent by them from Settings. Contains bank and account names, connection statuses, dates and error messages only: no balances, transactions or tokens.</p>`,
+  });
+  if (error) {
+    console.error('[connection report] email failed:', error);
+    return res.status(502).json({ error: "Couldn't send just now. Please try again." });
+  }
+  await supabase.from('bank_sync_health').upsert({ user_id: userId, report_sent_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  res.json({ ok: true });
 });
 
 export default router;

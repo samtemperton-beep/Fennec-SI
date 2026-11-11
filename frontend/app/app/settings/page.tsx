@@ -13,6 +13,7 @@ import { PartnerCard } from '@/components/settings/PartnerCard'
 import { SecurityCard } from '@/components/settings/SecurityCard'
 import { EmailCard } from '@/components/settings/EmailCard'
 import { PasswordCard } from '@/components/settings/PasswordCard'
+import { BankHealthPanel } from '@/components/settings/BankHealthPanel'
 import { openFeedback } from '@/components/shared/Feedback'
 import { AkahuGuide, AkahuBeforeYouStart } from '@/components/onboarding/AkahuGuide'
 import { AkahuTokenInput } from '@/components/onboarding/AkahuTokenInput'
@@ -788,6 +789,7 @@ function AkahuSettings({ supabase }: { supabase: any }) {
           {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Akahu Tokens'}
         </button>
       </form>
+      {hasCreds && <BankHealthPanel />}
       {hasCreds && (
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
           {!confirming ? (

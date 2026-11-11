@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadAkahuCredentials, type AkahuCredentials } from './akahuCredentials';
 import { AkahuTokensRejected } from './akahu';
 import { clearAkahuProblem, setAkahuProblem } from './akahuHealth';
+import { saveHealth, type AccountHealth } from './bankHealth';
 
 // Bank-side Akahu sync: account balances into fin_accounts and new transactions
 // into fin_transactions. Shared by POST /api/finance/sync (the Sync button) and
@@ -9,6 +10,12 @@ import { clearAkahuProblem, setAkahuProblem } from './akahuHealth';
 // net worth history even when nobody presses Sync.
 
 const AKAHU_BASE = 'https://api.akahu.io/v1';
+
+// Each sync re-reads this many days before the last one. Banks often date a
+// transaction a day or two before Akahu receives it, so asking only for
+// transactions after the last sync would miss those for good. Duplicates are
+// skipped by akahu_transaction_id.
+const OVERLAP_DAYS = 14;
 
 function makeAkahuClient(appToken: string, userToken: string) {
   const headers = { Authorization: `Bearer ${userToken}`, 'X-Akahu-Id': appToken };
@@ -53,8 +60,23 @@ export async function syncFinanceAccounts(
   userId: string,
   creds: AkahuCredentials
 ): Promise<FinanceSyncResult> {
+  try {
+    return await syncAccounts(supabase, userId, creds);
+  } catch (e: any) {
+    await saveHealth(supabase, userId, { ok: false, error: e?.message ?? String(e) });
+    throw e;
+  }
+}
+
+async function syncAccounts(
+  supabase: SupabaseClient,
+  userId: string,
+  creds: AkahuCredentials
+): Promise<FinanceSyncResult> {
   const { appToken, userToken } = creds;
-  const lastSyncedAt: string | undefined = creds.lastSyncedAt ?? undefined;
+  const since: string | undefined = creds.lastSyncedAt
+    ? new Date(Date.parse(creds.lastSyncedAt) - OVERLAP_DAYS * 86_400_000).toISOString()
+    : undefined;
   const akahu = makeAkahuClient(appToken, userToken);
 
   let akahuAccounts: any[];
@@ -66,6 +88,7 @@ export async function syncFinanceAccounts(
   }
   let accountsUpserted = 0;
   let txsInserted = 0;
+  const health: AccountHealth[] = [];
 
   for (const aa of akahuAccounts) {
     // Upsert account
@@ -99,8 +122,29 @@ export async function syncFinanceAccounts(
       accountsUpserted++;
     }
 
-    // Sync transactions since last sync
-    const txs = await akahu.listTransactionsSince(aa._id, lastSyncedAt);
+    const h: AccountHealth = {
+      name: String(aa.name ?? 'Account').slice(0, 80),
+      bank: String(aa.connection?.name ?? 'Bank').slice(0, 60),
+      type: String(aa.type ?? 'OTHER'),
+      status: String(aa.status ?? 'ACTIVE'),
+      refreshedTx: aa.refreshed?.transactions ?? null,
+      refreshedBalance: aa.refreshed?.balance ?? null,
+      newestTx: null,
+      fetched: 0,
+    };
+    health.push(h);
+
+    // Transactions since shortly before the last sync. One account failing
+    // doesn't stop the others; bad tokens still stop everything.
+    let txs: any[] = [];
+    try {
+      txs = await akahu.listTransactionsSince(aa._id, since);
+    } catch (e: any) {
+      if (e instanceof AkahuTokensRejected) throw e;
+      h.error = String(e?.message ?? e).slice(0, 300);
+      console.error(`[bank sync] user ${userId.slice(0, 8)} account transactions failed: ${h.error}`);
+    }
+    h.fetched = txs.length;
     if (txs.length > 0) {
       const rows = txs.map((t: any) => ({
         user_id: userId,
@@ -115,6 +159,9 @@ export async function syncFinanceAccounts(
         .upsert(rows, { onConflict: 'akahu_transaction_id', ignoreDuplicates: true, count: 'exact' });
       txsInserted += count ?? 0;
     }
+    const { data: newest } = await supabase.from('fin_transactions').select('date')
+      .eq('account_id', accountId).order('date', { ascending: false }).limit(1).maybeSingle();
+    h.newestTx = (newest as any)?.date ?? null;
   }
 
   // The tokens work, but a bank's own connection can lapse and need renewing.
@@ -123,6 +170,8 @@ export async function syncFinanceAccounts(
   )];
   if (lapsed.length) await setAkahuProblem(supabase, userId, 'connection', lapsed.join(', '));
   else await clearAkahuProblem(supabase, userId);
+
+  await saveHealth(supabase, userId, { ok: true, accounts: health, added: txsInserted });
 
   // Update last synced timestamp
   await supabase.from('akahu_credentials').update({ last_synced_at: new Date().toISOString() }).eq('user_id', userId);

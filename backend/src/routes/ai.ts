@@ -5,6 +5,13 @@ import * as claude from '../services/claude';
 import { modelFor, cleanMessages } from '../services/llm';
 import { getCached, setCached } from '../services/cache';
 import { fetchQuote } from '../services/yahoo';
+import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
+import dotenv from 'dotenv';
+dotenv.config();
+import { bankHealthFor } from '../services/bankHealthReport';
+
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, { realtime: { transport: ws as any } });
 
 const router = Router();
 
@@ -64,7 +71,8 @@ router.post('/helper', requireAuth, requireFeature('helper'), async (req, res) =
 
   try {
     const settings = await getPlatformSettings();
-    const stream = claude.streamHelper(cleanMessages(messages), user.user_metadata?.anthropic_key, context, modelFor(settings, 'helper', isPremium));
+    const connectionSummary = await bankHealthFor(supabase, user.id).then(r => r.text).catch(() => undefined);
+    const stream = claude.streamHelper(cleanMessages(messages), user.user_metadata?.anthropic_key, { ...(context ?? {}), connectionSummary }, modelFor(settings, 'helper', isPremium));
     for await (const chunk of stream) {
       res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
     }

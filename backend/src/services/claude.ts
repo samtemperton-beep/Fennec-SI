@@ -251,6 +251,8 @@ export interface HelperContext {
   kiwiSaverSummary?: string;
   savingsSummary?: string;
   aboutSummary?: string;
+  /** Added by the server from bank_sync_health, never from the browser. */
+  connectionSummary?: string;
 }
 
 export async function* streamHelper(messages: Message[], apiKey?: string, context?: HelperContext, model?: string) {
@@ -297,6 +299,10 @@ ABOUT THE USER (what they chose to tell Fennec):
 ${String(context.aboutSummary).slice(0, 600)}`
     : '';
 
+  const connectionSection = context?.connectionSummary
+    ? `\n\nUSER'S BANK CONNECTION STATUS (from Fennec's last syncs; use it for questions about syncing, missing or old transactions, or Akahu):\n${String(context.connectionSummary).slice(0, 2500)}`
+    : '';
+
   // Page-specific focus hint
   const pageHints: Record<string, string> = {
     portfolio: 'The user is viewing their investment portfolio. Prioritise portfolio analysis, stock signals, and position-level insights.',
@@ -341,7 +347,7 @@ ${String(context.aboutSummary).slice(0, 600)}`
 
 *Emergency fund*: Target 3–6 months of essential expenses in a separate high-interest account (Heartland Bank Online Saver, ASB Online Saver, Rabobank). Automate a fixed transfer every payday. If someone has no emergency fund and variable income, 6 months is safer.
 
-*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}${savingsSection}${aboutSection}
+*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}${savingsSection}${aboutSection}${connectionSection}
 
 **How to respond:**
 - Give expert, specific, actionable answers, like a knowledgeable friend who works in finance
