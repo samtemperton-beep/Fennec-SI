@@ -367,7 +367,15 @@ async function loadRentalContext(): Promise<Partial<FennecContext>> {
     if (p) byProp.set(p, [...(byProp.get(p) ?? []), { ...t, amount: Number(t.amount) }])
   }
   const catMap = new Map(((cats ?? []) as RentalCategory[]).map(c => [c.id, c]))
-  const list = (props as any[]).map(p => ({ ...p, interest_by_year: p.interest_by_year ?? {} })) as RentalProperty[]
+  const loanIds = (props as any[]).map(p => p.loan_account_id).filter(Boolean)
+  const { data: loans } = loanIds.length
+    ? await supabase.from('fin_accounts').select('id, current_balance').in('id', loanIds)
+    : { data: [] as any[] }
+  const loanBal = new Map((loans ?? []).map((l: any) => [l.id, Math.abs(Number(l.current_balance))]))
+  const list = (props as any[]).map(p => ({
+    ...p, interest_by_year: p.interest_by_year ?? {},
+    loan_balance: p.loan_account_id && loanBal.has(p.loan_account_id) ? loanBal.get(p.loan_account_id) : p.loan_balance,
+  })) as RentalProperty[]
   return { rentalSummary: rentalSummaryText(list, byProp, catMap) }
 }
 

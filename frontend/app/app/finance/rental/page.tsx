@@ -14,7 +14,7 @@ import { RentalTransactions } from '@/components/rental/RentalTransactions'
 import {
   ensureRentalCategories, totals, months, rentStatus, interestFor, interestDeductiblePct, monthlyRent,
   taxYearOf, taxYearRange, taxYearLabel, todayNZ, nzd, roleOf, TAX_LINES,
-  type RentalProperty, type RentalAccount, type RentalTx, type RentalCategory,
+  loanInterest, type RentalProperty, type RentalAccount, type RentalTx, type RentalCategory, type LoanTx,
 } from '@/lib/rental'
 
 const supabase = createClient()
@@ -49,6 +49,7 @@ export default function RentalPage() {
   const [taxYear, setTaxYear] = useState<number>(() => taxYearOf(todayNZ()) - 1)
   const [interestDraft, setInterestDraft] = useState('')
   const [homeLoan, setHomeLoan] = useState<HomeLoanFill | null>(null)
+  const [loanTxs, setLoanTxs] = useState<Record<string, LoanTx[]>>({})
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -56,7 +57,7 @@ export default function RentalPage() {
     setUserId(user.id)
     const [{ data: p, error }, { data: a }, { data: hl }] = await Promise.all([
       supabase.from('rental_properties').select('*').order('created_at'),
-      supabase.from('fin_accounts').select('id, name, type, rental_property_id, is_business').order('name'),
+      supabase.from('fin_accounts').select('id, name, type, rental_property_id, is_business, current_balance').order('name'),
       supabase.from('home_loan').select('balance, interest_rate, start_date, rv, market_estimate, purchase_price').eq('user_id', user.id).maybeSingle(),
     ])
     setHomeLoan((hl as HomeLoanFill) ?? null)
@@ -75,6 +76,16 @@ export default function RentalPage() {
         .in('account_id', linked).gte('date', since).order('date', { ascending: false }).limit(5000)
       setTxs(((t ?? []) as any[]).map(x => ({ ...x, amount: Number(x.amount) })))
     } else setTxs([])
+    // Loan accounts chosen for a property: interest charges, for the tax summary.
+    const loanIds = [...new Set(list.map(x => x.loan_account_id).filter(Boolean))] as string[]
+    if (loanIds.length) {
+      const since = taxYearRange(taxYearOf(todayNZ()) - 3).from
+      const { data: lt } = await supabase.from('fin_transactions').select('account_id, date, description, amount')
+        .in('account_id', loanIds).gte('date', since).limit(5000)
+      const by: Record<string, LoanTx[]> = {}
+      for (const t of (lt ?? []) as any[]) (by[t.account_id] ??= []).push({ date: t.date, description: t.description, amount: Number(t.amount) })
+      setLoanTxs(by)
+    } else setLoanTxs({})
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -115,6 +126,14 @@ export default function RentalPage() {
       : q.in('category_id', rentalIds.length ? rentalIds : ['00000000-0000-0000-0000-000000000000'])
     const { error } = await q
     if (error) toast.error(error.message)
+  }
+
+  async function setLoanAccount(accountId: string) {
+    if (!property) return
+    const { error } = await supabase.from('rental_properties').update({ loan_account_id: accountId || null }).eq('id', property.id)
+    if (error) { toast.error(/loan_account_id/.test(error.message) ? 'This needs a database update first (rental_loan_migration.sql).' : error.message); return }
+    toast.success(accountId ? "Loan linked. Fennec reads its balance and interest; it stays on your Home Loan page too." : 'Loan unlinked')
+    await load()
   }
 
   async function linkAccount(a: RentalAccount, on: boolean) {
@@ -188,7 +207,14 @@ export default function RentalPage() {
 
   if (loading) return <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><LoadingSpinner /></div>
 
-  const linkable = accounts.filter(a => !a.is_business && (!a.rental_property_id || a.rental_property_id === property?.id))
+  // Loans are chosen in "Loan for this property" instead, so repayments aren't counted twice.
+  const linkable = accounts.filter(a => !a.is_business && (a.type !== 'LOAN' || a.rental_property_id === property?.id) && (!a.rental_property_id || a.rental_property_id === property?.id))
+  const loanOptions = accounts.filter(a => a.type === 'LOAN' && !a.is_business && !a.rental_property_id)
+  const loanAccount = property?.loan_account_id ? accounts.find(a => a.id === property.loan_account_id) ?? null : null
+  // The property with the live loan balance, when a loan account is chosen.
+  const effective = property && loanAccount && loanAccount.current_balance != null
+    ? { ...property, loan_balance: Math.abs(Number(loanAccount.current_balance)) }
+    : property
   const years = (() => {
     const cur = taxYearOf(today)
     const oldest = propTxs.length ? taxYearOf(propTxs[propTxs.length - 1].date) : cur - 1
@@ -275,6 +301,22 @@ export default function RentalPage() {
                 ))}
               </div>
             )}
+            {loanOptions.length > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Loan for this property</label>
+                <p style={{ ...SUB, marginBottom: 8 }}>
+                  Fennec reads it for the live loan balance and the interest your bank actually charged, for the tax summary. It isn&apos;t moved here, so repayments aren&apos;t counted twice and your Home Loan page keeps working.
+                </p>
+                <select value={property.loan_account_id ?? ''} onChange={e => setLoanAccount(e.target.value)} aria-label="Loan for this property"
+                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2, var(--surface))', color: 'var(--text)', fontSize: 13, maxWidth: '100%' }}>
+                  <option value="">None</option>
+                  {loanOptions.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                {loanAccount && loanAccount.current_balance != null && (
+                  <span style={{ ...SUB, marginLeft: 10 }}>Balance {nzd.format(Math.abs(Number(loanAccount.current_balance)))}</span>
+                )}
+              </div>
+            )}
           </div>
 
           {propAccounts.length > 0 && (
@@ -307,10 +349,10 @@ export default function RentalPage() {
               </div>
 
               {/* Yield and equity */}
-              <YieldCard property={property} rentIn={rentIn} costs={last12.expenses} monthsOfData={monthsOfData} today={today} onEdit={() => setMode('edit')} />
+              <YieldCard property={effective!} liveLoan={!!loanAccount} rentIn={rentIn} costs={last12.expenses} monthsOfData={monthsOfData} today={today} onEdit={() => setMode('edit')} />
 
               {/* Tax year */}
-              <TaxCard property={property} txs={propTxs} catMap={catMap} years={years} year={taxYear} setYear={setTaxYear}
+              <TaxCard property={effective!} loanTxs={property.loan_account_id ? loanTxs[property.loan_account_id] ?? [] : []} txs={propTxs} catMap={catMap} years={years} year={taxYear} setYear={setTaxYear}
                 interestDraft={interestDraft} setInterestDraft={setInterestDraft} saveInterest={saveInterest} exportCsv={exportCsv} />
 
               {/* Transactions */}
@@ -328,7 +370,7 @@ export default function RentalPage() {
   )
 }
 
-function YieldCard({ property: p, rentIn, costs, monthsOfData, today, onEdit }: { property: RentalProperty; rentIn: number; costs: number; monthsOfData: number; today: string; onEdit: () => void }) {
+function YieldCard({ property: p, liveLoan, rentIn, costs, monthsOfData, today, onEdit }: { property: RentalProperty; liveLoan: boolean; rentIn: number; costs: number; monthsOfData: number; today: string; onEdit: () => void }) {
   // A full year of actual rent if there is one; otherwise the expected rent.
   const annualRent = monthsOfData >= 12 ? rentIn : monthsOfData >= 3 ? rentIn / monthsOfData * 12 : monthlyRent(p) * 12
   const annualCosts = monthsOfData >= 3 ? costs / Math.min(12, monthsOfData) * 12 : 0
@@ -346,7 +388,7 @@ function YieldCard({ property: p, rentIn, costs, monthsOfData, today, onEdit }: 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             <Stat label="Gross yield" value={annualRent ? pct1(annualRent / value * 100) : '–'} note="Rent ÷ value" />
             <Stat label="Net yield" value={annualRent && monthsOfData >= 3 ? pct1((annualRent - annualCosts) / value * 100) : '–'} note="After costs, before the mortgage" />
-            <Stat label="Equity" value={loan ? nzd.format(value - loan) : '–'} note={loan ? `Loan ${nzd.format(loan)}` : 'Add the loan balance'} />
+            <Stat label="Equity" value={loan ? nzd.format(value - loan) : '–'} note={loan ? `Loan ${nzd.format(loan)}${liveLoan ? ' (live)' : ''}` : 'Add the loan balance'} />
             <Stat label="LVR" value={loan ? pct((loan / value) * 100) : '–'} note="Loan ÷ value" />
             {p.purchase_price ? <Stat label="Since you bought" value={`${value >= p.purchase_price ? '+' : '−'}${nzd.format(Math.abs(value - p.purchase_price))}`} note={`Paid ${nzd.format(p.purchase_price)}`} /> : null}
           </div>
@@ -371,14 +413,14 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
   )
 }
 
-function TaxCard({ property: p, txs, catMap, years, year, setYear, interestDraft, setInterestDraft, saveInterest, exportCsv }: {
-  property: RentalProperty; txs: RentalTx[]; catMap: Map<string, RentalCategory>; years: number[]; year: number; setYear: (y: number) => void
+function TaxCard({ property: p, loanTxs, txs, catMap, years, year, setYear, interestDraft, setInterestDraft, saveInterest, exportCsv }: {
+  property: RentalProperty; loanTxs: LoanTx[]; txs: RentalTx[]; catMap: Map<string, RentalCategory>; years: number[]; year: number; setYear: (y: number) => void
   interestDraft: string; setInterestDraft: (s: string) => void; saveInterest: (y: number) => void; exportCsv: (y: number) => void
 }) {
   const { from, to } = taxYearRange(year)
   const inYear = txs.filter(t => t.date >= from && t.date <= to)
   const t = totals(inYear, catMap)
-  const interest = interestFor(p, year, t)
+  const interest = interestFor(p, year, t, loanInterest(loanTxs, year))
   const deductPct = interestDeductiblePct(year, p.new_build)
   const share = p.ownership_pct / 100
   const income = t.rent + t.otherIncome
@@ -416,7 +458,7 @@ function TaxCard({ property: p, txs, catMap, years, year, setYear, interestDraft
         <div key={l.line} style={ROW}>
           <span style={{ color: 'var(--text2)' }}>
             {l.line}
-            {l.line === 'Interest' && <> ({interest.source === 'entered' ? 'from your bank' : interest.source === 'transactions' ? 'from transactions' : interest.source === 'estimate' ? 'estimate' : 'not entered'}{deductPct !== null && deductPct < 100 ? `, ${deductPct}% deductible` : ''}{deductPct === null ? ', mixed rules this year' : ''})</>}
+            {l.line === 'Interest' && <> ({interest.source === 'entered' ? 'from your bank' : interest.source === 'loan' ? 'from your loan account' : interest.source === 'transactions' ? 'from transactions' : interest.source === 'estimate' ? 'estimate' : 'not entered'}{deductPct !== null && deductPct < 100 ? `, ${deductPct}% deductible` : ''}{deductPct === null ? ', mixed rules this year' : ''})</>}
           </span>
           <span>{nzd.format(l.amount)}</span>
         </div>
@@ -432,6 +474,7 @@ function TaxCard({ property: p, txs, catMap, years, year, setYear, interestDraft
         <p style={{ ...SUB, marginBottom: 8 }}>
           Your repayments mix interest and principal, and only interest can be claimed. Your bank&apos;s annual interest statement has the exact figure.
           {interest.source === 'estimate' && <> Until you enter it, Fennec estimates {nzd.format(interest.amount)} from your loan balance and rate.</>}
+          {interest.source === 'loan' && <> Fennec added up {nzd.format(interest.amount)} of interest charges on your loan account this year.{interest.partialFrom ? <> Its history only starts {fmtDate(interest.partialFrom)}, so earlier interest is missing: enter the full figure from your statement.</> : ' Check it against your statement; entering a figure here replaces it.'}</>}
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input inputMode="decimal" value={interestDraft} onChange={e => setInterestDraft(e.target.value)}

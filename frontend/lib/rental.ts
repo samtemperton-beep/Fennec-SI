@@ -21,9 +21,12 @@ export interface RentalProperty {
   ownership_pct: number
   new_build: boolean
   interest_by_year: Record<string, number>
+  /** A loan account read for the live balance and interest, not moved out of household. */
+  loan_account_id?: string | null
 }
 
-export interface RentalAccount { id: string; name: string; type: string; rental_property_id: string | null; is_business: boolean }
+export interface RentalAccount { id: string; name: string; type: string; rental_property_id: string | null; is_business: boolean; current_balance?: number | null }
+export interface LoanTx { date: string; description: string | null; amount: number }
 export interface RentalTx { id: string; date: string; description: string | null; amount: number; category_id: string | null; account_id: string }
 export interface RentalCategory { id: string; name: string; kind: string }
 
@@ -187,9 +190,26 @@ export function rentStatus(p: RentalProperty, txs: RentalTx[], cats: Map<string,
 }
 
 /** Interest for a tax year: what the person entered from their bank, else an estimate. */
-export function interestFor(p: RentalProperty, yearEnd: number, t: Totals): { amount: number; source: 'entered' | 'transactions' | 'estimate' | 'none' } {
+/**
+ * Interest the bank charged on the loan account in a tax year: debits that say
+ * "interest" (same test as lib/homeloan.ts). `partialFrom` is set when the
+ * account's history starts after the year began, so some may be missing.
+ */
+export function loanInterest(loanTxs: LoanTx[], yearEnd: number): { amount: number; partialFrom: string | null } | null {
+  if (!loanTxs.length) return null
+  const { from, to } = taxYearRange(yearEnd)
+  const earliest = loanTxs.reduce((m, t) => (t.date < m ? t.date : m), loanTxs[0].date)
+  if (earliest > to) return null
+  const amount = loanTxs.filter(t => t.date >= from && t.date <= to && t.amount < 0 && /interest/i.test(t.description ?? ''))
+    .reduce((s, t) => s - t.amount, 0)
+  if (amount <= 0) return null
+  return { amount: Math.round(amount), partialFrom: earliest > addDays(from, 31) ? earliest : null }
+}
+
+export function interestFor(p: RentalProperty, yearEnd: number, t: Totals, fromLoan?: { amount: number; partialFrom: string | null } | null): { amount: number; source: 'entered' | 'loan' | 'transactions' | 'estimate' | 'none'; partialFrom?: string | null } {
   const entered = p.interest_by_year?.[String(yearEnd)]
   if (typeof entered === 'number') return { amount: entered, source: 'entered' }
+  if (fromLoan) return { amount: fromLoan.amount, source: 'loan', partialFrom: fromLoan.partialFrom }
   if (t.interest > 0) return { amount: t.interest, source: 'transactions' }
   if (p.loan_balance && p.interest_rate) return { amount: Math.round(p.loan_balance * p.interest_rate / 100), source: 'estimate' }
   return { amount: 0, source: 'none' }
