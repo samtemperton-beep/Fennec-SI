@@ -8,7 +8,7 @@ import { IconBuildingCommunity, IconEdit, IconPlus, IconDownload, IconAlertTrian
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { askFennec } from '@/lib/askFennec'
-import { PropertyForm, EMPTY_PROPERTY, type PropertyDraft } from '@/components/rental/PropertyForm'
+import { PropertyForm, EMPTY_PROPERTY, type PropertyDraft, type HomeLoanFill } from '@/components/rental/PropertyForm'
 import { CoverageChart } from '@/components/rental/CoverageChart'
 import { RentalTransactions } from '@/components/rental/RentalTransactions'
 import {
@@ -48,15 +48,18 @@ export default function RentalPage() {
   const [saving, setSaving] = useState(false)
   const [taxYear, setTaxYear] = useState<number>(() => taxYearOf(todayNZ()) - 1)
   const [interestDraft, setInterestDraft] = useState('')
+  const [homeLoan, setHomeLoan] = useState<HomeLoanFill | null>(null)
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
     setUserId(user.id)
-    const [{ data: p, error }, { data: a }] = await Promise.all([
+    const [{ data: p, error }, { data: a }, { data: hl }] = await Promise.all([
       supabase.from('rental_properties').select('*').order('created_at'),
       supabase.from('fin_accounts').select('id, name, type, rental_property_id, is_business').order('name'),
+      supabase.from('home_loan').select('balance, interest_rate, start_date, rv, market_estimate, purchase_price').eq('user_id', user.id).maybeSingle(),
     ])
+    setHomeLoan((hl as HomeLoanFill) ?? null)
     if (error) { toast.error(/rental_properties/.test(error.message) ? 'Rental needs a database update first (rental_migration.sql).' : error.message); setLoading(false); return }
     const list = (p ?? []).map((x: any) => ({ ...x, interest_by_year: x.interest_by_year ?? {} })) as RentalProperty[]
     setProps(list)
@@ -225,7 +228,7 @@ export default function RentalPage() {
         <div className="card" style={{ padding: 20, marginBottom: 20 }}>
           <h2 style={H2}>{props.length ? 'Add another property' : 'Add your rental property'}</h2>
           <p style={{ ...SUB, marginBottom: 14 }}>Only the name is needed now; the rest makes the figures more useful and can be filled in later.</p>
-          <PropertyForm initial={EMPTY_PROPERTY} onSave={saveProperty} saving={saving} onCancel={props.length ? () => setMode('view') : undefined} />
+          <PropertyForm initial={EMPTY_PROPERTY} homeLoan={homeLoan} onSave={saveProperty} saving={saving} onCancel={props.length ? () => setMode('view') : undefined} />
         </div>
       )}
 
@@ -234,7 +237,7 @@ export default function RentalPage() {
           {mode === 'edit' ? (
             <div className="card" style={{ padding: 20, marginBottom: 20 }}>
               <h2 style={{ ...H2, marginBottom: 12 }}>Edit {property.name}</h2>
-              <PropertyForm initial={property} onSave={saveProperty} saving={saving} onCancel={() => setMode('view')} onDelete={removeProperty} />
+              <PropertyForm initial={property} homeLoan={homeLoan} onSave={saveProperty} saving={saving} onCancel={() => setMode('view')} onDelete={removeProperty} />
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
