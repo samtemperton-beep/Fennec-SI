@@ -41,7 +41,7 @@ export async function loadSavingsData(supabase: SupabaseClient): Promise<Savings
   const yearAgo = localDate(new Date(Date.now() - 366 * 86_400_000))
 
   const [{ data: accounts }, { data: txs }, { data: profile }, { data: ks }, net] = await Promise.all([
-    supabase.from('fin_accounts').select('id, name, type, current_balance, is_business'),
+    supabase.from('fin_accounts').select('id, name, type, current_balance, is_business, is_rental'),
     supabase.from('fin_transactions').select('account_id, date, amount, description, category:fin_categories(name)')
       .gte('date', yearAgo).order('date', { ascending: false }).limit(5000),
     supabase.from('profiles').select('savings_prefs').eq('id', user.id).maybeSingle(),

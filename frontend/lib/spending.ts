@@ -39,7 +39,7 @@ export interface CashFlow {
 /** `from` and `to` are inclusive YYYY-MM-DD dates. Null if the data couldn't be read. */
 export async function householdCashFlow(supabase: SupabaseClient, from: string, to: string): Promise<CashFlow | null> {
   const [{ data: accounts, error: aErr }, { data: txs, error: tErr }, { data: bizCats }] = await Promise.all([
-    supabase.from('fin_accounts').select('id, type, is_business'),
+    supabase.from('fin_accounts').select('id, type, is_business, is_rental'),
     // Widen the window so transfers that straddle the range edges still pair up.
     supabase.from('fin_transactions').select('id, account_id, date, amount, category_id')
       .gte('date', shift(from, -MATCH_WINDOW_DAYS)).lte('date', shift(to, MATCH_WINDOW_DAYS)).limit(5000),
@@ -51,7 +51,7 @@ export async function householdCashFlow(supabase: SupabaseClient, from: string, 
   const businessCats = new Set((bizCats ?? []).map(c => c.id))
   const isHousehold = (accountId: string) => {
     const a = accountById.get(accountId)
-    return !!a && !a.is_business && !NON_SPEND_TYPES.has(a.type)
+    return !!a && !a.is_business && !(a as any).is_rental && !NON_SPEND_TYPES.has(a.type)
   }
   const isBusiness = (accountId: string) => !!accountById.get(accountId)?.is_business
 

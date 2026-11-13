@@ -58,7 +58,7 @@ router.delete('/notifications', requireAuth, async (req, res) => {
 const BOOL_PREFS = [
   'portfolio_sell_alerts', 'watchlist_buy_alerts', 'watchlist_sell_alerts', 'price_alerts', 'earnings_alerts',
   'bill_alerts', 'budget_alerts', 'goal_alerts', 'invoice_alerts', 'sync_alerts', 'community_alerts', 'weekly_summary',
-  'reward_alerts', 'pledge_alerts', 'buddy_alerts',
+  'reward_alerts', 'pledge_alerts', 'buddy_alerts', 'rental_alerts',
 ] as const;
 // Before notifications_migration.sql only these exist.
 const OLD_COLUMNS = ['portfolio_sell_alerts', 'watchlist_buy_alerts', 'watchlist_sell_alerts', 'price_alerts'];

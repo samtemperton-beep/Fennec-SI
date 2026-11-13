@@ -31,6 +31,7 @@ export interface NotifyPrefs {
   bill_alerts: boolean; budget_alerts: boolean; goal_alerts: boolean; invoice_alerts: boolean
   sync_alerts: boolean; community_alerts: boolean
   reward_alerts: boolean; pledge_alerts: boolean; buddy_alerts: boolean
+  rental_alerts: boolean
   email_mode: EmailMode; weekly_summary: boolean
   digest_sent_on?: string | null; weekly_sent_on?: string | null
 }
@@ -42,6 +43,7 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   bill_alerts: true, budget_alerts: true, goal_alerts: true, invoice_alerts: true,
   sync_alerts: true, community_alerts: true,
   reward_alerts: true, pledge_alerts: true, buddy_alerts: true,
+  rental_alerts: true,
   email_mode: 'off', weekly_summary: false,
 };
 
@@ -214,7 +216,54 @@ export async function checkMoney(userId: string, p?: NotifyPrefs): Promise<numbe
       });
     }
   }
+
+  // Rent that hasn't arrived (Finance → Rental). Same rule as rentStatus in
+  // frontend/lib/rental.ts: more than 4 days after the next payment was due.
+  if (prefs.rental_alerts) {
+    try {
+      for (const r of await rentLate(userId)) {
+        await add({
+          type: 'rent_late', key: `rent-late:${r.id}:${r.due}`, link: '/app/finance/rental',
+          title: `Rent for ${r.name} looks late`,
+          body: `The last rent came in ${niceDate(r.last)}, and the next was due about ${niceDate(r.due)}. Banks can take a day or two to share it, so check with your tenant or property manager if it doesn't turn up.`,
+        });
+      }
+    } catch (e: any) {
+      console.error('[notify] rent check failed:', e?.message ?? e); // before rental_migration.sql
+    }
+  }
   return sent;
+}
+
+const RENT_DAYS: Record<string, number> = { weekly: 7, fortnightly: 14, monthly: 31 };
+
+/** Rental properties whose rent is more than 4 days overdue. */
+export async function rentLate(userId: string) {
+  const { data: props, error } = await supabase.from('rental_properties')
+    .select('id, name, rent_amount, rent_frequency').eq('user_id', userId).gt('rent_amount', 0);
+  if (error) throw new Error(error.message);
+  if (!props?.length) return [];
+  const [{ data: accts }, { data: cats }] = await Promise.all([
+    supabase.from('fin_accounts').select('id, rental_property_id').eq('user_id', userId).not('rental_property_id', 'is', null),
+    supabase.from('fin_categories').select('id').eq('user_id', userId).eq('scope', 'rental').eq('name', 'Rent received'),
+  ]);
+  const rentCats = (cats ?? []).map((c: any) => c.id);
+  if (!rentCats.length) return [];
+  const today = nzNow().date;
+  const out: { id: string; name: string; last: string; due: string }[] = [];
+  for (const p of props as any[]) {
+    const ids = (accts ?? []).filter((a: any) => a.rental_property_id === p.id).map((a: any) => a.id);
+    if (!ids.length) continue;
+    const { data: last } = await supabase.from('fin_transactions').select('date')
+      .in('account_id', ids).in('category_id', rentCats).gt('amount', 0)
+      .order('date', { ascending: false }).limit(1).maybeSingle();
+    if (!last) continue;
+    const due = addDays((last as any).date, RENT_DAYS[p.rent_frequency] ?? 7);
+    const late = daysBetween(due, today);
+    // Long gaps mean the tenancy probably ended; don't keep nagging.
+    if (late > 4 && late < 45) out.push({ id: p.id, name: p.name, last: (last as any).date, due });
+  }
+  return out;
 }
 
 // ── Emails ──────────────────────────────────────────────────────────────────

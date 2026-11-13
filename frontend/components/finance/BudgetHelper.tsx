@@ -33,8 +33,8 @@ export function BudgetHelper({ categories, expectedIncome, onApplied, onClose }:
     const from = localDate(new Date(new Date().getFullYear(), new Date().getMonth() - 4, 1))
     Promise.all([
       supabase.from('fin_transactions')
-        .select('date, amount, category:fin_categories(name), account:fin_accounts!inner(is_business)')
-        .eq('account.is_business', false).gte('date', from).limit(5000),
+        .select('date, amount, category:fin_categories(name), account:fin_accounts!inner(is_business, is_rental)')
+        .eq('account.is_business', false).eq('account.is_rental', false).gte('date', from).limit(5000),
       loadAboutYou(supabase),
     ]).then(([{ data }, about]) => {
       const rows = (data ?? []).map((t: any) => ({ date: t.date, amount: Number(t.amount), category: t.category?.name ?? null }))

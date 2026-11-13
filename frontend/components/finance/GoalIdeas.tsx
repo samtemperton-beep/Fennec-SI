@@ -33,7 +33,7 @@ export function GoalIdeas({ existing, onAdded }: { existing: string[]; onAdded: 
     Promise.all([
       loadAboutYou(supabase),
       householdCashFlow(supabase, from, to).catch(() => null),
-      supabase.from('fin_accounts').select('current_balance').eq('type', 'CREDITCARD').eq('is_business', false),
+      supabase.from('fin_accounts').select('current_balance').eq('type', 'CREDITCARD').eq('is_business', false).eq('is_rental', false),
     ]).then(([a, flow, { data: cards }]) => {
       setAbout(a)
       if (!a.ageBand && !a.interests?.length) setEditing(true)

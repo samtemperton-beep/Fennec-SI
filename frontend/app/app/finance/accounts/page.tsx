@@ -26,6 +26,7 @@ interface Account {
   id: string; name: string; type: string
   current_balance: number; last_synced: string | null
   is_business: boolean; akahu_account_id: string | null
+  is_rental?: boolean
   share_level: ShareLevel
 }
 // An account a partner has shared (from shared_accounts() in partner_sharing_migration.sql)
@@ -171,7 +172,7 @@ export default function AccountsPage() {
             {accounts.map((a, i) => (
               <div
                 key={a.id}
-                onClick={() => router.push(a.is_business ? '/app/finance/business' : `/app/finance/transactions?account=${a.id}`)}
+                onClick={() => router.push(a.is_business ? '/app/finance/business' : a.is_rental ? '/app/finance/rental' : `/app/finance/transactions?account=${a.id}`)}
                 style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: i < accounts.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', transition: 'background 0.12s', flexWrap: 'wrap' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -180,7 +181,7 @@ export default function AccountsPage() {
                 <div style={{ flex: 1, minWidth: 120 }}>
                   <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>{a.name}</p>
                   <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                    {a.type}{a.is_business ? ' · Business' : ''}
+                    {a.type}{a.is_business ? ' · Business' : a.is_rental ? ' · Rental' : ''}
                     {!linked && a.share_level !== 'private' && !a.is_business ? ` · Shared when you link a partner` : ''}
                   </p>
                 </div>

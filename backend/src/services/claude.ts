@@ -251,6 +251,7 @@ export interface HelperContext {
   kiwiSaverSummary?: string;
   savingsSummary?: string;
   aboutSummary?: string;
+  rentalSummary?: string;
   /** Added by the server from bank_sync_health, never from the browser. */
   connectionSummary?: string;
 }
@@ -303,6 +304,10 @@ ${String(context.aboutSummary).slice(0, 600)}`
     ? `\n\nUSER'S BANK CONNECTION STATUS (from Fennec's last syncs; use it for questions about syncing, missing or old transactions, or Akahu):\n${String(context.connectionSummary).slice(0, 2500)}`
     : '';
 
+  const rentalSection = context?.rentalSummary
+    ? `\n\nUSER'S RENTAL PROPERTIES (from Finance → Rental):\n${String(context.rentalSummary).slice(0, 3000)}`
+    : '';
+
   // Page-specific focus hint
   const pageHints: Record<string, string> = {
     portfolio: 'The user is viewing their investment portfolio. Prioritise portfolio analysis, stock signals, and position-level insights.',
@@ -315,6 +320,7 @@ ${String(context.aboutSummary).slice(0, 600)}`
     goals: 'The user is viewing their savings goals. Focus on goal progress, strategies to accelerate savings, and prioritisation. When asked for goal ideas, suggest 3-5 specific goals with a target amount, a timeframe and the monthly amount that needs, using their spending, savings, age range and what they are working towards; usually an emergency fund and clearing high-interest debt come first.',
     savings: 'The user is viewing their Savings page: savings balance, interest earned, RWT, a 5-10 year projection, and a comparison of savings, investing and KiwiSaver. Use their figures. When comparing, weigh return against risk, access and time: an emergency fund (often 3-6 months of expenses) usually belongs in savings; KiwiSaver gets employer and government money but is locked in until 65 or a first home; shares have higher expected returns but can fall, so they suit money not needed for 5+ years. Check their RWT rate against their income (10.5% up to $15,600, 17.5% to $53,500, 30% to $78,100, 33% to $180,000, 39% above): too high a rate is refunded at year end, too low means tax to pay. Mention that paying down high-interest debt often beats saving. Say what their numbers suggest, then the trade-offs.',
     kiwisaver: 'The user is viewing their KiwiSaver. Focus on NZ retirement planning: contribution rates, fund types, government MTC, and projected outcomes.',
+    rental: 'The user is viewing their rental property page. Use their rental figures: rent against mortgage repayments and other costs, yield, equity, rent arrival. NZ rental tax (general information, not tax advice): rental income and expenses go on the IR3 with an IR3R schedule per property; the tax year runs 1 April to 31 March. Deductible: rates, insurance, repairs and maintenance (not improvements, which are capital), property management and letting fees, accounting and legal fees, body corporate levies, interest. Interest deductibility for residential rentals (loans from before 27 March 2021): 75% in 2022-23, 50% in 2023-24, 80% in 2024-25, 100% from 1 April 2025; new builds (code compliance from 27 March 2020) are fully deductible. Principal repayments are never deductible. Residential rental losses are ring-fenced: they carry forward to future rental income and cannot reduce tax on salary. Bright-line: residential property sold within 2 years of purchase (sales from 1 July 2024) can be taxable. Buildings cannot be depreciated; chattels can. If figures look incomplete, point out uncategorised transactions. Suggest an accountant for anything specific.',
     dashboard: 'The user is on their financial dashboard. Give holistic advice covering both their investments and household finances.',
   };
   const pageFocus = context?.pageHint && pageHints[context.pageHint]
@@ -347,7 +353,7 @@ ${String(context.aboutSummary).slice(0, 600)}`
 
 *Emergency fund*: Target 3–6 months of essential expenses in a separate high-interest account (Heartland Bank Online Saver, ASB Online Saver, Rabobank). Automate a fixed transfer every payday. If someone has no emergency fund and variable income, 6 months is safer.
 
-*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}${savingsSection}${aboutSection}${connectionSection}
+*When analysing spending data*: Quote the user's actual numbers — never estimate or invent figures. Identify the top 2–3 biggest reduction opportunities by $ amount. For subscriptions, list each service and its amount explicitly, then calculate the rotation saving. Be direct: "You could save $X by doing Y" not "you might consider possibly...".${pageFocus}${portfolioSection}${watchlistSection}${newsSection}${accountsSection}${spendSection}${goalsSection}${kiwiSaverSection}${savingsSection}${aboutSection}${rentalSection}${connectionSection}
 
 **How to respond:**
 - Give expert, specific, actionable answers, like a knowledgeable friend who works in finance

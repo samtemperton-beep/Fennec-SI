@@ -74,7 +74,7 @@ function TransactionsPageInner() {
   async function loadTransactions() {
     let q = supabase
       .from('fin_transactions')
-      .select('id, date, description, amount, category_id, category_source, shared_match_id, shared_match:shared_category_matches(keyword), category:fin_categories(name), account:fin_accounts!inner(name,owner,is_business)')
+      .select('id, date, description, amount, category_id, category_source, shared_match_id, shared_match:shared_category_matches(keyword), category:fin_categories(name), account:fin_accounts!inner(name,owner,is_business,is_rental)')
       .order('date', { ascending: false })
       .limit(200)
     if (debouncedSearch) q = q.ilike('description', `%${debouncedSearch}%`)
@@ -82,7 +82,7 @@ function TransactionsPageInner() {
     if (dateTo) q = q.lte('date', dateTo)
     if (uncatOnly) q = q.is('category_id', null)
     if (accountId) q = q.eq('account_id', accountId)
-    else q = q.eq('account.is_business', false)
+    else q = q.eq('account.is_business', false).eq('account.is_rental', false)
     const { data, error } = await q
     if (error) toast.error(error.message)
     else setTransactions((data as any) || [])
@@ -133,7 +133,7 @@ function TransactionsPageInner() {
 
     // Apply to the household transactions that already match: uncategorised and
     // shared-list ones always; ones already in another category only if asked.
-    const { data: household } = await supabase.from('fin_accounts').select('id').eq('is_business', false)
+    const { data: household } = await supabase.from('fin_accounts').select('id').eq('is_business', false).eq('is_rental', false)
     let q = supabase.from('fin_transactions')
       .update({ category_id: creatingRule.categoryId, category_source: 'rule', shared_match_id: null })
       .in('account_id', (household || []).map(a => a.id))
@@ -294,7 +294,7 @@ function CreateRuleBanner({ txId, categoryId, description, categoryName, saving,
     if (keyword.length < 2) { setMatches(null); return }
     let cancelled = false
     const t = setTimeout(async () => {
-      const { data: household } = await supabase.from('fin_accounts').select('id').eq('is_business', false)
+      const { data: household } = await supabase.from('fin_accounts').select('id').eq('is_business', false).eq('is_rental', false)
       const { data } = await supabase.from('fin_transactions')
         .select('category_id, category_source')
         .in('account_id', (household || []).map(a => a.id))

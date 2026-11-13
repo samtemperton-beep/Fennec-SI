@@ -14,7 +14,7 @@ import {
   IconBell, IconPlus, IconTrash, IconRefresh, IconCheck,
   IconArrowDown, IconArrowUp, IconEye, IconMail,
   IconReceipt, IconChartPie, IconTarget, IconFileInvoice, IconPlugConnectedX, IconMessageCircle, IconCalendarEvent,
-  IconWallet, IconBuildingStore, IconUsers, IconChartLine, IconMedal, IconHandStop, IconHeartHandshake,
+  IconWallet, IconBuildingStore, IconUsers, IconChartLine, IconMedal, IconHandStop, IconHeartHandshake, IconBuildingCommunity,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
@@ -40,6 +40,7 @@ interface Prefs {
   reward_alerts: boolean
   pledge_alerts: boolean
   buddy_alerts: boolean
+  rental_alerts: boolean
   email_mode: EmailMode
   weekly_summary: boolean
 }
@@ -68,6 +69,7 @@ const NOTIF: Record<string, { icon: typeof IconBell; color: string; group: Group
   pledge_slip:       { icon: IconHandStop,        color: '#f59e0b', group: 'money' },
   buddy_update:      { icon: IconHeartHandshake,  color: '#a855f7', group: 'money' },
   buddy_invite:      { icon: IconHeartHandshake,  color: '#a855f7', group: 'money' },
+  rent_late:         { icon: IconBuildingCommunity, color: '#f59e0b', group: 'money' },
 }
 const metaOf = (type: string) => NOTIF[type] ?? { icon: IconBell, color: '#5b7cf0', group: 'investing' as Group }
 const GROUPS: { id: Group | 'all'; label: string }[] = [
@@ -159,7 +161,7 @@ export default function NotificationsPage() {
     stop_loss_pct: 10, take_profit_pct: 20,
     portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true, earnings_alerts: true,
     bill_alerts: true, budget_alerts: true, goal_alerts: true, invoice_alerts: true, sync_alerts: true, community_alerts: true,
-    reward_alerts: true, pledge_alerts: true, buddy_alerts: true,
+    reward_alerts: true, pledge_alerts: true, buddy_alerts: true, rental_alerts: true,
     email_mode: 'off', weekly_summary: false,
   })
   const [thresholds, setThresholds] = useState({ stop_loss_pct: '10', take_profit_pct: '20' })
@@ -497,6 +499,7 @@ export default function NotificationsPage() {
             <Row k="reward_alerts" label="Badges" desc="When you earn a new badge on Budget → Wins" />
             <Row k="pledge_alerts" label="Pledge slips" desc="When spending shows up somewhere you've pledged not to spend" />
             <Row k="buddy_alerts" label="Your buddies" desc="When someone you're an accountability buddy for slips, goes over budget or misses a goal" />
+            <Row k="rental_alerts" label="Rent" desc="When rent for a property on Finance → Rental hasn’t arrived a few days after it was due" />
           </Section>
 
           <Section icon={IconBuildingStore} color="#f59e0b" title="Business">

@@ -29,7 +29,7 @@ export function looksLikeRwt(description: string): boolean {
   return /withholding|\brwt\b|w\/h tax|wht\b/i.test(description)
 }
 
-export interface SavingsAccount { id: string; name: string; type: string; current_balance: number | string | null; is_business?: boolean | null }
+export interface SavingsAccount { id: string; name: string; type: string; current_balance: number | string | null; is_business?: boolean | null; is_rental?: boolean | null }
 export interface SavingsTx { account_id: string; date: string; amount: number | string; description: string | null; category?: string | null }
 
 export interface SavingsAnalysis {
@@ -58,7 +58,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100
  * the bank's wording says so.
  */
 export function analyseSavings(accounts: SavingsAccount[], txs: SavingsTx[], now: Date = new Date()): SavingsAnalysis {
-  const household = accounts.filter(a => !a.is_business && !NON_CASH_TYPES.has(String(a.type).toUpperCase()))
+  const household = accounts.filter(a => !a.is_business && !a.is_rental && !NON_CASH_TYPES.has(String(a.type).toUpperCase()))
   const savings = household.filter(a => SAVINGS_TYPES.has(String(a.type).toUpperCase()))
   const householdIds = new Set(household.map(a => a.id))
   const savingsIds = new Set(savings.map(a => a.id))

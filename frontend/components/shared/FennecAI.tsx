@@ -1,6 +1,7 @@
 'use client'
 import { localDate } from '@/lib/utils'
 import { loadSavingsData, savingsSummaryText } from '@/lib/savingsData'
+import { rentalSummaryText, type RentalProperty, type RentalTx, type RentalCategory } from '@/lib/rental'
 import { loadAboutYou, aboutYouText } from '@/lib/aboutYou'
 import { ASK_FENNEC_EVENT } from '@/lib/askFennec'
 import { useState, useRef, useEffect, useCallback } from 'react'
@@ -32,6 +33,8 @@ interface FennecContext {
   // Business
   businessPLSummary?: string
   businessTopExpenses?: string
+  // Rental
+  rentalSummary?: string
   // Meta
   pageHint: string
 }
@@ -159,6 +162,19 @@ function getPageConfig(pathname: string): {
       'How does my revenue compare to last year?',
     ],
     loadInvesting: false, loadFinance: true,
+  }
+  if (pathname.includes('/finance/rental')) return {
+    pageHint: 'rental',
+    label: 'Fennec AI',
+    description: 'Ask about your rental: rent against the mortgage, costs, yield or tax time.',
+    suggestions: [
+      'Is my rent covering the mortgage?',
+      'Which costs can I claim on my rental?',
+      'How is my rental yield?',
+      'What should I raise the rent to?',
+      'How do I categorise my rental transactions?',
+    ],
+    loadInvesting: false, loadFinance: false,
   }
   if (pathname.includes('/finance')) return {
     pageHint: 'finance',
@@ -331,6 +347,30 @@ async function loadFinanceContext(): Promise<Partial<FennecContext>> {
   return { accountsSummary, monthlySpend, goalsSummary, kiwiSaverSummary, savingsSummary, aboutSummary }
 }
 
+async function loadRentalContext(): Promise<Partial<FennecContext>> {
+  const supabase = createClient()
+  const [{ data: props }, { data: accts }, { data: cats }] = await Promise.all([
+    supabase.from('rental_properties').select('*'),
+    supabase.from('fin_accounts').select('id, rental_property_id').not('rental_property_id', 'is', null),
+    supabase.from('fin_categories').select('id, name, kind').eq('scope', 'rental'),
+  ])
+  if (!props?.length) return { rentalSummary: 'No rental properties added yet.' }
+  const ids = (accts ?? []).map((a: any) => a.id)
+  const since = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10)
+  const { data: txs } = ids.length
+    ? await supabase.from('fin_transactions').select('id, date, description, amount, category_id, account_id').in('account_id', ids).gte('date', since).limit(5000)
+    : { data: [] as any[] }
+  const propOf = new Map((accts ?? []).map((a: any) => [a.id, a.rental_property_id]))
+  const byProp = new Map<string, RentalTx[]>()
+  for (const t of (txs ?? []) as any[]) {
+    const p = propOf.get(t.account_id)
+    if (p) byProp.set(p, [...(byProp.get(p) ?? []), { ...t, amount: Number(t.amount) }])
+  }
+  const catMap = new Map(((cats ?? []) as RentalCategory[]).map(c => [c.id, c]))
+  const list = (props as any[]).map(p => ({ ...p, interest_by_year: p.interest_by_year ?? {} })) as RentalProperty[]
+  return { rentalSummary: rentalSummaryText(list, byProp, catMap) }
+}
+
 async function loadBusinessContext(): Promise<Partial<FennecContext>> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -449,12 +489,13 @@ export function FennecAI() {
       const token = await getToken()
       const cfg = getPageConfig(pathname)
       const isBusiness = pathname.includes('/finance/business')
-      const [investing, finance, business] = await Promise.all([
+      const [investing, finance, business, rental] = await Promise.all([
         cfg.loadInvesting ? loadInvestingContext(token) : Promise.resolve({} as Partial<FennecContext>),
         cfg.loadFinance ? loadFinanceContext() : Promise.resolve({} as Partial<FennecContext>),
         isBusiness ? loadBusinessContext() : Promise.resolve({} as Partial<FennecContext>),
+        cfg.pageHint === 'rental' ? loadRentalContext() : Promise.resolve({} as Partial<FennecContext>),
       ])
-      const ctx: FennecContext = { pageHint: cfg.pageHint, ...investing, ...finance, ...business }
+      const ctx: FennecContext = { pageHint: cfg.pageHint, ...investing, ...finance, ...business, ...rental }
       setContext(ctx)
       contextLoadedRef.current = pathname
 

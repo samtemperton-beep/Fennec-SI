@@ -130,6 +130,7 @@ export default function HomeLoanPage() {
       .select('id, name, current_balance')
       .eq('type', 'LOAN')
       .eq('is_business', false)
+      .eq('is_rental', false)
       .order('current_balance')
       .limit(1)
 
