@@ -45,7 +45,8 @@ export const RENTAL_CATEGORIES: { name: string; kind: 'income' | 'spending'; rol
   { name: 'Repairs & maintenance',  kind: 'spending', role: 'expense',      line: 'Repairs and maintenance', hint: 'Fixing and maintaining what is already there' },
   { name: 'Body corporate',         kind: 'spending', role: 'expense',      line: 'Other expenses', hint: 'Body corporate levies' },
   { name: 'Accounting & legal',     kind: 'spending', role: 'expense',      line: 'Legal and accounting fees', hint: 'Accountant, tax agent and legal fees' },
-  { name: 'Other costs',            kind: 'spending', role: 'expense',      line: 'Other expenses', hint: 'Bank fees, travel to the property, smoke alarms, healthy homes checks' },
+  { name: 'Bank fees',              kind: 'spending', role: 'expense',      line: 'Other expenses', hint: 'Account, overdraft and other bank fees on this account' },
+  { name: 'Other costs',            kind: 'spending', role: 'expense',      line: 'Other expenses', hint: 'Travel to the property, smoke alarms, healthy homes checks' },
   { name: 'Improvements',           kind: 'spending', role: 'capital',      hint: "Renovations and additions: capital, so not a deductible expense" },
   { name: 'Tenant utilities',       kind: 'spending', role: 'passthrough',  hint: "Power, broadband and water you pay for the tenants, and what they pay you back. Only the difference counts" },
   { name: 'Transfers',              kind: 'spending', role: 'transfer',     hint: "Money moved between your own accounts. Left out of everything" },
@@ -137,7 +138,7 @@ export function suggestCategory(t: Pick<RentalTx, 'description' | 'amount'>, p?:
   if (has(d, PM) || has(d, ['management fee', 'letting fee', 'mgmt fee'])) return 'Property management'
   if (has(d, ['accountant', 'accounting', 'xero', 'tax agent', 'lawyer', 'legal', 'solicitor'])) return 'Accounting & legal'
   if (has(d, ['plumb', 'electric', 'builder', 'roof', 'bunnings', 'mitre 10', 'mitre10', 'placemakers', 'repair', 'maint', 'handyman', 'glass', 'locksmith', 'paint', 'garden', 'lawn', 'pest', 'clean', 'gas fit', 'heat pump', 'smoke alarm', 'healthy home'])) return 'Repairs & maintenance'
-  if (has(d, ['fee', 'bank charge', 'account fee'])) return 'Other costs'
+  if (has(d, ['fee', 'bank charge', 'overdraft', 'dishonour', 'service charge'])) return 'Bank fees'
   return null
 }
 
