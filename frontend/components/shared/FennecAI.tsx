@@ -163,6 +163,19 @@ function getPageConfig(pathname: string): {
     ],
     loadInvesting: false, loadFinance: true,
   }
+  if (pathname.includes('/finance/insurance')) return {
+    pageHint: 'insurance',
+    label: 'Fennec AI',
+    description: 'Ask about your policies: cover, sum insured, excess, getting a better deal, or a message to your insurer.',
+    suggestions: [
+      'Is my sum insured about right?',
+      'How can I lower my premium?',
+      'What does a landlord policy cover that home insurance doesn\'t?',
+      'Should I bundle my policies?',
+      'Help me write to my insurer',
+    ],
+    loadInvesting: false, loadFinance: false,
+  }
   if (pathname.includes('/finance/rental')) return {
     pageHint: 'rental',
     label: 'Fennec AI',

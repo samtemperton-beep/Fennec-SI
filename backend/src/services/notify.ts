@@ -32,6 +32,7 @@ export interface NotifyPrefs {
   sync_alerts: boolean; community_alerts: boolean
   reward_alerts: boolean; pledge_alerts: boolean; buddy_alerts: boolean
   rental_alerts: boolean
+  insurance_alerts: boolean
   email_mode: EmailMode; weekly_summary: boolean
   digest_sent_on?: string | null; weekly_sent_on?: string | null
 }
@@ -44,6 +45,7 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   sync_alerts: true, community_alerts: true,
   reward_alerts: true, pledge_alerts: true, buddy_alerts: true,
   rental_alerts: true,
+  insurance_alerts: true,
   email_mode: 'off', weekly_summary: false,
 };
 
@@ -230,6 +232,21 @@ export async function checkMoney(userId: string, p?: NotifyPrefs): Promise<numbe
       }
     } catch (e: any) {
       console.error('[notify] rent check failed:', e?.message ?? e); // before rental_migration.sql
+    }
+  }
+  // Insurance renewing within four weeks: a nudge to compare quotes.
+  if (prefs.insurance_alerts) {
+    const today = nzNow().date;
+    const { data: pols, error: polErr } = await supabase.from('insurance_policies')
+      .select('id, insurer, kind, label, renewal_date').eq('user_id', userId).neq('holder', 'partner')
+      .gte('renewal_date', today).lte('renewal_date', addDays(today, 28));
+    if (polErr) console.error('[notify] insurance check failed:', polErr.message); // before insurance_migration.sql
+    for (const p of (pols ?? []) as any[]) {
+      await add({
+        type: 'policy_renewal', key: `policy-renewal:${p.id}:${p.renewal_date}`, link: '/app/finance/insurance',
+        title: `Your ${p.insurer} ${p.kind} insurance${p.label ? ` (${p.label})` : ''} renews ${niceDate(p.renewal_date)}`,
+        body: `Now's a good time to compare quotes. Fennec's check on Finance → Insurance lists what to ask about.`,
+      });
     }
   }
   return sent;

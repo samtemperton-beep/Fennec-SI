@@ -9,7 +9,7 @@ import {
   IconSettings, IconLogout, IconTrophy,
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
   IconWallet, IconReceipt, IconLayoutDashboard, IconPigMoney, IconCoins,
-  IconBriefcase, IconCalculator, IconFileInvoice, IconHome, IconBuildingCommunity, IconMessageReport, IconHelpCircle } from '@tabler/icons-react'
+  IconBriefcase, IconCalculator, IconFileInvoice, IconHome, IconBuildingCommunity, IconShieldCheck, IconMessageReport, IconHelpCircle } from '@tabler/icons-react'
 import { FennecAI } from '@/components/shared/FennecAI'
 import { FoxIcon } from '@/components/shared/FoxIcon'
 import { MarketTicker } from '@/components/shared/MarketTicker'
@@ -75,6 +75,7 @@ const SECTIONS = {
           { href: '/app/finance/kiwisaver',    label: 'KiwiSaver',    icon: IconPigMoney },
           { href: '/app/finance/homeloan',     label: 'Home Loan',    icon: IconHome },
           { href: '/app/finance/rental',       label: 'Rental',       icon: IconBuildingCommunity },
+          { href: '/app/finance/insurance',    label: 'Insurance',    icon: IconShieldCheck },
         ],
       },
     ],

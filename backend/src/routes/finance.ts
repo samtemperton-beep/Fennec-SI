@@ -12,6 +12,7 @@ import { emailAdmins, escapeHtml } from '../services/adminEmail';
 import { lookupProperty, LinzError } from '../services/linz';
 import { readRatesNotice, RatesNoticeError } from '../services/ratesNotice';
 import { readKiwiSaverStatement, KiwiSaverStatementError } from '../services/kiwisaverStatement';
+import { readPolicy, PolicyReadError } from '../services/policyReader';
 import { loadPrivateFields } from '../services/privateFields';
 import { loadSavedProperty, saveProperty } from '../services/propertyStore';
 
@@ -184,6 +185,22 @@ router.post('/kiwisaver-statement', requireAuth, async (req: any, res) => {
   } catch (e: any) {
     if (e instanceof KiwiSaverStatementError) return res.status(422).json({ error: e.message });
     console.error('[kiwisaver statement] read failed:', e?.message ?? e);
+    res.status(502).json({ error: "Couldn't read that just now. Please try again." });
+  }
+});
+
+// ── POST /api/finance/policy-read ────────────────────────────────────────────
+// Reads an insurance policy schedule for Finance → Insurance. Returns the
+// values for the person to check; the file and nothing personal is kept.
+router.post('/policy-read', requireAuth, async (req: any, res) => {
+  const file = req.body?.file;
+  if (!file?.data || !file?.type) return res.status(400).json({ error: 'Choose a file first.' });
+  if (!await checkAndIncrementUsage(req, res)) return;
+  try {
+    res.json(await readPolicy({ type: String(file.type), data: String(file.data) }));
+  } catch (e: any) {
+    if (e instanceof PolicyReadError) return res.status(422).json({ error: e.message });
+    console.error('[policy read] failed:', e?.message ?? e);
     res.status(502).json({ error: "Couldn't read that just now. Please try again." });
   }
 });
