@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { askFennec } from '@/lib/askFennec'
 import { PolicyForm, EMPTY_POLICY } from '@/components/insurance/PolicyForm'
 import { RebuildEstimate } from '@/components/insurance/RebuildEstimate'
+import { Estimators } from '@/components/insurance/Estimators'
 import { checkPolicy, policyText, money, fmtDate, daysUntil, KIND_LABEL, type Policy, type PolicyDraft, type Finding } from '@/lib/insurance'
 
 const supabase = createClient()
@@ -211,6 +212,8 @@ export default function InsurancePage() {
           </div>
         )
       })}
+
+      <Estimators />
     </div>
   )
 }
