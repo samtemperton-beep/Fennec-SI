@@ -8,6 +8,7 @@ import { IconBuildingCommunity, IconEdit, IconPlus, IconDownload, IconAlertTrian
 import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { askFennec } from '@/lib/askFennec'
+import { SubTabs, PROPERTY_TABS } from '@/components/shared/SubTabs'
 import { PropertyForm, EMPTY_PROPERTY, type PropertyDraft, type HomeLoanFill } from '@/components/rental/PropertyForm'
 import { CoverageChart } from '@/components/rental/CoverageChart'
 import { RentalTransactions } from '@/components/rental/RentalTransactions'
@@ -225,6 +226,7 @@ export default function RentalPage() {
 
   return (
     <div style={{ padding: 'clamp(16px, 4vw, 28px)', maxWidth: 960 }}>
+      <SubTabs tabs={PROPERTY_TABS} label="Property" />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
         <IconBuildingCommunity size={24} style={{ color: 'var(--primary)' }} />
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Rental</h1>

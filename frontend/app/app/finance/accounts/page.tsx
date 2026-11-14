@@ -1,6 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
+import { SubTabs, ACCOUNTS_TABS } from '@/components/shared/SubTabs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -135,6 +136,7 @@ export default function AccountsPage() {
 
   return (
     <div style={{ padding: 28 }}>
+      <SubTabs tabs={ACCOUNTS_TABS} label="Accounts" />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Accounts</h1>

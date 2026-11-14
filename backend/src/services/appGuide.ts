@@ -17,7 +17,7 @@ Investing:
 - Today's Picks: a daily top 10. Discover: hidden-gem ideas. Watchlist: stocks being watched, with signals.
 - News (with an AI digest), Newsletters, and Events (IPOs and earnings).
 
-Finance (household):
+Finance (household). The menu has Accounts (with an Accounts | Transactions switch at the top), Budget, Bills, Savings (Growth | Goals), KiwiSaver, Property (Home Loan | Rental) and Insurance:
 - Accounts: bank balances. Bank sync uses Akahu with read-only access, connected from Settings. Accounts can be added by hand too.
 - Transactions: categorise them; "create a rule" auto-categorises matching ones. Common merchants are categorised automatically from Fennec's shared list (marked "auto"); the person's own rules come first, and "Not right? Stop matching" on the category turns a match off for them.
 - Budget has three tabs. Wins: points, levels (Kit, Cub, Scout, Tracker, Fox, Silver Fox, Golden Fox), a weekly streak and badges, earned for weeks and months under budget, pledges kept and milestones. Pledges: places the person has decided not to spend (Lotto, betting, Uber Eats or their own words); new transactions are checked and a slip is notified. Also on Pledges: an accountability buddy invited by email who, once they accept, sees pledges, streaks and slips, plus slip amounts, budgets gone over and missed goals if the person chooses. Be encouraging about slips, never shaming.

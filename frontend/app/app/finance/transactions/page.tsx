@@ -8,6 +8,7 @@ import { IconSearch, IconX, IconCheck, IconArrowLeft, IconWand } from '@tabler/i
 import { toast } from 'sonner'
 import { suggestKeyword } from '@/lib/categoryRules'
 import { NewCategory } from '@/components/finance/NewCategory'
+import { SubTabs, ACCOUNTS_TABS } from '@/components/shared/SubTabs'
 
 const supabase = createClient()
 const currency = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
@@ -158,6 +159,7 @@ function TransactionsPageInner() {
 
   return (
     <div style={{ padding: 28 }}>
+      {!accountId && <SubTabs tabs={ACCOUNTS_TABS} label="Accounts" />}
       <div style={{ marginBottom: 20 }}>
         {accountId && (
           <button onClick={() => router.push('/app/finance/accounts')}

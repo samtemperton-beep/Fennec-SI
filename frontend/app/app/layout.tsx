@@ -9,7 +9,7 @@ import {
   IconSettings, IconLogout, IconTrophy,
   IconSun, IconMoon, IconShield, IconBuildingBank, IconArrowsExchange,
   IconWallet, IconReceipt, IconLayoutDashboard, IconPigMoney, IconCoins,
-  IconBriefcase, IconCalculator, IconFileInvoice, IconHome, IconBuildingCommunity, IconShieldCheck, IconMessageReport, IconHelpCircle } from '@tabler/icons-react'
+  IconBriefcase, IconCalculator, IconFileInvoice, IconHome, IconShieldCheck, IconMessageReport, IconHelpCircle } from '@tabler/icons-react'
 import { FennecAI } from '@/components/shared/FennecAI'
 import { FoxIcon } from '@/components/shared/FoxIcon'
 import { MarketTicker } from '@/components/shared/MarketTicker'
@@ -24,7 +24,8 @@ import { usePlan, PlanFeature } from '@/lib/plan'
 
 // ── Section definitions ───────────────────────────────────────────────────────
 
-type NavItem = { href: string; label: string; icon: typeof IconChartBar }
+// `also`: other pages under the same menu item (they switch with SubTabs at the top).
+type NavItem = { href: string; label: string; icon: typeof IconChartBar; also?: string[] }
 type NavGroup = { label: string; items: NavItem[] }
 type Section = { label: string; icon: typeof IconChartBar; defaultHref: string; groups: NavGroup[] }
 
@@ -67,14 +68,12 @@ const SECTIONS = {
       {
         label: 'Household',
         items: [
-          { href: '/app/finance/accounts',     label: 'Accounts',     icon: IconBuildingBank },
-          { href: '/app/finance/transactions', label: 'Transactions', icon: IconArrowsExchange },
+          { href: '/app/finance/accounts',     label: 'Accounts',     icon: IconBuildingBank, also: ['/app/finance/transactions'] },
           { href: '/app/finance/budget',       label: 'Budget',       icon: IconWallet },
           { href: '/app/finance/bills',        label: 'Bills',        icon: IconReceipt },
           { href: '/app/finance/savings',      label: 'Savings',      icon: IconCoins },
           { href: '/app/finance/kiwisaver',    label: 'KiwiSaver',    icon: IconPigMoney },
-          { href: '/app/finance/homeloan',     label: 'Home Loan',    icon: IconHome },
-          { href: '/app/finance/rental',       label: 'Rental',       icon: IconBuildingCommunity },
+          { href: '/app/finance/homeloan',     label: 'Property',     icon: IconHome, also: ['/app/finance/rental'] },
           { href: '/app/finance/insurance',    label: 'Insurance',    icon: IconShieldCheck },
         ],
       },
@@ -136,9 +135,14 @@ function getActiveSection(pathname: string): SectionKey {
 // Longest matching href wins, so /app/finance/business/tax doesn't also light up Overview
 function getActiveHref(items: NavItem[], pathname: string): string | null {
   let best: string | null = null
-  for (const { href } of items) {
-    if ((pathname === href || pathname.startsWith(href + '/')) && (!best || href.length > best.length)) best = href
+  for (const { href, also } of items) {
+    for (const h of [href, ...(also ?? [])]) {
+      if ((pathname === h || pathname.startsWith(h + '/')) && (!best || h.length > best.length)) best = h
+    }
   }
+  // An `also` page lights up the item it belongs to.
+  const owner = items.find(i => i.also?.includes(best ?? ''))
+  if (owner) return owner.href
   return best
 }
 

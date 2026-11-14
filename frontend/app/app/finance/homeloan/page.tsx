@@ -10,6 +10,7 @@ import { RatesNoticeUpload, type RatesNoticeValues } from '@/components/finance/
 import { detectRepayment, summariseInterest, projectPayoff, scheduledMonthly, type LoanTx } from '@/lib/homeloan'
 import { api } from '@/lib/api'
 import { Secret } from '@/components/shared/Secret'
+import { SubTabs, PROPERTY_TABS } from '@/components/shared/SubTabs'
 
 const supabase = createClient()
 
@@ -308,6 +309,7 @@ export default function HomeLoanPage() {
 
   return (
     <div style={{ padding: 28, maxWidth: 900 }}>
+      <SubTabs tabs={PROPERTY_TABS} label="Property" />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 24 }}>Home Loan</h1>
