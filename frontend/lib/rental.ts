@@ -31,7 +31,7 @@ export interface RentalTx { id: string; date: string; description: string | null
 export interface RentalCategory { id: string; name: string; kind: string }
 
 /** What a category means for coverage and tax. */
-export type Role = 'rent' | 'other_income' | 'mortgage' | 'interest' | 'expense' | 'capital' | 'transfer'
+export type Role = 'rent' | 'other_income' | 'mortgage' | 'interest' | 'expense' | 'capital' | 'transfer' | 'passthrough'
 
 export const RENTAL_CATEGORIES: { name: string; kind: 'income' | 'spending'; role: Role; line?: string; hint: string }[] = [
   { name: 'Rent received',          kind: 'income',   role: 'rent',         hint: 'Rent from tenants, or from your property manager' },
@@ -47,7 +47,9 @@ export const RENTAL_CATEGORIES: { name: string; kind: 'income' | 'spending'; rol
   { name: 'Accounting & legal',     kind: 'spending', role: 'expense',      line: 'Legal and accounting fees', hint: 'Accountant, tax agent and legal fees' },
   { name: 'Other costs',            kind: 'spending', role: 'expense',      line: 'Other expenses', hint: 'Bank fees, travel to the property, smoke alarms, healthy homes checks' },
   { name: 'Improvements',           kind: 'spending', role: 'capital',      hint: "Renovations and additions: capital, so not a deductible expense" },
+  { name: 'Tenant utilities',       kind: 'spending', role: 'passthrough',  hint: "Power, broadband and water you pay for the tenants, and what they pay you back. Only the difference counts" },
   { name: 'Transfers',              kind: 'spending', role: 'transfer',     hint: "Money moved between your own accounts. Left out of everything" },
+  { name: 'Personal (not rental)',  kind: 'spending', role: 'transfer',     hint: "Something personal paid from this account by mistake, and the money you put back. Left out of everything" },
 ]
 const BY_NAME = new Map(RENTAL_CATEGORIES.map(c => [c.name, c]))
 export const TAX_LINES = ['Rates', 'Insurance', 'Interest', 'Repairs and maintenance', "Agent's fees", 'Legal and accounting fees', 'Other expenses']
@@ -105,6 +107,8 @@ export const monthlyRent = (p: Pick<RentalProperty, 'rent_amount' | 'rent_freque
 
 // ── Suggestions for uncategorised transactions ─────────────────────────────
 
+// Power, gas and internet companies, for bills paid for the tenants.
+export const UTILITIES = ['powershop', 'contact energy', 'mercury', 'genesis', 'meridian', 'electric kiwi', 'flick', 'frank energy', 'nova energy', 'trustpower', 'pulse energy', 'octopus', 'ecotricity', 'globug', 'energy online', 'rockgas', 'elgas', '2degrees', 'one nz', 'onenz', 'spark', 'vodafone', 'skinny', 'slingshot', 'orcon', 'bigpipe', 'voyager', 'starlink', 'mynetfone', 'zeronet', 'kogan']
 const has = (d: string, words: string[]) => words.some(w => d.includes(w))
 const PM = ['property manag', 'quinovic', 'harcourts', 'barfoot', 'ray white', 'bayleys', 'lj hooker', 'tall poppy', 'property brokers', 'professionals', 'crockers', 'mike pero', 'rentals', 'lodge', 'my rental']
 
@@ -116,6 +120,7 @@ export function suggestCategory(t: Pick<RentalTx, 'description' | 'amount'>, p?:
   if (t.amount < 0 && has(d, loan)) return 'Mortgage repayments'
   if (has(d, ['transfer', ' tfr', 'tfr ', ' trf', 'trf ', 'internet banking', 'online banking', 'mobile banking'])) return 'Transfers'
   if (t.amount > 0) {
+    if (has(d, ['power', 'electric', 'internet', 'broadband', 'wifi', 'utilit', 'reimb'])) return 'Tenant utilities'
     if (has(d, ['rent', 'tenant', 'bond']) || has(d, PM)) return 'Rent received'
     // Close to the expected rent, or a whole number of rent periods.
     const r = p?.rent_amount ?? 0
@@ -124,6 +129,7 @@ export function suggestCategory(t: Pick<RentalTx, 'description' | 'amount'>, p?:
     return null
   }
   if (has(d, ['interest', 'debit int'])) return 'Mortgage interest'
+  if (has(d, UTILITIES)) return 'Tenant utilities'
   if (has(d, ['watercare', 'water rates', 'water charge', 'wellington water', 'water services'])) return 'Water'
   if (has(d, ['council', 'rates', ' dc ', 'district c', 'city c', 'regional c'])) return 'Rates'
   if (has(d, ['body corp', 'bodycorp', 'bc levy', 'strata'])) return 'Body corporate'
@@ -137,15 +143,16 @@ export function suggestCategory(t: Pick<RentalTx, 'description' | 'amount'>, p?:
 
 // ── Figures ────────────────────────────────────────────────────────────────
 
-export interface Totals { rent: number; otherIncome: number; mortgage: number; interest: number; expenses: number; capital: number; uncategorised: number; uncategorisedCount: number; byLine: Record<string, number> }
+export interface Totals { rent: number; otherIncome: number; mortgage: number; interest: number; expenses: number; capital: number; uncategorised: number; uncategorisedCount: number; byLine: Record<string, number>; utilitiesPaid: number; utilitiesBack: number }
 
 export function totals(txs: RentalTx[], cats: Map<string, RentalCategory>): Totals {
-  const t: Totals = { rent: 0, otherIncome: 0, mortgage: 0, interest: 0, expenses: 0, capital: 0, uncategorised: 0, uncategorisedCount: 0, byLine: {} }
+  const t: Totals = { rent: 0, otherIncome: 0, mortgage: 0, interest: 0, expenses: 0, capital: 0, uncategorised: 0, uncategorisedCount: 0, byLine: {}, utilitiesPaid: 0, utilitiesBack: 0 }
   for (const x of txs) {
     const a = Number(x.amount)
     if (!x.category_id || !cats.has(x.category_id)) { t.uncategorised += a; t.uncategorisedCount++; continue }
     const { role, line } = roleOf(cats.get(x.category_id))
     if (role === 'transfer') continue
+    if (role === 'passthrough') { if (a < 0) t.utilitiesPaid -= a; else t.utilitiesBack += a; continue }
     if (role === 'rent') t.rent += a
     else if (role === 'other_income') t.otherIncome += a
     else if (role === 'mortgage') t.mortgage -= a
@@ -154,6 +161,10 @@ export function totals(txs: RentalTx[], cats: Map<string, RentalCategory>): Tota
     else t.expenses -= a
     if (line) t.byLine[line] = (t.byLine[line] ?? 0) - a
   }
+  // Paid for the tenants and paid back: only the difference is a cost (or income).
+  const gap = t.utilitiesPaid - t.utilitiesBack
+  if (gap > 0) { t.expenses += gap; t.byLine['Other expenses'] = (t.byLine['Other expenses'] ?? 0) + gap }
+  else if (gap < 0) t.otherIncome -= gap
   return t
 }
 
@@ -227,7 +238,7 @@ export function rentalSummaryText(props: RentalProperty[], txsByProp: Map<string
     const rent = t.rent + t.otherIncome
     const out = t.mortgage + t.interest + t.expenses
     const s = rentStatus(p, txs, cats, today)
-    lines.push(`${p.name} (${p.ownership_pct}% owned${p.new_build ? ', new build' : ''}): last 12 months rent ${nzd.format(rent)}, mortgage ${nzd.format(t.mortgage + t.interest)}, other costs ${nzd.format(t.expenses)}, net ${nzd.format(rent - out)}${t.mortgage + t.interest > 0 ? `; rent covers ${Math.round(rent / (t.mortgage + t.interest) * 100)}% of the mortgage` : ''}${out > 0 ? ` and ${Math.round(rent / out * 100)}% of all costs` : ''}. ${t.uncategorisedCount} transactions uncategorised. Expected rent ${p.rent_amount ? `${nzd.format(p.rent_amount)} ${p.rent_frequency}` : 'not set'}; last rent ${s.last ?? 'none found'}${s.late ? `, ${s.daysLate} days late` : ''}. Value ${p.value ? nzd.format(p.value) : 'not set'}${p.value_note ? ` (${p.value_note})` : ''}, loan ${p.loan_balance ? nzd.format(p.loan_balance) : 'not set'}${p.interest_rate ? ` at ${p.interest_rate}%` : ''}.`)
+    lines.push(`${p.name} (${p.ownership_pct}% owned${p.new_build ? ', new build' : ''}): last 12 months rent ${nzd.format(rent)}, mortgage ${nzd.format(t.mortgage + t.interest)}, other costs ${nzd.format(t.expenses)}${t.utilitiesPaid ? ` (tenant utilities: paid ${nzd.format(t.utilitiesPaid)}, paid back ${nzd.format(t.utilitiesBack)})` : ''}, net ${nzd.format(rent - out)}${t.mortgage + t.interest > 0 ? `; rent covers ${Math.round(rent / (t.mortgage + t.interest) * 100)}% of the mortgage` : ''}${out > 0 ? ` and ${Math.round(rent / out * 100)}% of all costs` : ''}. ${t.uncategorisedCount} transactions uncategorised. Expected rent ${p.rent_amount ? `${nzd.format(p.rent_amount)} ${p.rent_frequency}` : 'not set'}; last rent ${s.last ?? 'none found'}${s.late ? `, ${s.daysLate} days late` : ''}. Value ${p.value ? nzd.format(p.value) : 'not set'}${p.value_note ? ` (${p.value_note})` : ''}, loan ${p.loan_balance ? nzd.format(p.loan_balance) : 'not set'}${p.interest_rate ? ` at ${p.interest_rate}%` : ''}.`)
   }
   return lines.join('\n')
 }

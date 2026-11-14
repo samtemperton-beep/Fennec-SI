@@ -180,7 +180,7 @@ export default function RentalPage() {
     for (const t of rows) {
       const c = t.category_id ? catMap.get(t.category_id) : undefined
       const { role, line } = roleOf(c)
-      const group = !c ? 'Uncategorised' : role === 'rent' || role === 'other_income' ? 'Rental income' : role === 'mortgage' ? 'Not deductible (principal and interest; use the interest figure)' : role === 'capital' ? 'Not deductible (capital)' : role === 'transfer' ? 'Ignored (transfer)' : line ?? 'Other expenses'
+      const group = !c ? 'Uncategorised' : role === 'rent' || role === 'other_income' ? 'Rental income' : role === 'mortgage' ? 'Not deductible (principal and interest; use the interest figure)' : role === 'capital' ? 'Not deductible (capital)' : role === 'transfer' ? (c.name === 'Personal (not rental)' ? 'Ignored (personal, not rental)' : 'Ignored (transfer)') : role === 'passthrough' ? 'Tenant utilities (paid and paid back; only the difference is in Other expenses or income)' : line ?? 'Other expenses'
       lines.push([t.date, q(t.description ?? ''), t.amount.toFixed(2), q(c?.name ?? ''), q(group)].join(','))
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
@@ -343,6 +343,7 @@ export default function RentalPage() {
                   {allOut > 0
                     ? <>Over the last {monthsOfData < 12 ? `${monthsOfData} month${monthsOfData === 1 ? '' : 's'}` : '12 months'}, rent covered <strong style={{ color: 'var(--text)' }}>{mortgageOut > 0 ? pct(rentIn / mortgageOut * 100) : '–'}</strong> of the mortgage and <strong style={{ color: 'var(--text)' }}>{pct(rentIn / allOut * 100)}</strong> of all costs.{net < 0 ? ` The gap came from you, about ${nzd.format(-perMonth)} a month.` : ` About ${nzd.format(perMonth)} a month was left over.`}</>
                     : 'Categorise the transactions below to see how the rent compares with the mortgage and costs.'}
+                  {last12.utilitiesPaid > 0 && <> Tenant utilities: you paid {nzd.format(last12.utilitiesPaid)} and got back {nzd.format(last12.utilitiesBack)}{last12.utilitiesPaid - last12.utilitiesBack > 1 ? `, so ${nzd.format(last12.utilitiesPaid - last12.utilitiesBack)} is still to come back or counted as a cost` : ''}.</>}
                   {last12.uncategorisedCount > 0 && <> <strong style={{ color: 'var(--text)' }}>{last12.uncategorisedCount} transaction{last12.uncategorisedCount === 1 ? '' : 's'}</strong> still need{last12.uncategorisedCount === 1 ? 's' : ''} a category, so these figures aren&apos;t complete.</>}
                 </p>
                 <CoverageChart data={chart} />

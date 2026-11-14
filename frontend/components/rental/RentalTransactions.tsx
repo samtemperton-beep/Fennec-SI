@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase'
 import { suggestKeyword } from '@/lib/categoryRules'
-import { suggestCategory, nzd, RENTAL_CATEGORIES, type RentalCategory, type RentalProperty, type RentalTx } from '@/lib/rental'
+import { suggestCategory, nzd, RENTAL_CATEGORIES, UTILITIES, type RentalCategory, type RentalProperty, type RentalTx } from '@/lib/rental'
 
 // A property's transactions, with suggested rental categories and rules.
 
@@ -50,7 +50,9 @@ export function RentalTransactions({ property, txs, cats, accountIds, onChanged 
 
   async function pick(t: RentalTx, categoryId: string) {
     if (!(await setCategory([t.id], categoryId || null)) || !categoryId) return
-    const kw = suggestKeyword(t.description ?? '')
+    // A known power or internet company's name, without account numbers.
+    const desc = (t.description ?? '').toLowerCase()
+    const kw = UTILITIES.find(u => desc.includes(u)) ?? suggestKeyword(t.description ?? '')
     if (kw.length >= 3) setRule({ txId: t.id, keyword: kw, categoryId, name: catName.get(categoryId) ?? '' })
   }
 
