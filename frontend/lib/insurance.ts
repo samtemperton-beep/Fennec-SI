@@ -13,7 +13,14 @@ export interface PolicyDetails {
   nh_cover?: number | null; business_use?: boolean | null
   other_excesses?: { name: string; amount: number }[]; optional_added?: string[]; optional_available?: string[]
   interested_parties?: string[]; cooling_off_days?: number | null
+  /** A rebuild estimate the person got (Cordell Sum Sure, a valuer), to check the sum insured against. */
+  rebuild_estimate?: RebuildEstimate | null
 }
+
+export interface RebuildEstimate { today: number; in12: number | null; source: string; date: string }
+
+/** Cordell Sum Sure, free and run by Cotality; the same engine most NZ insurers use. */
+export const CORDELL_URL = 'https://sumsure.cotality.com/#/products/8/profiles/219'
 
 export interface Policy {
   id: string
@@ -105,13 +112,33 @@ export function checkPolicy(p: Policy, ctx: { paidLast12?: number | null; rental
     out.push({ level: 'info', title: 'Do you live at this property?', detail: 'Answer it in Edit so Fennec can check the policy matches.' })
   }
 
-  // 2. Sum insured against floor area (a rough guide only).
+  // 2. Sum insured against a rebuild estimate the person got, or else floor area (a rough guide).
+  const est = d.rebuild_estimate
+  const building = p.kind === 'home' || p.kind === 'landlord'
+  if (building && p.sum_insured && est?.today) {
+    const target = est.in12 ?? est.today
+    const from = `${est.source} (${fmtDate(est.date)})`
+    const old = daysUntil(est.date, ctx.now) < -365 * 3
+    if (p.sum_insured < est.today) {
+      out.push({ level: 'problem', title: `Below your rebuild estimate by ${money(est.today - p.sum_insured)}`,
+        detail: `${from} puts the rebuild at ${money(est.today)} today${est.in12 ? ` and ${money(est.in12)} in a year` : ''}, but the sum insured is ${money(p.sum_insured)}. After a total loss you'd pay the gap, and some insurers only give their full replacement benefit when the sum insured is at least their estimate. Ask to raise it.` })
+    } else if (p.sum_insured < target) {
+      out.push({ level: 'warn', title: 'Close to your rebuild estimate',
+        detail: `It covers today's estimate (${money(est.today)}) but not the ${money(target)} ${est.source} expects in 12 months, when building costs are higher. Consider matching that.` })
+    } else if (p.sum_insured > target * 1.1) {
+      out.push({ level: 'saving', title: `About ${money(p.sum_insured - target)} above your rebuild estimate`,
+        detail: `${from}: ${money(est.today)} today${est.in12 ? `, ${money(est.in12)} in 12 months` : ''}. The sum insured is ${money(p.sum_insured)}, and the premium is priced on it. Ask ${p.insurer} for their own estimate and to set the sum insured at it (or at the 12-month figure, to allow for rising costs).` })
+    } else {
+      out.push({ level: 'ok', title: 'Sum insured matches your rebuild estimate', detail: `${from}: ${money(est.today)} today${est.in12 ? `, ${money(est.in12)} in 12 months` : ''}.` })
+    }
+    if (old) out.push({ level: 'info', title: 'Your rebuild estimate is over 3 years old', detail: 'Building costs change; run it again.' })
+  }
   const area = d.floor_area ?? null
-  if ((p.kind === 'home' || p.kind === 'landlord') && p.sum_insured && area) {
+  if (building && p.sum_insured && area && !est?.today) {
     const perM2 = p.sum_insured / area
     const withOut = d.outbuildings_area ? p.sum_insured / (area + d.outbuildings_area) : null
     const range = `${nzd.format(perM2)} per m² of the ${area} m² home${withOut ? ` (${nzd.format(withOut)} including the ${d.outbuildings_area} m² of outbuildings)` : ''}`
-    if (perM2 > 6000) out.push({ level: 'saving', title: 'The sum insured looks high', detail: `${money(p.sum_insured)} is ${range}. The premium is priced on it, so re-run the insurer's rebuild calculator (or get a valuer's estimate) with the right floor areas. Keep it at or above that estimate so replacement cover still applies.` })
+    if (perM2 > 6000) out.push({ level: 'saving', title: 'The sum insured looks high', detail: `${money(p.sum_insured)} is ${range}. The premium is priced on it. Get a proper rebuild estimate (the Rebuild estimate box below links to the free Cordell Sum Sure calculator) and keep the sum insured at or above it, so replacement cover still applies.` })
     else if (perM2 < 2800) out.push({ level: 'warn', title: 'The sum insured may be low', detail: `${money(p.sum_insured)} is ${range}. If it costs more than that to rebuild, you'd pay the gap. Check it with the insurer's rebuild calculator.` })
     else out.push({ level: 'ok', title: 'Sum insured looks in a normal range', detail: `${range}. Still worth checking with the insurer's rebuild calculator now and then.` })
   }
@@ -183,6 +210,7 @@ export function policyText(p: Policy, findings: Finding[], rentalName?: string |
     `Premium ${money(p.premium_total)} a year (insurer's premium ${money(p.base_premium)}, levies ${money(p.levies)}, GST ${money(p.gst)}), paid ${p.pay_frequency ?? '?'}${p.instalment ? ` at ${money(p.instalment)}` : ''}. Period ${fmtDate(p.start_date)} to ${fmtDate(p.renewal_date)}.`,
     d.occupancy ? `The policy says: "${d.occupancy}". Does the person actually live there: ${p.lives_there === null ? 'not answered' : p.lives_there ? 'yes' : 'no'}.` : '',
     d.floor_area ? `Property: ${d.property_type ?? ''}, built ${d.year_built ?? '?'}, ${d.floor_area} m² plus ${d.outbuildings_area ?? 0} m² outbuildings, ${d.walls ?? '?'} walls, ${d.roof ?? '?'} roof, ${d.storeys ?? '?'} storey(s); insures ${d.dwellings_insured ?? '?'} of ${d.dwellings_in_building ?? '?'} dwellings.` : '',
+    d.rebuild_estimate?.today ? `Rebuild estimate (${d.rebuild_estimate.source}, ${fmtDate(d.rebuild_estimate.date)}): ${money(d.rebuild_estimate.today)} today${d.rebuild_estimate.in12 ? `, ${money(d.rebuild_estimate.in12)} in 12 months` : ''}.` : '',
     d.optional_added?.length ? `Optional benefits included: ${d.optional_added.join(', ')}.` : '',
     d.interested_parties?.length ? `Interested parties: ${d.interested_parties.join(', ')}.` : '',
     'Fennec\'s check:',

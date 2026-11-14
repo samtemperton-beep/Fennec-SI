@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { askFennec } from '@/lib/askFennec'
 import { PolicyForm, EMPTY_POLICY } from '@/components/insurance/PolicyForm'
+import { RebuildEstimate } from '@/components/insurance/RebuildEstimate'
 import { checkPolicy, policyText, money, fmtDate, daysUntil, KIND_LABEL, type Policy, type PolicyDraft, type Finding } from '@/lib/insurance'
 
 const supabase = createClient()
@@ -193,6 +194,10 @@ export default function InsurancePage() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {p.holder !== 'partner' && (p.kind === 'home' || p.kind === 'landlord') && (
+              <RebuildEstimate policy={p} onSaved={e => setPolicies(ps => ps.map(x => x.id === p.id ? { ...x, details: { ...x.details, rebuild_estimate: e } } : x))} />
             )}
 
             {p.holder !== 'partner' && (
