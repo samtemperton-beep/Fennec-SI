@@ -12,10 +12,11 @@ import { SubTabs, PROPERTY_TABS } from '@/components/shared/SubTabs'
 import { PropertyForm, EMPTY_PROPERTY, type PropertyDraft, type HomeLoanFill } from '@/components/rental/PropertyForm'
 import { CoverageChart } from '@/components/rental/CoverageChart'
 import { RentalTransactions } from '@/components/rental/RentalTransactions'
+import { AgentStatements } from '@/components/rental/AgentStatements'
 import {
   ensureRentalCategories, totals, months, rentStatus, interestFor, interestDeductiblePct, monthlyRent,
   taxYearOf, taxYearRange, taxYearLabel, todayNZ, nzd, roleOf, TAX_LINES,
-  loanInterest, type RentalProperty, type RentalAccount, type RentalTx, type RentalCategory, type LoanTx,
+  loanInterest, withAgentStatements, type RentalProperty, type RentalAccount, type RentalTx, type RentalCategory, type LoanTx, type AgentStatement,
 } from '@/lib/rental'
 
 const supabase = createClient()
@@ -51,6 +52,7 @@ export default function RentalPage() {
   const [interestDraft, setInterestDraft] = useState('')
   const [homeLoan, setHomeLoan] = useState<HomeLoanFill | null>(null)
   const [loanTxs, setLoanTxs] = useState<Record<string, LoanTx[]>>({})
+  const [statements, setStatements] = useState<AgentStatement[]>([])
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -69,6 +71,12 @@ export default function RentalPage() {
     setSelected(s => (s && list.some(x => x.id === s) ? s : list[0]?.id ?? null))
     if (!list.length) setMode('add')
     if (list.length) setCats(await ensureRentalCategories(supabase, user.id))
+    // Property manager statements (agent_statements_migration.sql); none until it's run.
+    if (list.length) {
+      const { data: st } = await supabase.from('rental_agent_statements').select('*').order('period_end', { ascending: false })
+      setStatements(((st ?? []) as any[]).map(s => ({ ...s, items: Array.isArray(s.items) ? s.items : [],
+        ...Object.fromEntries(['rent', 'fees', 'expenses', 'utilities', 'other_income', 'paid_to_owner'].map(k => [k, Number(s[k]) || 0])) })))
+    } else setStatements([])
     const linked = (a ?? []).filter((x: any) => x.rental_property_id).map((x: any) => x.id)
     if (linked.length) {
       const since = taxYearRange(taxYearOf(todayNZ()) - 3).from
@@ -98,6 +106,10 @@ export default function RentalPage() {
     const ids = new Set(propAccounts.map(a => a.id))
     return txs.filter(t => ids.has(t.account_id))
   }, [txs, propAccounts])
+  // The bank transactions with agent statements worked in, for every figure.
+  const merged = useMemo(() => property ? withAgentStatements(property, propTxs, statements, cats) : { txs: propTxs, replaced: new Set<string>(), missing: [], estimated: [] },
+    [property, propTxs, statements, cats])
+  const figTxs = merged.txs
 
   // ── Saving ───────────────────────────────────────────────────────────────
 
@@ -175,14 +187,15 @@ export default function RentalPage() {
   function exportCsv(yearEnd: number) {
     if (!property) return
     const { from, to } = taxYearRange(yearEnd)
-    const rows = propTxs.filter(t => t.date >= from && t.date <= to).sort((a, b) => a.date.localeCompare(b.date))
+    const replacedRows = propTxs.filter(t => merged.replaced.has(t.id))
+    const rows = [...figTxs, ...replacedRows].filter(t => t.date >= from && t.date <= to).sort((a, b) => a.date.localeCompare(b.date))
     const q = (s: string) => `"${s.replace(/"/g, '""')}"`
     const lines = [['Date', 'Description', 'Amount', 'Category', 'IR3R group'].join(',')]
     for (const t of rows) {
       const c = t.category_id ? catMap.get(t.category_id) : undefined
       const { role, line } = roleOf(c)
-      const group = !c ? 'Uncategorised' : role === 'rent' || role === 'other_income' ? 'Rental income' : role === 'mortgage' ? 'Not deductible (principal and interest; use the interest figure)' : role === 'capital' ? 'Not deductible (capital)' : role === 'transfer' ? (c.name === 'Personal (not rental)' ? 'Ignored (personal, not rental)' : 'Ignored (transfer)') : role === 'passthrough' ? 'Tenant utilities (paid and paid back; only the difference is in Other expenses or income)' : line ?? 'Other expenses'
-      lines.push([t.date, q(t.description ?? ''), t.amount.toFixed(2), q(c?.name ?? ''), q(group)].join(','))
+      const group = merged.replaced.has(t.id) ? 'Ignored (paid out by the property manager; their statement lines are used, or the fee estimate)' : !c ? 'Uncategorised' : role === 'rent' || role === 'other_income' ? 'Rental income' : role === 'mortgage' ? 'Not deductible (principal and interest; use the interest figure)' : role === 'capital' ? 'Not deductible (capital)' : role === 'transfer' ? (c.name === 'Personal (not rental)' ? 'Ignored (personal, not rental)' : 'Ignored (transfer)') : role === 'passthrough' ? 'Tenant utilities (paid and paid back; only the difference is in Other expenses or income)' : line ?? 'Other expenses'
+      lines.push([t.date, q((t.description ?? '') + (t.synthetic === 'estimate' ? ' [estimate]' : '')), t.amount.toFixed(2), q(c?.name ?? ''), q(group)].join(','))
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -195,10 +208,10 @@ export default function RentalPage() {
 
   const today = todayNZ()
   const yearAgo = `${Number(today.slice(0, 4)) - 1}${today.slice(4)}`
-  const last12 = useMemo(() => totals(propTxs.filter(t => t.date >= yearAgo), catMap), [propTxs, catMap, yearAgo])
-  const chart = useMemo(() => months(propTxs, catMap, 12, today), [propTxs, catMap, today])
-  const status = property ? rentStatus(property, propTxs, catMap, today) : null
-  const monthsOfData = propTxs.length ? Math.min(12, Math.max(1, Math.round((Date.parse(today) - Date.parse(propTxs[propTxs.length - 1].date)) / (30.4 * 86_400_000)))) : 0
+  const last12 = useMemo(() => totals(figTxs.filter(t => t.date >= yearAgo), catMap), [figTxs, catMap, yearAgo])
+  const chart = useMemo(() => months(figTxs, catMap, 12, today), [figTxs, catMap, today])
+  const status = property ? rentStatus(property, figTxs, catMap, today) : null
+  const monthsOfData = figTxs.length ? Math.min(12, Math.max(1, Math.round((Date.parse(today) - Date.parse(figTxs[figTxs.length - 1].date)) / (30.4 * 86_400_000)))) : 0
 
   const rentIn = last12.rent + last12.otherIncome
   const mortgageOut = last12.mortgage + last12.interest
@@ -218,7 +231,7 @@ export default function RentalPage() {
     : property
   const years = (() => {
     const cur = taxYearOf(today)
-    const oldest = propTxs.length ? taxYearOf(propTxs[propTxs.length - 1].date) : cur - 1
+    const oldest = figTxs.length ? taxYearOf(figTxs[figTxs.length - 1].date) : cur - 1
     const out: number[] = []
     for (let y = cur; y >= Math.max(oldest, cur - 3); y--) out.push(y)
     return out
@@ -351,11 +364,14 @@ export default function RentalPage() {
                 <CoverageChart data={chart} />
               </div>
 
+              {/* Property manager */}
+              <AgentStatements property={property} statements={statements} missing={merged.missing} estimated={merged.estimated} onChanged={load} />
+
               {/* Yield and equity */}
               <YieldCard property={effective!} liveLoan={!!loanAccount} rentIn={rentIn} costs={last12.expenses} monthsOfData={monthsOfData} today={today} onEdit={() => setMode('edit')} />
 
               {/* Tax year */}
-              <TaxCard property={effective!} loanTxs={property.loan_account_id ? loanTxs[property.loan_account_id] ?? [] : []} txs={propTxs} catMap={catMap} years={years} year={taxYear} setYear={setTaxYear}
+              <TaxCard property={effective!} loanTxs={property.loan_account_id ? loanTxs[property.loan_account_id] ?? [] : []} txs={figTxs} catMap={catMap} years={years} year={taxYear} setYear={setTaxYear}
                 interestDraft={interestDraft} setInterestDraft={setInterestDraft} saveInterest={saveInterest} exportCsv={exportCsv} />
 
               {/* Transactions */}

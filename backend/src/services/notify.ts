@@ -271,14 +271,20 @@ export async function rentLate(userId: string) {
   for (const p of props as any[]) {
     const ids = (accts ?? []).filter((a: any) => a.rental_property_id === p.id).map((a: any) => a.id);
     if (!ids.length) continue;
-    const { data: last } = await supabase.from('fin_transactions').select('date')
-      .in('account_id', ids).in('category_id', rentCats).gt('amount', 0)
-      .order('date', { ascending: false }).limit(1).maybeSingle();
+    const { data: recent } = await supabase.from('fin_transactions').select('date')
+      .in('account_id', ids).in('category_id', rentCats).gt('amount', 0).gte('date', addDays(today, -120))
+      .order('date', { ascending: false }).limit(60);
+    const dates = [...new Set(((recent ?? []) as any[]).map(r => r.date as string))].sort();
+    const last = dates[dates.length - 1];
     if (!last) continue;
-    const due = addDays((last as any).date, RENT_DAYS[p.rent_frequency] ?? 7);
+    // A property manager often pays out fortnightly or monthly whatever the rent
+    // period, so allow for the usual gap between payments (as lib/rental.ts does).
+    const gaps = dates.slice(1).map((d, i) => daysBetween(dates[i], d)).sort((a, b) => a - b);
+    const usual = dates.length >= 3 ? Math.min(35, gaps[Math.floor(gaps.length / 2)]) : 0;
+    const due = addDays(last, Math.max(RENT_DAYS[p.rent_frequency] ?? 7, usual));
     const late = daysBetween(due, today);
     // Long gaps mean the tenancy probably ended; don't keep nagging.
-    if (late > 4 && late < 45) out.push({ id: p.id, name: p.name, last: (last as any).date, due });
+    if (late > 4 && late < 45) out.push({ id: p.id, name: p.name, last, due });
   }
   return out;
 }

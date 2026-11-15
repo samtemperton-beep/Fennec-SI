@@ -1,7 +1,7 @@
 'use client'
 import { localDate } from '@/lib/utils'
 import { loadSavingsData, savingsSummaryText } from '@/lib/savingsData'
-import { rentalSummaryText, type RentalProperty, type RentalTx, type RentalCategory } from '@/lib/rental'
+import { rentalSummaryText, withAgentStatements, agentFeesByYear, taxYearLabel, type RentalProperty, type RentalTx, type RentalCategory, type AgentStatement } from '@/lib/rental'
 import { loadAboutYou, aboutYouText } from '@/lib/aboutYou'
 import { ASK_FENNEC_EVENT } from '@/lib/askFennec'
 import { useState, useRef, useEffect, useCallback } from 'react'
@@ -389,7 +389,18 @@ async function loadRentalContext(): Promise<Partial<FennecContext>> {
     ...p, interest_by_year: p.interest_by_year ?? {},
     loan_balance: p.loan_account_id && loanBal.has(p.loan_account_id) ? loanBal.get(p.loan_account_id) : p.loan_balance,
   })) as RentalProperty[]
-  return { rentalSummary: rentalSummaryText(list, byProp, catMap) }
+  // Property manager statements: full rent and fees in place of the net payouts.
+  const { data: st } = await supabase.from('rental_agent_statements').select('*')
+  const statements = ((st ?? []) as any[]).map(s => ({ ...s, items: Array.isArray(s.items) ? s.items : [] })) as AgentStatement[]
+  const catList = (cats ?? []) as RentalCategory[]
+  for (const p of list) byProp.set(p.id, withAgentStatements(p, byProp.get(p.id) ?? [], statements, catList).txs)
+  const fees = list.map(p => {
+    const years = agentFeesByYear(statements.filter(s => s.property_id === p.id))
+    const rate = p.agent_fee_pct ? `${p.agent_fee_pct}%${p.agent_fee_plus_gst === false ? '' : ' + GST'}` : null
+    if (!years.length && !rate) return ''
+    return `\n${p.name} property manager: fee ${rate ?? 'not set'}; ${statements.filter(s => s.property_id === p.id).length} monthly statements uploaded${years.length ? '; fees incl. GST by tax year: ' + years.map(y => `${taxYearLabel(y.year)} ${y.total.toFixed(2)} (${Object.entries(y.byType).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(', ')})`).join('; ') : ''}.`
+  }).join('')
+  return { rentalSummary: rentalSummaryText(list, byProp, catMap) + fees }
 }
 
 async function loadBusinessContext(): Promise<Partial<FennecContext>> {

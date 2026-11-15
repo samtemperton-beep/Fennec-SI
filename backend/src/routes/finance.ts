@@ -13,6 +13,7 @@ import { lookupProperty, LinzError } from '../services/linz';
 import { readRatesNotice, RatesNoticeError } from '../services/ratesNotice';
 import { readKiwiSaverStatement, KiwiSaverStatementError } from '../services/kiwisaverStatement';
 import { readPolicy, PolicyReadError } from '../services/policyReader';
+import { readAgentStatement, StatementReadError } from '../services/agentStatementReader';
 import { loadPrivateFields } from '../services/privateFields';
 import { loadSavedProperty, saveProperty } from '../services/propertyStore';
 
@@ -201,6 +202,22 @@ router.post('/policy-read', requireAuth, async (req: any, res) => {
   } catch (e: any) {
     if (e instanceof PolicyReadError) return res.status(422).json({ error: e.message });
     console.error('[policy read] failed:', e?.message ?? e);
+    res.status(502).json({ error: "Couldn't read that just now. Please try again." });
+  }
+});
+
+// ── POST /api/finance/agent-statement-read ───────────────────────────────────
+// Reads a property manager's monthly statement for Finance → Rental. Returns
+// the figures for the person to check; the file and names aren't kept.
+router.post('/agent-statement-read', requireAuth, async (req: any, res) => {
+  const file = req.body?.file;
+  if (!file?.data || !file?.type) return res.status(400).json({ error: 'Choose a file first.' });
+  if (!await checkAndIncrementUsage(req, res)) return;
+  try {
+    res.json(await readAgentStatement({ type: String(file.type), data: String(file.data) }));
+  } catch (e: any) {
+    if (e instanceof StatementReadError) return res.status(422).json({ error: e.message });
+    console.error('[agent statement read] failed:', e?.message ?? e);
     res.status(502).json({ error: "Couldn't read that just now. Please try again." });
   }
 });
