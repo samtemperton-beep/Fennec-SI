@@ -14,7 +14,7 @@ import {
   IconBell, IconPlus, IconTrash, IconRefresh, IconCheck,
   IconArrowDown, IconArrowUp, IconEye, IconMail,
   IconReceipt, IconChartPie, IconTarget, IconFileInvoice, IconPlugConnectedX, IconMessageCircle, IconCalendarEvent,
-  IconWallet, IconBuildingStore, IconUsers, IconChartLine, IconMedal, IconHandStop, IconHeartHandshake, IconBuildingCommunity, IconShieldCheck,
+  IconWallet, IconBuildingStore, IconUsers, IconChartLine, IconMedal, IconHandStop, IconHeartHandshake, IconBuildingCommunity, IconShieldCheck, IconBellOff,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 
@@ -42,6 +42,7 @@ interface Prefs {
   buddy_alerts: boolean
   rental_alerts: boolean
   insurance_alerts: boolean
+  muted_tickers: string[]
   email_mode: EmailMode
   weekly_summary: boolean
 }
@@ -73,6 +74,9 @@ const NOTIF: Record<string, { icon: typeof IconBell; color: string; group: Group
   rent_late:         { icon: IconBuildingCommunity, color: '#f59e0b', group: 'money' },
   policy_renewal:    { icon: IconShieldCheck,     color: '#5b7cf0', group: 'money' },
 }
+// Stock alerts that can be muted per share (price alerts are set by hand, so they stay).
+const MUTABLE = new Set(['stop_loss', 'take_profit', 'watchlist_signal', 'earnings_reminder'])
+const tickerKey = (t: string | null | undefined) => String(t ?? '').trim().toUpperCase().replace(/\.(NZ|AX)$/, '')
 const metaOf = (type: string) => NOTIF[type] ?? { icon: IconBell, color: '#5b7cf0', group: 'investing' as Group }
 const GROUPS: { id: Group | 'all'; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'money', label: 'Money' }, { id: 'business', label: 'Business' },
@@ -164,8 +168,10 @@ export default function NotificationsPage() {
     portfolio_sell_alerts: true, watchlist_buy_alerts: true, watchlist_sell_alerts: true, price_alerts: true, earnings_alerts: true,
     bill_alerts: true, budget_alerts: true, goal_alerts: true, invoice_alerts: true, sync_alerts: true, community_alerts: true,
     reward_alerts: true, pledge_alerts: true, buddy_alerts: true, rental_alerts: true, insurance_alerts: true,
-    email_mode: 'off', weekly_summary: false,
+    muted_tickers: [], email_mode: 'off', weekly_summary: false,
   })
+  // Shares held or watched, for Quiet shares.
+  const [myShares, setMyShares] = useState<{ code: string; held: boolean }[]>([])
   const [thresholds, setThresholds] = useState({ stop_loss_pct: '10', take_profit_pct: '20' })
 
   const supabase = createClient()
@@ -180,6 +186,7 @@ export default function NotificationsPage() {
       loadNotifs()
       loadAlerts(data.user.id)
       loadPrefs()
+      loadShares(data.user.id)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -200,11 +207,35 @@ export default function NotificationsPage() {
     setLoadingAlerts(false)
   }
 
+  async function loadShares(uid: string) {
+    const [{ data: h }, { data: w }] = await Promise.all([
+      supabase.from('holdings').select('ticker').eq('user_id', uid),
+      supabase.from('watchlist').select('ticker').eq('user_id', uid),
+    ])
+    const held = new Set((h ?? []).map((r: any) => tickerKey(r.ticker)))
+    const all = new Set([...held, ...(w ?? []).map((r: any) => tickerKey(r.ticker))])
+    setMyShares([...all].filter(Boolean).sort().map(code => ({ code, held: held.has(code) })))
+  }
+
+  const isMuted = (t: string | null | undefined) => prefs.muted_tickers.includes(tickerKey(t))
+  async function setMuted(ticker: string, muted: boolean) {
+    const code = tickerKey(ticker)
+    try {
+      const r = await api.setShareMuted(code, muted)
+      setPrefs(p => ({ ...p, muted_tickers: r.muted_tickers ?? p.muted_tickers }))
+      if (muted) {
+        setNotifs(prev => prev.map(n => MUTABLE.has(n.type) && tickerKey(n.ticker) === code ? { ...n, read: true } : n))
+        window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED))
+      }
+      toast.success(muted ? `No more stock alerts for ${code}. Undo in Preferences.` : `Stock alerts back on for ${code}`)
+    } catch (e: any) { toast.error(e.message) }
+  }
+
   async function loadPrefs() {
     try {
       const data = await api.getNotificationPrefs()
       if (data && !data.error) {
-        setPrefs(prev => ({ ...prev, ...data }))
+        setPrefs(prev => ({ ...prev, ...data, muted_tickers: Array.isArray(data.muted_tickers) ? data.muted_tickers : [] }))
         setThresholds({ stop_loss_pct: String(data.stop_loss_pct ?? 10), take_profit_pct: String(data.take_profit_pct ?? 20) })
       }
     } catch {}
@@ -381,8 +412,10 @@ export default function NotificationsPage() {
               {shown.map(n => {
                 const meta = metaOf(n.type)
                 const Icon = meta.icon
+                const canMute = MUTABLE.has(n.type) && !!n.ticker && !isMuted(n.ticker)
                 return (
-                  <button key={n.id} onClick={() => open(n)} className="card" style={{
+                  <div key={n.id} style={{ position: 'relative' }}>
+                  <button onClick={() => open(n)} className="card" style={{
                     display: 'flex', gap: 14, padding: '14px 16px', opacity: n.read ? 0.7 : 1, textAlign: 'left', cursor: 'pointer', width: '100%', color: 'inherit', font: 'inherit',
                     borderLeft: n.read ? '3px solid transparent' : `3px solid ${meta.color}`,
                   }}>
@@ -395,9 +428,16 @@ export default function NotificationsPage() {
                         {!n.read && <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>New</span>}
                       </div>
                       <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{n.body}</p>
-                      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 5 }}>{timeAgo(n.created_at)}</p>
+                      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 5, paddingRight: canMute ? 110 : 0 }}>{timeAgo(n.created_at)}</p>
                     </div>
                   </button>
+                  {canMute && (
+                    <button onClick={() => setMuted(n.ticker!, true)} title={`Stop big-move, rating and earnings alerts for ${tickerKey(n.ticker)}`}
+                      style={{ position: 'absolute', right: 12, bottom: 10, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--text3)', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 7, padding: '3px 8px', cursor: 'pointer' }}>
+                      <IconBellOff size={12} /> Mute {tickerKey(n.ticker)}
+                    </button>
+                  )}
+                  </div>
                 )
               })}
             </div>
@@ -535,6 +575,30 @@ export default function NotificationsPage() {
                 style={{ padding: '9px 16px', borderRadius: 8, background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', opacity: Number(thresholds.stop_loss_pct) === prefs.stop_loss_pct && Number(thresholds.take_profit_pct) === prefs.take_profit_pct ? 0.5 : 1 }}>
                 Save
               </button>
+            </div>
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 12 }}>
+              <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13 }}>Quiet shares</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, marginBottom: 10 }}>
+                Tap a share to stop its big-move, AI rating and earnings alerts, for one you're holding long term or already keeping an eye on. Price alerts you set still go off.
+              </div>
+              {myShares.length === 0 && !prefs.muted_tickers.length ? (
+                <p style={{ fontSize: 12, color: 'var(--text3)' }}>Shares in your portfolio and watchlist show here.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {[...myShares, ...prefs.muted_tickers.filter(c => !myShares.some(s => s.code === c)).map(code => ({ code, held: false }))].map(s => {
+                    const quiet = isMuted(s.code)
+                    return (
+                      <button key={s.code} onClick={() => setMuted(s.code, !quiet)} aria-pressed={quiet}
+                        title={quiet ? `${s.code} is quiet. Tap to get its alerts again` : `Tap to stop alerts for ${s.code}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 16, fontSize: 12, fontWeight: 600, fontFamily: 'DM Mono, monospace', cursor: 'pointer',
+                          border: `1px solid ${quiet ? 'var(--border)' : 'var(--primary)'}`, background: quiet ? 'var(--surface2)' : 'var(--primary-light)', color: quiet ? 'var(--text3)' : 'var(--primary)', textDecoration: quiet ? 'line-through' : 'none' }}>
+                        {quiet ? <IconBellOff size={12} /> : <IconBell size={12} />} {s.code}
+                        {!s.held && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.8 }}>watch</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
             <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8 }}>
               Shares are checked every few hours; prices can be up to 20 minutes delayed. These are reminders you set, not advice to buy or sell.

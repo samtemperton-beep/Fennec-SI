@@ -3,7 +3,7 @@ import { requireAuth } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { fetchPrices, splitSymbol, type Market } from '../services/yahoo';
 import { fetchEarningsCalendar } from '../services/finnhub';
-import { notify, prefsFor, emailNow, checkMoney, DEFAULT_PREFS } from '../services/notify';
+import { notify, prefsFor, emailNow, checkMoney, DEFAULT_PREFS, tickerKey } from '../services/notify';
 import ws from 'ws';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -96,6 +96,33 @@ router.put('/prefs', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Quiet shares: no big-move, watchlist-rating or earnings alerts for these.
+// Saved on its own so the fallback above can't drop the list.
+router.put('/prefs/muted', requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  const code = tickerKey(req.body?.ticker);
+  if (!/^[A-Z0-9.-]{1,12}$/.test(code)) return res.status(400).json({ error: "That share code doesn't look right." });
+  const mute = req.body?.muted !== false;
+  const current = await prefsFor(user.id);
+  const list = new Set(current.muted_tickers.map(tickerKey));
+  if (mute) list.add(code); else list.delete(code);
+  const muted_tickers = [...list].sort();
+  const { error } = await supabase.from('notification_prefs')
+    .upsert({ user_id: user.id, muted_tickers, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  if (error) {
+    const missing = /muted_tickers|column/.test(error.message);
+    return res.status(missing ? 503 : 500).json({ error: missing ? 'Quiet shares need muted_tickers_migration.sql run in Supabase first.' : error.message });
+  }
+  // Muting also clears that share's unread stock alerts.
+  if (mute) {
+    const { data: unread } = await supabase.from('notifications').select('id, ticker').eq('user_id', user.id).eq('read', false)
+      .in('type', ['stop_loss', 'take_profit', 'watchlist_signal', 'earnings_reminder']);
+    const ids = (unread ?? []).filter((n: any) => tickerKey(n.ticker) === code).map((n: any) => n.id);
+    if (ids.length) await supabase.from('notifications').update({ read: true }).in('id', ids);
+  }
+  res.json({ ok: true, muted_tickers });
+});
+
 // ── Alert check ───────────────────────────────────────────────────────────────
 
 // "FPH.NZ" -> "FPH (NZX)"; prices with their currency, since an alert on an NZX
@@ -147,6 +174,9 @@ export async function checkAlertsForUser(user: { id: string; email?: string | nu
     }
   }
   if (opts.priceOnly) return triggered;
+  // Shares the person has made quiet (held long term, or they know how it's doing).
+  const muted = new Set((p.muted_tickers ?? []).map(tickerKey));
+  const loud = (t: string) => !muted.has(tickerKey(t));
 
   // 2. Holdings past your stop-loss or take-profit percentage, once per holding
   //    and threshold (again if the buy price or threshold changes).
@@ -161,6 +191,7 @@ export async function checkAlertsForUser(user: { id: string; email?: string | nu
       };
       const prices = await fetchPrices([...new Set(holdings.map(symbolOf))]);
       for (const h of holdings) {
+        if (!loud(h.ticker)) continue;
         const sym = symbolOf(h);
         const priceData = prices[sym];
         const current = typeof priceData === 'object' ? priceData.price : priceData;
@@ -187,7 +218,7 @@ export async function checkAlertsForUser(user: { id: string; email?: string | nu
   // 3. Watchlist AI ratings, once per rating (again if it changes).
   if (p.watchlist_buy_alerts || p.watchlist_sell_alerts) {
     const { data: watchlist } = await supabase.from('watchlist').select('*').eq('user_id', user.id).in('signal', ['BUY', 'SELL']);
-    const wanted = (watchlist ?? []).filter(w => (w.signal === 'BUY' ? p.watchlist_buy_alerts : p.watchlist_sell_alerts));
+    const wanted = (watchlist ?? []).filter(w => loud(w.ticker) && (w.signal === 'BUY' ? p.watchlist_buy_alerts : p.watchlist_sell_alerts));
     const keyOf = (w: any) => `watch:${w.id}:${w.signal}`;
     const { data: seen } = wanted.length
       ? await supabase.from('notifications').select('dedupe_key').eq('user_id', user.id).in('dedupe_key', wanted.map(keyOf))
@@ -218,7 +249,7 @@ export async function checkAlertsForUser(user: { id: string; email?: string | nu
   if (p.earnings_alerts !== false) {
     const { data: holdings } = await supabase.from('holdings').select('ticker').eq('user_id', user.id);
     const { data: watchlist } = await supabase.from('watchlist').select('ticker').eq('user_id', user.id);
-    const allTickers = [...new Set([...(holdings || []), ...(watchlist || [])].map((x: any) => x.ticker))];
+    const allTickers = [...new Set([...(holdings || []), ...(watchlist || [])].map((x: any) => x.ticker))].filter(loud);
     if (allTickers.length) {
       try {
         const upcoming = await fetchEarningsCalendar(allTickers, 2, 0);

@@ -33,6 +33,7 @@ export interface NotifyPrefs {
   reward_alerts: boolean; pledge_alerts: boolean; buddy_alerts: boolean
   rental_alerts: boolean
   insurance_alerts: boolean
+  muted_tickers: string[]
   email_mode: EmailMode; weekly_summary: boolean
   digest_sent_on?: string | null; weekly_sent_on?: string | null
 }
@@ -46,13 +47,18 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   reward_alerts: true, pledge_alerts: true, buddy_alerts: true,
   rental_alerts: true,
   insurance_alerts: true,
+  muted_tickers: [],
   email_mode: 'off', weekly_summary: false,
 };
+
+/** A share code without its market suffix, so FPH, FPH.NZ and fph match. */
+export const tickerKey = (t: string | null | undefined) => String(t ?? '').trim().toUpperCase().replace(/\.(NZ|AX)$/, '');
 
 export async function prefsFor(userId: string): Promise<NotifyPrefs> {
   const { data } = await supabase.from('notification_prefs').select('*').eq('user_id', userId).maybeSingle();
   const p: any = { ...DEFAULT_PREFS };
   for (const [k, v] of Object.entries(data ?? {})) if (v !== null && v !== undefined) p[k] = v;
+  if (!Array.isArray(p.muted_tickers)) p.muted_tickers = [];
   return p;
 }
 

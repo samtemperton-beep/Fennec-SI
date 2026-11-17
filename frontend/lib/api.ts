@@ -266,6 +266,9 @@ export const api = {
 
   saveNotificationPrefs: (prefs: object) =>
     apiFetch('/api/alerts/prefs', { method: 'PUT', body: JSON.stringify(prefs) }),
+  // Quiet shares: no big-move, watchlist-rating or earnings alerts for this code.
+  setShareMuted: (ticker: string, muted: boolean): Promise<{ ok: boolean; muted_tickers: string[] }> =>
+    apiFetch('/api/alerts/prefs/muted', { method: 'PUT', body: JSON.stringify({ ticker, muted }) }),
 
   getPlan: (): Promise<import('./plan').Plan> =>
     apiFetch('/api/premium/plan'),
